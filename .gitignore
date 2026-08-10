@@ -1,0 +1,6 @@
+node_modules/
+dist/
+dist-review/
+dist-platform-review/
+*.local
+.DS_Store

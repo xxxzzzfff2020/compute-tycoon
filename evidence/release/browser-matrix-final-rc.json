@@ -1,0 +1,1985 @@
+{
+  "generatedAt": "2026-08-08T12:31:59.187Z",
+  "baseUrl": "http://127.0.0.1:4174/",
+  "engines": {
+    "chromium": {
+      "status": "FAIL",
+      "cases": [
+        {
+          "scenario": "review_home",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 68,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 45,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 347,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 32,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 68,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "320x568",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "320x568",
+          "status": "FAIL",
+          "elapsedMs": 33,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "review_home",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 34,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 33,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 173,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 59,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 33,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 23,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "360x800",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "360x800",
+          "status": "FAIL",
+          "elapsedMs": 30,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "review_home",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 95,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 82,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 228,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 85,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 85,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 81,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 82,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 104,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 83,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 79,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 133,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 85,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 83,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 81,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "390x844",
+          "status": "PASS",
+          "elapsedMs": 85,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "390x844",
+          "status": "FAIL",
+          "elapsedMs": 120,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "review_home",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 39,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 32,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 173,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 23,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 30,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 70,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 30,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "430x932",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "430x932",
+          "status": "FAIL",
+          "elapsedMs": 30,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "review_home",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 40,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 36,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 157,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 57,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 23,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 29,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "768x1024",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "768x1024",
+          "status": "FAIL",
+          "elapsedMs": 33,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "review_home",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 33,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · 创始人集中评审",
+            "checkpoint": null,
+            "horizontalOverflow": false,
+            "rootCount": 0,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": null,
+            "rootReplacementCount": null,
+            "activeRuntime": 0
+          }
+        },
+        {
+          "scenario": "new_game",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 32,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "manual_order",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 173,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · A 新档开始",
+            "checkpoint": "new_game",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 10,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "automation",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · B 自动经营刚解锁",
+            "checkpoint": "automation_unlocked",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "first_server",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 26,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · C 第一台服务器即将获得",
+            "checkpoint": "first_server_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server3_blueprint",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 24,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · D 3 台服务器与首个架构节点",
+            "checkpoint": "server3_blueprint",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "server8_throughput",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · E 8 台服务器与高吞吐",
+            "checkpoint": "server8_high_throughput",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage3_infrastructure",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · F Stage 3 刚进入",
+            "checkpoint": "stage3_entry",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "room_commission",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · G 机房 2 即将投产",
+            "checkpoint": "room2_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "flagship",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · H 机房 3 与最终旗舰工程",
+            "checkpoint": "room3_final_flagship",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "archive",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 72,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 0,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "iteration",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 27,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · I 第一次技术迭代确认页",
+            "checkpoint": "iteration_ready",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "second_run",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 23,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · J 第二轮与首服加速",
+            "checkpoint": "second_run_acceleration",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage4_lunar",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 28,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · K Stage 4 地月中期",
+            "checkpoint": "endgame_stage4_mid",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "stage5_dyson",
+          "viewport": "1280x800",
+          "status": "PASS",
+          "elapsedMs": 25,
+          "error": null,
+          "audit": {
+            "title": "算力大亨 · L Stage 5 戴森球冲刺",
+            "checkpoint": "endgame_stage5_dyson_almost",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 9,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        },
+        {
+          "scenario": "dyson_terminal",
+          "viewport": "1280x800",
+          "status": "FAIL",
+          "elapsedMs": 36,
+          "error": "layout_or_runtime_contract_failed",
+          "audit": {
+            "title": "算力大亨 · M 永续增长模式",
+            "checkpoint": "endgame_perpetual",
+            "horizontalOverflow": false,
+            "rootCount": 1,
+            "smallTargets": [
+              {
+                "tag": "BUTTON",
+                "text": "关闭",
+                "width": 42,
+                "height": 42
+              }
+            ],
+            "clippedText": [],
+            "dialogOutsideViewport": false,
+            "toolbarOutsideViewport": false,
+            "fullRenderCount": 8,
+            "rootReplacementCount": 0,
+            "activeRuntime": 1
+          }
+        }
+      ],
+      "consoleErrors": [],
+      "pageErrors": [],
+      "resource404s": []
+    }
+  },
+  "totals": {
+    "cases": 96,
+    "passed": 90,
+    "failed": 6,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "unhandledRejections": 0,
+    "resource404s": 0
+  }
+}

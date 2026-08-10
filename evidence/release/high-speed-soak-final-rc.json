@@ -1,0 +1,354 @@
+{
+  "durationMs": 600000,
+  "speed": 256,
+  "normalizedGameSeconds": 153600,
+  "samples": [
+    {
+      "at": 1786192319460,
+      "domNodes": 285,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 9,
+        "partialPatchCount": 8,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 0,
+      "money": 800009265151830.1,
+      "stage5ActiveProject": "dyson_sphere",
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192349466,
+      "domNodes": 285,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 9,
+        "partialPatchCount": 14384,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 496,
+      "money": 853489860607830.1,
+      "stage5ActiveProject": "dyson_sphere",
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192379469,
+      "domNodes": 285,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 9,
+        "partialPatchCount": 28784,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 994,
+      "money": 906942304255830.1,
+      "stage5ActiveProject": "dyson_sphere",
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192409472,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 43151,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 1490,
+      "money": 960395104255830.1,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192439475,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 57551,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 1986,
+      "money": 1013848438783830.1,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192469477,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 71951,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 2483,
+      "money": 1067299635199830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192499479,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 86351,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 2979,
+      "money": 1120752791551830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192529482,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 100759,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 3475,
+      "money": 1174235881471830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192559483,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 115159,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 3973,
+      "money": 1227688503295830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192589485,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 129559,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 4469,
+      "money": 1281140946943830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192619486,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 143959,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 4965,
+      "money": 1334593746943830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192649487,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 158359,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 5462,
+      "money": 1388046903295830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192679489,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 172759,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 5958,
+      "money": 1441499703295830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192709491,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 187159,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 6455,
+      "money": 1494951434239830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192739492,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 201559,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 6951,
+      "money": 1548404234239830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192769494,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 215967,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 7448,
+      "money": 1601886967807830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192799497,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 230367,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 7944,
+      "money": 1655339589631830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192829500,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 244727,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 8440,
+      "money": 1708792567807830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192859502,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 259127,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 8937,
+      "money": 1762245367807830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192889503,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 273527,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 9433,
+      "money": 1815697633279830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    },
+    {
+      "at": 1786192919453,
+      "domNodes": 286,
+      "rootCount": 1,
+      "horizontalOverflow": false,
+      "render": {
+        "fullRenderCount": 10,
+        "partialPatchCount": 287903,
+        "orderCompletionCount": 0,
+        "rootReplacementCount": 0
+      },
+      "revision": 9930,
+      "money": 1869061523455830,
+      "stage5ActiveProject": null,
+      "stage5Completed": []
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resource404s": [],
+  "assertions": {
+    "singleRoot": true,
+    "noHorizontalOverflow": true,
+    "domBounded": true,
+    "noRootReplacement": true,
+    "noRuntimeErrors": true
+  },
+  "status": "PASS"
+}

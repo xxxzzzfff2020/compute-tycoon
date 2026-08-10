@@ -1,0 +1,215 @@
+{
+  "browser_runtime": {
+    "first_model_button": {
+      "label": "after_first_model",
+      "money": "¥0",
+      "workshop": "工作室 Lv.1 · 经验 30/100",
+      "revenue": "累计收入 ¥0",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 93
+    },
+    "order_progress": {
+      "0": "w",
+      "1": "i",
+      "2": "d",
+      "3": "t",
+      "4": "h",
+      "5": ":",
+      "6": " ",
+      "7": "1",
+      "8": "6",
+      "9": ".",
+      "10": "8",
+      "11": "%",
+      "12": ";",
+      "label": "order_progress",
+      "money": "¥0",
+      "workshop": "工作室 Lv.1 · 经验 30/100",
+      "revenue": "累计收入 ¥0",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 98
+    },
+    "full_render_count": null,
+    "root_replacement_count": null,
+    "dom_node_count_start": {
+      "sec": 15,
+      "nodes": 99
+    },
+    "dom_node_count_end": {
+      "sec": 300,
+      "nodes": 104
+    },
+    "workshop_level": "工作室 Lv.1 · 经验 30/100",
+    "workshop_experience": "工作室 Lv.1 · 经验 30/100",
+    "lifetime_revenue": "累计收入 ¥0",
+    "first_server_awarded": "第一台服务器（Stage 1 里程碑）",
+    "money_before_server_award": "¥0",
+    "money_after_server_award": "¥0",
+    "console_error_count": 1,
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ]
+  },
+  "steps": [
+    {
+      "label": "after_first_model",
+      "money": "¥0",
+      "workshop": "工作室 Lv.1 · 经验 30/100",
+      "revenue": "累计收入 ¥0",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 93
+    },
+    {
+      "0": "w",
+      "1": "i",
+      "2": "d",
+      "3": "t",
+      "4": "h",
+      "5": ":",
+      "6": " ",
+      "7": "1",
+      "8": "6",
+      "9": ".",
+      "10": "8",
+      "11": "%",
+      "12": ";",
+      "label": "order_progress",
+      "money": "¥0",
+      "workshop": "工作室 Lv.1 · 经验 30/100",
+      "revenue": "累计收入 ¥0",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 98
+    },
+    {
+      "label": "after_train",
+      "money": "¥0",
+      "workshop": "工作室 Lv.1 · 经验 30/100",
+      "revenue": "累计收入 ¥0",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 98
+    },
+    {
+      "label": "after_automation_unlock",
+      "money": "¥104",
+      "workshop": "工作室 Lv.1 · 经验 36/100",
+      "revenue": "累计收入 ¥108",
+      "modelName": "🤖 代码推理模型 Lv.1",
+      "domNodes": 99
+    },
+    {
+      "label": "after_5min_auto",
+      "domSamples": [
+        {
+          "sec": 15,
+          "nodes": 99
+        },
+        {
+          "sec": 30,
+          "nodes": 99
+        },
+        {
+          "sec": 45,
+          "nodes": 99
+        },
+        {
+          "sec": 60,
+          "nodes": 99
+        },
+        {
+          "sec": 75,
+          "nodes": 99
+        },
+        {
+          "sec": 90,
+          "nodes": 99
+        },
+        {
+          "sec": 105,
+          "nodes": 99
+        },
+        {
+          "sec": 120,
+          "nodes": 99
+        },
+        {
+          "sec": 135,
+          "nodes": 99
+        },
+        {
+          "sec": 150,
+          "nodes": 99
+        },
+        {
+          "sec": 165,
+          "nodes": 99
+        },
+        {
+          "sec": 180,
+          "nodes": 104
+        },
+        {
+          "sec": 195,
+          "nodes": 104
+        },
+        {
+          "sec": 210,
+          "nodes": 104
+        },
+        {
+          "sec": 225,
+          "nodes": 104
+        },
+        {
+          "sec": 240,
+          "nodes": 104
+        },
+        {
+          "sec": 255,
+          "nodes": 104
+        },
+        {
+          "sec": 270,
+          "nodes": 104
+        },
+        {
+          "sec": 285,
+          "nodes": 104
+        },
+        {
+          "sec": 300,
+          "nodes": 104
+        }
+      ],
+      "activeOrdersAfter5m": 1,
+      "moneyAfter5m": "¥0"
+    },
+    {
+      "label": "first_server_milestone",
+      "milestoneMet": false,
+      "moneyBeforeAward": "¥0",
+      "moneyAfterAward": "¥0",
+      "serverProgressTitle": "第一台服务器（Stage 1 里程碑）",
+      "serverLines": [
+        "工作室等级：Lv.1 / Lv.6",
+        "累计营业收入：¥108 / ¥2.4万"
+      ],
+      "serverChips": [
+        "入门服务器（2×）",
+        "进阶服务器（4×）",
+        "专业服务器（8×）",
+        "高性能服务器（12×）",
+        "旗舰服务器（16×）",
+        "机架服务器（20×）",
+        "机柜服务器（24×）",
+        "算力中心级服务器（28×）"
+      ],
+      "workshopAfter": "工作室 Lv.1 · 经验 36/100",
+      "revenueAfter": "累计收入 ¥108"
+    },
+    {
+      "label": "after_refresh",
+      "serverCountAfterRefresh": 0,
+      "serverTitleAfterRefresh": "第一台服务器（Stage 1 里程碑）"
+    }
+  ]
+}

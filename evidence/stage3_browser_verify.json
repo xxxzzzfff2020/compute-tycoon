@@ -1,0 +1,257 @@
+[
+  {
+    "state": "stage3_entry",
+    "out": {
+      "stageLabel": "Stage 3 · 算力中心",
+      "stage3SectionVisible": true,
+      "sections": [
+        {
+          "id": "section-model",
+          "hidden": false
+        },
+        {
+          "id": "section-orders",
+          "hidden": true
+        },
+        {
+          "id": "section-server",
+          "hidden": true
+        },
+        {
+          "id": "section-center",
+          "hidden": true
+        },
+        {
+          "id": "section-stage3",
+          "hidden": false
+        },
+        {
+          "id": "section-archive",
+          "hidden": true
+        },
+        {
+          "id": "section-prestige",
+          "hidden": true
+        }
+      ],
+      "roomCards": [
+        "✅ 集群核心机房集群核心机房",
+        "企业级算力机房电力 Lv3 · 算力卡 Lv3 · 光模块 Lv2 · 存储 Lv2需先完成旗舰工程「大模型集中训练」",
+        "区域算力中心电力 Lv9 · 算力卡 Lv9 · 光模块 Lv8 · 存储 Lv8需先完成旗舰工程「全国推理服务网络」"
+      ],
+      "infraCards": [
+        "⚡ 电力设施 Lv.1/10决定机房可投产上限；电力不足时算力降载运行（不损坏）升级（¥475万）",
+        "🖥️ 算力卡 Lv.1/10直接提高总算力与请求处理速度升级（¥576万）",
+        "🔆 光模块 Lv.1/10提高有效吞吐与算力向收入的转化率升级（¥380万）",
+        "💾 存储阵列 Lv.1/10提高旗舰工程奖励与离线收益上限升级（¥360万）"
+      ],
+      "totalDomNodes": 160,
+      "singleOrderProgress": 0
+    },
+    "consoleErrors": []
+  },
+  {
+    "state": "room2_almost",
+    "out": {
+      "stageLabel": "Stage 3 · 算力中心",
+      "stage3SectionVisible": true,
+      "sections": [
+        {
+          "id": "section-model",
+          "hidden": false
+        },
+        {
+          "id": "section-orders",
+          "hidden": true
+        },
+        {
+          "id": "section-server",
+          "hidden": true
+        },
+        {
+          "id": "section-center",
+          "hidden": true
+        },
+        {
+          "id": "section-stage3",
+          "hidden": false
+        },
+        {
+          "id": "section-archive",
+          "hidden": true
+        },
+        {
+          "id": "section-prestige",
+          "hidden": true
+        }
+      ],
+      "roomCards": [
+        "✅ 集群核心机房集群核心机房",
+        "企业级算力机房电力 Lv3 · 算力卡 Lv3 · 光模块 Lv2 · 存储 Lv2需先完成旗舰工程「大模型集中训练」",
+        "区域算力中心电力 Lv9 · 算力卡 Lv9 · 光模块 Lv8 · 存储 Lv8需先完成旗舰工程「全国推理服务网络」"
+      ],
+      "infraCards": [
+        "⚡ 电力设施 Lv.4/10决定机房可投产上限；电力不足时算力降载运行（不损坏）升级（¥3258万）",
+        "🖥️ 算力卡 Lv.5/10直接提高总算力与请求处理速度升级（¥6047万）",
+        "🔆 光模块 Lv.3/10提高有效吞吐与算力向收入的转化率升级（¥1372万）",
+        "💾 存储阵列 Lv.3/10提高旗舰工程奖励与离线收益上限升级（¥1440万）"
+      ],
+      "totalDomNodes": 160,
+      "singleOrderProgress": 0
+    },
+    "consoleErrors": []
+  },
+  {
+    "state": "room3_almost",
+    "out": {
+      "stageLabel": "Stage 3 · 算力中心",
+      "stage3SectionVisible": true,
+      "sections": [
+        {
+          "id": "section-model",
+          "hidden": false
+        },
+        {
+          "id": "section-orders",
+          "hidden": true
+        },
+        {
+          "id": "section-server",
+          "hidden": true
+        },
+        {
+          "id": "section-center",
+          "hidden": true
+        },
+        {
+          "id": "section-stage3",
+          "hidden": false
+        },
+        {
+          "id": "section-archive",
+          "hidden": true
+        },
+        {
+          "id": "section-prestige",
+          "hidden": true
+        }
+      ],
+      "roomCards": [
+        "✅ 集群核心机房集群核心机房",
+        "✅ 企业级算力机房企业级算力机房",
+        "区域算力中心电力 Lv9 · 算力卡 Lv9 · 光模块 Lv8 · 存储 Lv8需先完成旗舰工程「全国推理服务网络」"
+      ],
+      "infraCards": [
+        "⚡ 电力设施 Lv.5/10决定机房可投产上限；电力不足时算力降载运行（不损坏）升级（¥6190万）",
+        "🖥️ 算力卡 Lv.6/10直接提高总算力与请求处理速度升级（¥1.09亿）",
+        "🔆 光模块 Lv.4/10提高有效吞吐与算力向收入的转化率升级（¥2606万）",
+        "💾 存储阵列 Lv.4/10提高旗舰工程奖励与离线收益上限升级（¥2880万）"
+      ],
+      "totalDomNodes": 159,
+      "singleOrderProgress": 0
+    },
+    "consoleErrors": []
+  },
+  {
+    "state": "final_project_almost",
+    "out": {
+      "stageLabel": "Stage 3 · 算力中心",
+      "stage3SectionVisible": true,
+      "sections": [
+        {
+          "id": "section-model",
+          "hidden": false
+        },
+        {
+          "id": "section-orders",
+          "hidden": true
+        },
+        {
+          "id": "section-server",
+          "hidden": true
+        },
+        {
+          "id": "section-center",
+          "hidden": true
+        },
+        {
+          "id": "section-stage3",
+          "hidden": false
+        },
+        {
+          "id": "section-archive",
+          "hidden": true
+        },
+        {
+          "id": "section-prestige",
+          "hidden": true
+        }
+      ],
+      "roomCards": [
+        "✅ 集群核心机房集群核心机房",
+        "✅ 企业级算力机房企业级算力机房",
+        "✅ 区域算力中心区域级算力运营商"
+      ],
+      "infraCards": [
+        "⚡ 电力设施 Lv.6/10决定机房可投产上限；电力不足时算力降载运行（不损坏）升级（¥1.18亿）",
+        "🖥️ 算力卡 Lv.7/10直接提高总算力与请求处理速度升级（¥1.96亿）",
+        "🔆 光模块 Lv.5/10提高有效吞吐与算力向收入的转化率升级（¥4952万）",
+        "💾 存储阵列 Lv.5/10提高旗舰工程奖励与离线收益上限升级（¥5760万）"
+      ],
+      "totalDomNodes": 148,
+      "singleOrderProgress": 0
+    },
+    "consoleErrors": []
+  },
+  {
+    "state": "iteration_ready",
+    "out": {
+      "stageLabel": "Stage 3 · 算力中心",
+      "stage3SectionVisible": true,
+      "sections": [
+        {
+          "id": "section-model",
+          "hidden": false
+        },
+        {
+          "id": "section-orders",
+          "hidden": true
+        },
+        {
+          "id": "section-server",
+          "hidden": true
+        },
+        {
+          "id": "section-center",
+          "hidden": true
+        },
+        {
+          "id": "section-stage3",
+          "hidden": false
+        },
+        {
+          "id": "section-archive",
+          "hidden": true
+        },
+        {
+          "id": "section-prestige",
+          "hidden": false
+        }
+      ],
+      "roomCards": [
+        "✅ 集群核心机房集群核心机房",
+        "✅ 企业级算力机房企业级算力机房",
+        "✅ 区域算力中心区域级算力运营商"
+      ],
+      "infraCards": [
+        "⚡ 电力设施 Lv.6/10决定机房可投产上限；电力不足时算力降载运行（不损坏）升级（¥1.18亿）",
+        "🖥️ 算力卡 Lv.7/10直接提高总算力与请求处理速度升级（¥1.96亿）",
+        "🔆 光模块 Lv.5/10提高有效吞吐与算力向收入的转化率升级（¥4952万）",
+        "💾 存储阵列 Lv.5/10提高旗舰工程奖励与离线收益上限升级（¥5760万）"
+      ],
+      "totalDomNodes": 171,
+      "singleOrderProgress": 0
+    },
+    "consoleErrors": []
+  }
+]

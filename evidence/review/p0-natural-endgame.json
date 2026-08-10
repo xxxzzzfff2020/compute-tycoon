@@ -1,0 +1,1134 @@
+{
+  "generatedAt": "2026-08-08T09:22:38.093Z",
+  "reviewSpeed": 240,
+  "wallSeconds": 119.132,
+  "requiredMilestones": [
+    "first_model",
+    "automation",
+    "first_server",
+    "server3",
+    "server8",
+    "stage3_entered",
+    "room2",
+    "room3",
+    "final_flagship",
+    "iteration1",
+    "second_run_first_server",
+    "r2_era_active",
+    "core2_claimed",
+    "iteration2",
+    "r3_era_active",
+    "core3_claimed",
+    "iteration3_space_reveal",
+    "stage4_entered",
+    "stage4_complete",
+    "stage5_entered",
+    "stage5_ending"
+  ],
+  "missingMilestones": [],
+  "milestones": [
+    {
+      "name": "first_model",
+      "wallSeconds": 0.015,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 8,
+          "partialPatchCount": 25,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 157,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "automation",
+      "wallSeconds": 0.233,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 2,
+          "partialPatchCount": 14,
+          "orderCompletionCount": 3,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 182,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "first_server",
+      "wallSeconds": 2.531,
+      "serverCount": 1,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 31,
+          "orderCompletionCount": 60,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "server3",
+      "wallSeconds": 5.389,
+      "serverCount": 3,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 1,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 169,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "server8",
+      "wallSeconds": 6.736,
+      "serverCount": 8,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 1,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 250,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage3_entered",
+      "wallSeconds": 6.799,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 1,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 1,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 30,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 254,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 180,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "room2",
+      "wallSeconds": 8.248,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 2,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 7,
+          "orderCompletionCount": 82,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 231,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "room3",
+      "wallSeconds": 10.082,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 7,
+          "orderCompletionCount": 192,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 230,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "final_flagship",
+      "wallSeconds": 12.64,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 0,
+      "coresClaimed": [],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 345,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 227,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "iteration1",
+      "wallSeconds": 20.8,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 3,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 486,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 239,
+        "scrollY": 2165,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "second_run_first_server",
+      "wallSeconds": 21.868,
+      "serverCount": 1,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 15,
+          "orderCompletionCount": 37,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 163,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r2_server3",
+      "wallSeconds": 22.176,
+      "serverCount": 3,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 55,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 163,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r2_server8",
+      "wallSeconds": 22.559,
+      "serverCount": 8,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 78,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 163,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r2_stage3",
+      "wallSeconds": 22.63,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 1,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 30,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 7,
+          "orderCompletionCount": 83,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 231,
+        "scrollY": 163,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r2_era_active",
+      "wallSeconds": 27.05,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 30,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 7,
+          "orderCompletionCount": 347,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 229,
+        "scrollY": 198,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "core2_claimed",
+      "wallSeconds": 40.572,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 1,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r2"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 809,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 233,
+        "scrollY": 1981,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "iteration2",
+      "wallSeconds": 40.615,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 1,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 238,
+        "scrollY": 1982,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r3_server3",
+      "wallSeconds": 41.285,
+      "serverCount": 3,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 26,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 178,
+        "scrollY": 99,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r3_server8",
+      "wallSeconds": 41.573,
+      "serverCount": 8,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 43,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 179,
+        "scrollY": 99,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r3_stage3",
+      "wallSeconds": 41.64,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 1,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 30,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 47,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 179,
+        "scrollY": 99,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "r3_era_active",
+      "wallSeconds": 46.501,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 30,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 2,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 339,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 230,
+        "scrollY": 99,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "core3_claimed",
+      "wallSeconds": 56.604,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 2,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": false,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 603,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 233,
+        "scrollY": 1966,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "iteration3_space_reveal",
+      "wallSeconds": 56.665,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 3,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": true,
+      "spacePlanStarted": false,
+      "stage4Entered": false,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 8,
+          "orderCompletionCount": 607,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 234,
+        "scrollY": 2019,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage4_entered",
+      "wallSeconds": 56.705,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 3,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": true,
+      "spacePlanStarted": true,
+      "stage4Entered": true,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 8,
+          "partialPatchCount": 1,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 231,
+        "scrollY": 99,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage4_complete",
+      "wallSeconds": 80.138,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 3,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": true,
+      "spacePlanStarted": true,
+      "stage4Entered": true,
+      "stage5Entered": false,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 16,
+          "partialPatchCount": 11209,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 251,
+        "scrollY": 359,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage5_entered",
+      "wallSeconds": 80.15,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 3,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": true,
+      "spacePlanStarted": true,
+      "stage4Entered": true,
+      "stage5Entered": true,
+      "perpetual": false,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 17,
+          "partialPatchCount": 11216,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 251,
+        "scrollY": 361,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage5_ending",
+      "wallSeconds": 119.091,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 3,
+      "coresClaimed": [
+        "core_1",
+        "core_2",
+        "core_3"
+      ],
+      "spacePlanRevealed": true,
+      "spacePlanStarted": true,
+      "stage4Entered": true,
+      "stage5Entered": true,
+      "perpetual": true,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3",
+        "project_r3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 1,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 29,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 16,
+          "partialPatchCount": 18665,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 268,
+        "scrollY": 222,
+        "heap": 10000000
+      }
+    }
+  ],
+  "refreshChecks": [
+    "first_server",
+    "final_flagship",
+    "iteration1",
+    "r2_era",
+    "core2",
+    "iteration2",
+    "r3_era",
+    "iteration3",
+    "stage4",
+    "stage5",
+    "ending"
+  ],
+  "closeAndReenterChecks": [
+    "stage3"
+  ],
+  "backgroundPauseResume": true,
+  "initialMetrics": {
+    "qa": {
+      "activeTimeoutCount": 0,
+      "activeIntervalCount": 1,
+      "activeAnimationFrameCount": 1,
+      "listenerTotal": 29,
+      "rootReplacementCount": 0,
+      "unhandledRejections": 0
+    },
+    "render": {
+      "fullRenderCount": 8,
+      "partialPatchCount": 17,
+      "orderCompletionCount": 0,
+      "rootReplacementCount": 0
+    },
+    "domNodes": 157,
+    "scrollY": 0,
+    "heap": 10000000
+  },
+  "finalMetrics": {
+    "qa": {
+      "activeTimeoutCount": 0,
+      "activeIntervalCount": 1,
+      "activeAnimationFrameCount": 1,
+      "listenerTotal": 29,
+      "rootReplacementCount": 0,
+      "unhandledRejections": 0
+    },
+    "render": {
+      "fullRenderCount": 8,
+      "partialPatchCount": 9,
+      "orderCompletionCount": 0,
+      "rootReplacementCount": 0
+    },
+    "domNodes": 269,
+    "scrollY": 222,
+    "heap": 10000000
+  },
+  "finalState": {
+    "stage": 3,
+    "serverCount": 8,
+    "iterationCount": 3,
+    "permanentMultiplier": 2
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resource404s": [],
+  "pointerClicks": [
+    "claim_core_1",
+    "prestige_1",
+    "claim_core_2",
+    "prestige_2",
+    "claim_core_3",
+    "prestige_3",
+    "start_space_plan",
+    "start_stage4_project",
+    "claim_stage4_reward",
+    "start_stage5",
+    "start_stage5_project",
+    "claim_stage5_reward"
+  ],
+  "status": "PASS"
+}

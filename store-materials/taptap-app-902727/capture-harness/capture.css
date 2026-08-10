@@ -1,0 +1,36 @@
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #08101f;
+}
+
+body[data-capture-mode="video"] {
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+body[data-capture-mode="video"]::-webkit-scrollbar {
+  display: none;
+}
+
+body[data-capture-mode="video"] #app {
+  width: 430px;
+  max-width: none;
+  margin: 0 auto;
+  zoom: var(--capture-video-zoom, 3.1);
+}
+
+@media (max-width: 1333px) {
+  /* Scale the entire capture surface so fixed toolbar descendants stay inside narrow viewports. */
+  body[data-capture-mode="video"] {
+    width: 430px;
+    margin: 0 auto;
+    zoom: var(--capture-video-zoom, 1);
+  }
+
+  body[data-capture-mode="video"] #app {
+    width: 430px;
+    zoom: 1;
+  }
+}

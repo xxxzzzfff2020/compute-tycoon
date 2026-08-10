@@ -1,0 +1,30 @@
+{
+  "task_id": "COMPUTE_TYCOON_H5_TAPTAP_STORE_MATERIALS_01",
+  "app_id": 902727,
+  "miniapp_id": "tapmcix1sdc8m7ybwj",
+  "baseline": "d5084130014139f1f9c33a72d37e77662c6df3cc",
+  "status": "owner_review_required",
+  "online_writes": 0,
+  "items": [
+    {"id": 1, "name": "宣传图", "recommended": "brand-assets/01-promo-1920x1080.jpg", "sha256": "841d46364e29181d2c6d715eb32440119a823e911212205c45592170d96d1e76"},
+    {"id": 2, "name": "游戏截图", "recommended": ["real-game-media/01-earth-compute-center-720x1280.jpg", "real-game-media/02-earth-r3-core-720x1280.jpg", "real-game-media/03-lunar-network-720x1280.jpg", "real-game-media/04-dyson-sphere-720x1280.jpg"]},
+    {"id": 3, "name": "游戏实机录屏", "recommended": "real-game-media/05-gameplay-recording-1920x1080.mp4", "sha256": "dcf02562c379650afb5a679bc4377c4766b4350453241c505d2f276c4c4d5460"},
+    {"id": 4, "name": "游戏 Logo", "recommended": "brand-assets/04-logo-1600x720.png", "sha256": "b8a6bb665111a6d2eb757aaabf89df0baa375b98dc656b4a2e3332e52cd66562"},
+    {"id": 5, "name": "库页面背景图", "recommended": "brand-assets/05-library-background-3840x1240.jpg", "sha256": "9da38aedd0c97012c6fd01240e48a026214fefbdf6c1ca7fa03bac3366d3c952"},
+    {"id": 6, "name": "横版封面", "recommended": "brand-assets/06-cover-horizontal-460x215.jpg", "sha256": "4cc17079455123b33efa85f670230c1c258e83472f89fc975d54a0561a9f0c70"},
+    {"id": 7, "name": "竖版封面", "recommended": "brand-assets/07-cover-vertical-600x900.jpg", "sha256": "80e04a86cd761bf705bbc5ded01a42311e5f31746d29654e6fc6b0aeebca292c"},
+    {"id": 8, "name": "游戏简介", "recommended_source": "copy/MAT_01_COPY.md", "characters": 134}
+  ],
+  "scope_expansions": [
+    {
+      "name": "方形游戏图标",
+      "requested_by_owner": true,
+      "recommended": "brand-assets/00-game-icon-1024x1024.png",
+      "spec": "1024x1024 PNG, opaque, full-bleed square, no baked rounded corners",
+      "bytes": 1313018,
+      "sha256": "9f66561a21cd884ce4541912bf1c2fe9a290213ae0c4e9b9af2bb2170aaa0bc5",
+      "online_status": "local candidate only; not uploaded"
+    }
+  ],
+  "approval_gate": "MAT_05 requires explicit owner approval in this conversation"
+}

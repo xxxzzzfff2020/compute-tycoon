@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "route": "?natural=1",
+  "fileChooserImport": true,
+  "legacyIterationCount": 1,
+  "restoredCores": [
+    "core_1"
+  ],
+  "economicValuesNotDecreased": true,
+  "obsoleteTerminalCopyVisible": false,
+  "refreshPreservedImportedSaveId": true,
+  "repeatedImportIdempotent": true,
+  "consoleErrors": [],
+  "pageErrors": []
+}

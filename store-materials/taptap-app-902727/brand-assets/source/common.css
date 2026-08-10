@@ -1,0 +1,88 @@
+:root {
+  color-scheme: dark;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #070b1b;
+}
+
+.art {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background: #070b1b;
+}
+
+.art::before {
+  content: "";
+  position: absolute;
+  inset: -8%;
+  z-index: -3;
+  background: url("../../../../public/assets/visuals/dyson-compute-sphere-keyart-v1.jpg") center / cover no-repeat;
+  filter: blur(22px) brightness(.56) saturate(1.12);
+  transform: scale(1.08);
+}
+
+.keyart {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: url("../../../../public/assets/visuals/dyson-compute-sphere-keyart-v1.jpg") center / cover no-repeat;
+}
+
+.veil {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 66% 45%, transparent 0 24%, rgba(7, 11, 27, .10) 44%, rgba(7, 11, 27, .46) 82%),
+    linear-gradient(90deg, rgba(4, 8, 21, .92) 0%, rgba(4, 8, 21, .60) 28%, rgba(4, 8, 21, .06) 60%, rgba(4, 8, 21, .50) 100%);
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: .18em;
+  color: #ffd872;
+  font-weight: 900;
+  letter-spacing: .08em;
+  line-height: 1;
+  text-shadow:
+    0 .04em .08em rgba(0, 0, 0, .75),
+    0 0 .16em rgba(255, 183, 72, .32),
+    .01em 0 rgba(255, 246, 202, .8);
+  white-space: nowrap;
+}
+
+.wordmark::before {
+  content: "";
+  width: .34em;
+  height: .34em;
+  flex: 0 0 auto;
+  border: .05em solid #ffd872;
+  transform: rotate(45deg);
+  box-shadow: 0 0 .18em rgba(255, 183, 72, .62), inset 0 0 .12em rgba(255, 255, 255, .35);
+}
+
+.orbit-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0 34%, rgba(255, 190, 85, .12) 34.2%, transparent 34.5% 100%),
+    linear-gradient(120deg, transparent 0 64%, rgba(122, 103, 255, .12) 64.2%, transparent 64.5% 100%);
+  mix-blend-mode: screen;
+}
+

@@ -1,0 +1,114 @@
+{
+  "initial": {
+    "serverBody": 1,
+    "acquireBtn": 1,
+    "totalNodes": 83
+  },
+  "afterModel": {
+    "modelName": "🤖 代码推理模型 Lv.1",
+    "acquireBtn": 0,
+    "trainBtn": 1,
+    "revision": "存档 2bfbd6f6 · rev 3",
+    "totalNodes": 83
+  },
+  "doubleClickExtraAcquireButtons": 0,
+  "orderAccepted": 1,
+  "samples": [
+    {
+      "sec": 10,
+      "serverBody": 1,
+      "totalNodes": 88
+    },
+    {
+      "sec": 20,
+      "serverBody": 1,
+      "totalNodes": 88
+    },
+    {
+      "sec": 30,
+      "serverBody": 1,
+      "totalNodes": 88
+    },
+    {
+      "sec": 40,
+      "serverBody": 1,
+      "totalNodes": 88
+    },
+    {
+      "sec": 50,
+      "serverBody": 1,
+      "totalNodes": 88
+    },
+    {
+      "sec": 60,
+      "serverBody": 1,
+      "totalNodes": 88
+    }
+  ],
+  "after60s": {
+    "sec": 60,
+    "serverBody": 1,
+    "totalNodes": 88
+  },
+  "afterRefresh": {
+    "modelName": "🤖 代码推理模型 Lv.1",
+    "serverBody": 1,
+    "activeOrders": 1,
+    "totalNodes": 91
+  },
+  "stableSamples": [
+    {
+      "sec": 30,
+      "serverBody": 1,
+      "totalNodes": 91
+    },
+    {
+      "sec": 60,
+      "serverBody": 1,
+      "totalNodes": 91
+    },
+    {
+      "sec": 90,
+      "serverBody": 1,
+      "totalNodes": 91
+    },
+    {
+      "sec": 120,
+      "serverBody": 1,
+      "totalNodes": 91
+    },
+    {
+      "sec": 150,
+      "serverBody": 1,
+      "totalNodes": 92
+    },
+    {
+      "sec": 180,
+      "serverBody": 1,
+      "totalNodes": 92
+    },
+    {
+      "sec": 210,
+      "serverBody": 1,
+      "totalNodes": 92
+    },
+    {
+      "sec": 240,
+      "serverBody": 1,
+      "totalNodes": 92
+    },
+    {
+      "sec": 270,
+      "serverBody": 1,
+      "totalNodes": 92
+    },
+    {
+      "sec": 300,
+      "serverBody": 1,
+      "totalNodes": 92
+    }
+  ],
+  "consoleErrors": [
+    "[console.error] Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

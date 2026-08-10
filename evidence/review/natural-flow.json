@@ -1,0 +1,395 @@
+{
+  "generatedAt": "2026-08-01T09:17:51.290Z",
+  "reviewSpeed": 240,
+  "wallSeconds": 20.001,
+  "requiredMilestones": [
+    "first_model",
+    "automation",
+    "first_server",
+    "server3",
+    "server8",
+    "stage3_entered",
+    "room2",
+    "room3",
+    "final_flagship",
+    "iteration1",
+    "second_run_first_server"
+  ],
+  "missingMilestones": [],
+  "milestones": [
+    {
+      "name": "first_model",
+      "wallSeconds": 0.024,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 8,
+          "partialPatchCount": 5,
+          "orderCompletionCount": 0,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 123,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "automation",
+      "wallSeconds": 0.204,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 2,
+          "partialPatchCount": 4,
+          "orderCompletionCount": 3,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 148,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "first_server",
+      "wallSeconds": 2.503,
+      "serverCount": 1,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 12,
+          "orderCompletionCount": 78,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 144,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "server3",
+      "wallSeconds": 5.909,
+      "serverCount": 3,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 194,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 128,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "server8",
+      "wallSeconds": 10.276,
+      "serverCount": 8,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 466,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 128,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "stage3_entered",
+      "wallSeconds": 10.303,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 1,
+      "iterationCount": 0,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 24,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 2,
+          "partialPatchCount": 4,
+          "orderCompletionCount": 468,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 130,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "room2",
+      "wallSeconds": 12.462,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 2,
+      "iterationCount": 0,
+      "completedProjects": [
+        "project_1"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 140,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 165,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "room3",
+      "wallSeconds": 16.675,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 0,
+      "completedProjects": [
+        "project_1",
+        "project_2"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 5,
+          "orderCompletionCount": 405,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 164,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "final_flagship",
+      "wallSeconds": 19.247,
+      "serverCount": 8,
+      "stage": 3,
+      "rooms": 3,
+      "iterationCount": 0,
+      "completedProjects": [
+        "project_1",
+        "project_2",
+        "project_3"
+      ],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 572,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 161,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "iteration1",
+      "wallSeconds": 19.285,
+      "serverCount": 0,
+      "stage": 1,
+      "rooms": 0,
+      "iterationCount": 1,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 0,
+          "partialPatchCount": 6,
+          "orderCompletionCount": 2,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 176,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    },
+    {
+      "name": "second_run_first_server",
+      "wallSeconds": 19.998,
+      "serverCount": 1,
+      "stage": 2,
+      "rooms": 0,
+      "iterationCount": 1,
+      "completedProjects": [],
+      "metrics": {
+        "qa": {
+          "activeTimeoutCount": 0,
+          "activeIntervalCount": 0,
+          "activeAnimationFrameCount": 1,
+          "listenerTotal": 23,
+          "rootReplacementCount": 0,
+          "unhandledRejections": 0
+        },
+        "render": {
+          "fullRenderCount": 1,
+          "partialPatchCount": 17,
+          "orderCompletionCount": 19,
+          "rootReplacementCount": 0
+        },
+        "domNodes": 145,
+        "scrollY": 0,
+        "heap": 10000000
+      }
+    }
+  ],
+  "refreshChecks": [
+    "first_server",
+    "final_flagship",
+    "iteration1"
+  ],
+  "closeAndReenterChecks": [
+    "stage3"
+  ],
+  "backgroundPauseResume": true,
+  "initialMetrics": {
+    "qa": {
+      "activeTimeoutCount": 0,
+      "activeIntervalCount": 0,
+      "activeAnimationFrameCount": 1,
+      "listenerTotal": 23,
+      "rootReplacementCount": 0,
+      "unhandledRejections": 0
+    },
+    "render": {
+      "fullRenderCount": 6,
+      "partialPatchCount": 1,
+      "orderCompletionCount": 0,
+      "rootReplacementCount": 0
+    },
+    "domNodes": 123,
+    "scrollY": 0,
+    "heap": 10000000
+  },
+  "finalMetrics": {
+    "qa": {
+      "activeTimeoutCount": 0,
+      "activeIntervalCount": 0,
+      "activeAnimationFrameCount": 1,
+      "listenerTotal": 23,
+      "rootReplacementCount": 0,
+      "unhandledRejections": 0
+    },
+    "render": {
+      "fullRenderCount": 1,
+      "partialPatchCount": 17,
+      "orderCompletionCount": 19,
+      "rootReplacementCount": 0
+    },
+    "domNodes": 145,
+    "scrollY": 0,
+    "heap": 10000000
+  },
+  "finalState": {
+    "stage": 2,
+    "serverCount": 1,
+    "iterationCount": 1,
+    "permanentMultiplier": 2
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "resource404s": [],
+  "status": "PASS"
+}

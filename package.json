@@ -1,0 +1,38 @@
+{
+  "name": "compute-tycoon-h5-mvp",
+  "version": "1.0.0-rc.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "build:review": "tsc -p tsconfig.json && vite build --config vite.review.config.ts && node scripts/finalize-review-build.mjs dist-review",
+    "build:platform-review": "tsc -p tsconfig.json && vite build --config vite.platform-review.config.ts",
+    "build:sites": "node scripts/clean-sites-build.mjs && tsc -p tsconfig.json && vite build --outDir dist/client && node scripts/prepare-sites.mjs",
+    "build:sites:review": "node scripts/clean-sites-build.mjs && tsc -p tsconfig.json && vite build --config vite.review.config.ts --outDir dist/client && node scripts/finalize-review-build.mjs dist/client && node scripts/prepare-sites.mjs",
+    "preview": "vite preview",
+    "preview:review": "vite preview --config vite.review.config.ts",
+    "preview:platform-review": "vite preview --config vite.platform-review.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "simulate": "tsx scripts/simulate-economy.ts",
+    "simulate:endgame": "tsx scripts/simulate-endgame.ts"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "lucide": "^1.30.0"
+  },
+  "devDependencies": {
+    "@types/decimal.js": "^0.0.32",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^26.1.2",
+    "jsdom": "^29.1.1",
+    "puppeteer-core": "^24.43.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  }
+}

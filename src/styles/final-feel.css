@@ -1,0 +1,403 @@
+/* Level A 最终运行感：纯表现层，全部状态来自只读 ViewModel。 */
+.final-feel-panel {
+  --feel-activity: 0;
+  --feel-period: 6s;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* 组件用原生 hidden 控制未触发内容；显式 display 不能把它重新显示。 */
+.final-feel-panel [hidden] {
+  display: none !important;
+}
+
+.compute-engine {
+  position: relative;
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  min-height: 86px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 42%, var(--line));
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 43px 43px,
+      color-mix(in srgb, var(--stage-accent, var(--accent)) 13%, transparent),
+      transparent 64px),
+    linear-gradient(145deg, rgba(18, 31, 58, 0.96), rgba(11, 19, 37, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.compute-engine::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  content: "";
+  opacity: calc(0.16 + var(--feel-activity) * 0.5);
+  background: linear-gradient(90deg, transparent, var(--stage-accent, var(--accent)), transparent);
+  transform: scaleX(calc(0.3 + var(--feel-activity) * 0.7));
+  transform-origin: center;
+}
+
+.compute-engine-visual {
+  position: relative;
+  width: 86px;
+  min-height: 84px;
+}
+
+.compute-ring,
+.compute-core,
+.compute-orbit,
+.compute-particle {
+  position: absolute;
+  pointer-events: none;
+}
+
+.compute-ring {
+  top: 50%;
+  left: 50%;
+  border: 1px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 76%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.compute-ring::before,
+.compute-ring::after {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--stage-accent, var(--accent));
+  content: "";
+}
+
+.compute-ring::before { top: -2px; left: 50%; }
+.compute-ring::after { right: -2px; bottom: 28%; }
+.compute-ring-inner { width: 34px; height: 34px; }
+.compute-ring-middle { width: 52px; height: 52px; border-style: dashed; }
+.compute-ring-outer { width: 70px; height: 70px; border-color: color-mix(in srgb, var(--stage-accent-2, var(--accent-2)) 58%, transparent); }
+
+.compute-core {
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  border: 2px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 76%, white);
+  border-radius: 5px;
+  opacity: 0.38;
+  background: color-mix(in srgb, var(--stage-accent, var(--accent)) 50%, #eaf6ff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--stage-accent, var(--accent)) 42%, transparent);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.compute-orbit {
+  top: 50%;
+  left: 50%;
+  width: 76px;
+  height: 28px;
+  border: 1px solid color-mix(in srgb, var(--stage-accent-2, var(--accent-2)) 72%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-18deg);
+}
+
+.compute-particles { position: absolute; inset: 0; }
+.compute-particle {
+  top: calc(50% + var(--particle-y, 0px));
+  left: calc(50% + var(--particle-x, 0px));
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  opacity: 0;
+  background: var(--stage-accent-2, var(--accent-2));
+  transform: translate(-50%, -50%) scale(0.6);
+}
+
+.compute-particle:nth-child(1) { --particle-x: -31px; --particle-y: -8px; --particle-delay: -0.1s; }
+.compute-particle:nth-child(2) { --particle-x: 28px; --particle-y: 12px; --particle-delay: -1.2s; }
+.compute-particle:nth-child(3) { --particle-x: -22px; --particle-y: 25px; --particle-delay: -2.1s; }
+.compute-particle:nth-child(4) { --particle-x: 20px; --particle-y: -27px; --particle-delay: -3.2s; }
+.compute-particle:nth-child(5) { --particle-x: -11px; --particle-y: -34px; --particle-delay: -0.7s; }
+.compute-particle:nth-child(6) { --particle-x: 35px; --particle-y: -8px; --particle-delay: -2.7s; }
+.compute-particle:nth-child(7) { --particle-x: 7px; --particle-y: 34px; --particle-delay: -1.7s; }
+.compute-particle:nth-child(8) { --particle-x: -35px; --particle-y: 10px; --particle-delay: -3.7s; }
+.compute-particle:nth-child(9) { --particle-x: 10px; --particle-y: -20px; --particle-delay: -2.4s; }
+.compute-particle:nth-child(10) { --particle-x: -17px; --particle-y: 14px; --particle-delay: -0.4s; }
+
+.compute-engine-readout {
+  min-width: 0;
+  align-self: center;
+  padding: 10px 12px 10px 2px;
+}
+
+.compute-engine-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.compute-engine-value {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compute-engine-status {
+  margin-top: 3px;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--stage-accent, var(--accent)) 76%, var(--muted));
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compute-engine-cosmic {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  margin-top: 4px;
+  color: #c6d3ef;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.compute-engine-progress {
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(4, 10, 24, 0.72);
+}
+
+.compute-engine-progress-bar {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--stage-accent, var(--accent)), var(--stage-accent-2, var(--accent-2)));
+  transition: width 0.25s ease-out;
+}
+
+/* 八档形态只改变同一组稳定节点的可见度。 */
+.final-feel-panel:not([data-tier="idle"]) .compute-core { opacity: 1; }
+.final-feel-panel:not([data-tier="idle"]) .compute-ring-inner { opacity: 0.72; }
+.final-feel-panel[data-tier="studio"] .compute-ring-middle,
+.final-feel-panel[data-tier="cluster"] .compute-ring-middle,
+.final-feel-panel[data-tier="room"] .compute-ring-middle,
+.final-feel-panel[data-tier="regional"] .compute-ring-middle,
+.final-feel-panel[data-tier="lunar"] .compute-ring-middle,
+.final-feel-panel[data-tier="stellar"] .compute-ring-middle { opacity: 0.64; }
+.final-feel-panel[data-tier="cluster"] .compute-ring-outer,
+.final-feel-panel[data-tier="room"] .compute-ring-outer,
+.final-feel-panel[data-tier="regional"] .compute-ring-outer,
+.final-feel-panel[data-tier="lunar"] .compute-ring-outer,
+.final-feel-panel[data-tier="stellar"] .compute-ring-outer { opacity: 0.58; }
+.final-feel-panel[data-tier="lunar"] .compute-orbit,
+.final-feel-panel[data-tier="stellar"] .compute-orbit { opacity: 0.72; }
+.final-feel-panel[data-tier="stellar"] .compute-core { border-radius: 50%; }
+.final-feel-panel[data-tier="stellar"] .compute-engine {
+  background:
+    radial-gradient(circle at 43px 43px, rgba(255, 209, 102, 0.16), transparent 65px),
+    linear-gradient(145deg, rgba(47, 31, 36, 0.96), rgba(14, 17, 33, 0.98));
+}
+
+/* 固定粒子池：按Tier最多显示10个，绝不追加DOM。 */
+.final-feel-panel[data-tier="micro"] .compute-particle:nth-child(-n+2),
+.final-feel-panel[data-tier="studio"] .compute-particle:nth-child(-n+4),
+.final-feel-panel[data-tier="cluster"] .compute-particle:nth-child(-n+6),
+.final-feel-panel[data-tier="room"] .compute-particle:nth-child(-n+8),
+.final-feel-panel[data-tier="regional"] .compute-particle,
+.final-feel-panel[data-tier="lunar"] .compute-particle,
+.final-feel-panel[data-tier="stellar"] .compute-particle { opacity: 0.62; }
+
+.final-feel-panel[data-running="true"] .compute-ring-inner {
+  animation: feel-ring-spin var(--feel-period) linear infinite;
+}
+.final-feel-panel[data-running="true"] .compute-ring-middle {
+  animation: feel-ring-spin var(--feel-period) linear infinite reverse;
+}
+.final-feel-panel[data-running="true"] .compute-ring-outer {
+  animation: feel-ring-spin var(--feel-period) linear infinite;
+}
+.final-feel-panel[data-running="true"] .compute-core {
+  animation: feel-core-pulse var(--feel-period) ease-in-out infinite alternate;
+}
+.final-feel-panel[data-running="true"] .compute-orbit {
+  animation: feel-orbit var(--feel-period) linear infinite;
+}
+.final-feel-panel[data-running="true"] .compute-particle {
+  animation: feel-particle var(--feel-period) ease-in-out var(--particle-delay) infinite alternate;
+}
+
+.growth-feedback {
+  display: grid;
+  gap: 2px;
+  min-height: 46px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 46%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--stage-accent, var(--accent)) 9%, var(--card));
+  animation: feel-feedback-enter 0.32s ease-out both;
+}
+.growth-feedback-title { color: var(--text); font-size: 13px; }
+.growth-feedback-detail { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.growth-feedback[data-kind="bottleneck_released"] { border-color: var(--ok); }
+.growth-feedback[data-kind="milestone"] { border-color: var(--money); }
+
+.investment-summary {
+  display: grid;
+  gap: 7px;
+  padding: 10px 11px;
+  border: 1px solid rgba(79, 140, 255, 0.24);
+  border-radius: 13px;
+  background: rgba(16, 29, 55, 0.82);
+}
+.investment-summary-header { display: grid; gap: 2px; }
+.investment-summary-title { color: var(--text); font-size: 13px; }
+.investment-summary-recommendation {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.investment-summary-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.investment-action {
+  min-width: 0;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 34%, var(--line));
+  border-radius: 9px;
+  background: rgba(26, 43, 79, 0.9);
+  color: #dce8fb;
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.investment-action:first-child {
+  border-color: color-mix(in srgb, var(--stage-accent, var(--accent)) 68%, white);
+  color: #fff;
+}
+.investment-action:active { transform: scale(0.97); }
+.investment-action.became-affordable { animation: feel-affordable-edge 0.62s ease-out both; }
+
+.growth-review-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(52, 42, 42, 0.64), rgba(19, 29, 53, 0.92));
+}
+.growth-review-kicker { color: var(--money); font-size: 10px; font-weight: 900; letter-spacing: 0.14em; }
+.growth-review-route { font-size: 13px; line-height: 1.35; }
+.growth-review-metrics,
+.growth-review-summary { color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+.offline-card { animation: feel-offline-enter 1.2s ease-out both; }
+.feel-money-rise { animation: feel-money-rise 1s ease-out both; }
+.feel-target-focus { animation: feel-target-focus 0.9s ease-out both; }
+.compute-engine.growth-burst { animation: feel-engine-burst 0.72s ease-out both; }
+
+/* Stage3说明保留但压缩，按钮、等级、成本与状态永不折叠。 */
+.infra-card { min-height: 128px; gap: 5px; padding: 10px; }
+.infra-desc {
+  display: block;
+  overflow: visible;
+}
+
+/* 荣誉馆二级入口同样遵守移动端44px触控门。 */
+#section-archive .archive-categories .btn { min-height: 44px; }
+
+@keyframes feel-ring-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes feel-core-pulse {
+  from { opacity: 0.72; transform: translate(-50%, -50%) rotate(45deg) scale(0.88); }
+  to { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.08); }
+}
+@keyframes feel-orbit {
+  from { transform: translate(-50%, -50%) rotate(-18deg); }
+  to { transform: translate(-50%, -50%) rotate(342deg); }
+}
+@keyframes feel-particle {
+  from { opacity: 0.2; transform: translate(-50%, -50%) scale(0.55); }
+  to { opacity: 0.82; transform: translate(-50%, -50%) scale(1.25); }
+}
+@keyframes feel-feedback-enter {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes feel-affordable-edge {
+  0% { transform: scale(1); }
+  38% { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+@keyframes feel-engine-burst {
+  0% { transform: scale(1); }
+  42% { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+@keyframes feel-offline-enter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes feel-money-rise {
+  0% { transform: translateY(0) scale(1); }
+  36% { transform: translateY(-2px) scale(1.035); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes feel-target-focus {
+  0% { outline: 0 solid transparent; }
+  35% { outline: 3px solid color-mix(in srgb, var(--stage-accent, var(--accent)) 58%, transparent); }
+  100% { outline: 0 solid transparent; }
+}
+
+.final-feel-panel[data-paused="true"] *,
+.final-feel-panel[data-paused="true"] *::before,
+.final-feel-panel[data-paused="true"] *::after {
+  animation-play-state: paused !important;
+}
+
+@media (max-width: 350px) {
+  .compute-engine { grid-template-columns: 76px minmax(0, 1fr); }
+  .compute-engine-visual { width: 76px; }
+  .compute-ring-outer { width: 64px; height: 64px; }
+  .compute-engine-value { font-size: 18px; }
+  .investment-summary-actions { grid-template-columns: 1fr; }
+  .investment-action { min-height: 44px; }
+  .infra-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .infra-name { font-size: 12px; }
+  .infra-card .btn { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .final-feel-panel *,
+  .final-feel-panel *::before,
+  .final-feel-panel *::after,
+  .offline-card,
+  .feel-money-rise,
+  .feel-target-focus {
+    animation: none !important;
+    transition: none !important;
+  }
+  .compute-ring,
+  .compute-core,
+  .compute-orbit,
+  .compute-particle { transform: translate(-50%, -50%); }
+}

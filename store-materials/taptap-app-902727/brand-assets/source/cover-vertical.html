@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="./common.css" />
+    <style>
+      .art::before { filter: blur(26px) brightness(.50) saturate(1.12); }
+      .keyart { background-position: 49% center; }
+      .veil {
+        background:
+          linear-gradient(0deg, rgba(4, 8, 21, .92) 0%, rgba(4, 8, 21, .26) 42%, rgba(4, 8, 21, .10) 70%, rgba(4, 8, 21, .62) 100%),
+          radial-gradient(circle at 50% 43%, transparent 0 26%, rgba(4, 8, 21, .20) 58%);
+      }
+      .title {
+        position: absolute;
+        left: 50%;
+        bottom: 12%;
+        transform: translateX(-50%);
+        font-size: 102px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="art">
+      <div class="keyart"></div>
+      <div class="veil"></div>
+      <div class="orbit-lines"></div>
+      <div class="wordmark title">算力大亨</div>
+    </main>
+  </body>
+</html>
+
