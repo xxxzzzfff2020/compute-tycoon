@@ -166,7 +166,7 @@ export function enterStage3(
       ...state.stage3,
       machineRooms: [
         ...(state.stage3?.machineRooms ?? []),
-        { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs },
+        { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs },
       ],
     };
   }
@@ -263,7 +263,7 @@ export function bottleneckAnalysis(state: SaveData): {
     });
   }
   if (candidates.length === 0) {
-    return { id: "", name: "无瓶颈", efficiency: eff, upgradeEfficiency: eff, projectedIncomeGain: new Decimal(0) };
+    return { id: "", name: "stage3.noBottleneck", efficiency: eff, upgradeEfficiency: eff, projectedIncomeGain: new Decimal(0) };
   }
   candidates.sort((a, b) => b.gain.comparedTo(a.gain));
   const top = candidates[0];

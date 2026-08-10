@@ -8,7 +8,7 @@ scope: 终局收敛（裁决落地）→ 正式整合（迁移+自然流程）�
 baseline_commit: 41d8730（2026-08-03，收口基线）
 integration_commit: 4d65ad7（2026-08-07 终局正式整合，tag compute-tycoon-h5-endgame-integration-20260807）
 fix_commit: 0ee4a13（2026-08-08 评审问题修复）
-sites_deployed: compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site（版本 9，2026-08-08 03:06 私有部署成功）
+sites_deployed: <PRIVATE_REVIEW_URL>（版本 9，2026-08-08 03:06 私有部署成功）
 ```
 
 ## 一、任务完成情况总览
@@ -41,7 +41,7 @@ sites_deployed: compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site（版本 9�
 
 ### 2026-08-08 评审站部署
 
-- 重建评审构建（`npm run build:sites:review`，含终局整合 + 修复）→ 打包 → 保存版本 9 → **私有部署 succeeded**（`https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site`，仅 owner 可见，未登录访问 401 属预期访问控制）。
+- 重建评审构建（`npm run build:sites:review`，含终局整合 + 修复）→ 打包 → 保存版本 9 → **私有部署 succeeded**（`<PRIVATE_REVIEW_URL>`，仅 owner 可见，未登录访问 401 属预期访问控制）。
 - 部署通道要求 `commit_sha` = 站点源仓库 main 当前 HEAD，故将终局整合与修复提交并推送（`41d8730 → 0ee4a13`；仅推送 Sites 部署源，未改变项目 git 管理现状）。
 
 ### 2026-08-08 试玩问题修复与复盘
@@ -81,4 +81,4 @@ sites_deployed: compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site（版本 9�
 - 代码：commit `4d65ad7`（终局正式整合）+ `0ee4a13`（评审修复），45 文件 +6503/-56（自收口基线）
 - Tag：`compute-tycoon-h5-endgame-convergence-baseline-20260807`、`compute-tycoon-h5-endgame-integration-20260807`
 - 报告：`docs/reports/H5_ENDGAME_CONVERGENCE_PHASE0_1_20260807.md`、`H5_ENDGAME_CONVERGENCE_P2_REPORT_20260807.md`、`H5_ENDGAME_FORMAL_INTEGRATION_REPORT_20260807.md`（本报告为汇总）
-- 评审站：`https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site`（版本 9，私有）
+- 评审站：`<PRIVATE_REVIEW_URL>`（版本 9，私有）

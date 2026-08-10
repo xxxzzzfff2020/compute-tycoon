@@ -97,6 +97,7 @@ import {
   roomById,
 } from "../data/stage3";
 import { formatBig, formatHeaderMoney, formatLiveMoney, formatMoney, formatTime } from "../core/big";
+import { t } from "../i18n";
 import {
   automationIncomePerSec,
   automationUnlockThreshold,
@@ -432,10 +433,10 @@ function buildOrderDisplay(state: SaveData): OrderDisplayVM {
   const cost = gross.minus(net);
   const summaryText =
     mode === "compute"
-      ? `算力结算：处理请求 ${ops.toFixed(1)}/秒 · 收入 ${formatMoney(net)}/秒 · 总算力 ${formatBig(compute.mul(serverPower))}`
+      ? t("order.summaryCompute", { ops: ops.toFixed(1), income: formatMoney(net), total: formatBig(compute.mul(serverPower)) })
       : mode === "flow"
-        ? `业务流水：处理速度 ${ops.toFixed(1)} 单/秒 · 净收入 ${formatMoney(net)}/秒`
-        : `单笔订单：当前处理 ${ops.toFixed(2)} 单/秒`;
+        ? t("order.summaryFlow", { ops: ops.toFixed(1), income: formatMoney(net) })
+        : t("order.summarySingle", { ops: ops.toFixed(2) });
   return {
     mode,
     opsPerSec: ops.toFixed(mode === "single" ? 2 : 1),
@@ -473,7 +474,7 @@ export function buildViewModel(state: SaveData): ViewModel {
   const model: ModelVM = {
     id: modelDef?.id ?? null,
     acquired: state.modelProgress != null,
-    name: modelDef?.name ?? "未获取模型",
+    name: modelDef?.name ? t(modelDef.name) : t("model.notAcquired"),
     icon: modelDef?.icon ?? "❓",
     level: modelLevel(state),
     maxLevel: modelDef?.maxLevel ?? 0,
@@ -527,7 +528,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       icon: def?.icon ?? "📋",
       status: o.status === 0 ? "processing" : "ready",
       progress,
-      remainingLabel: o.status === 1 ? "可领取" : formatTime(Math.ceil(o.remainingSec)),
+      remainingLabel: o.status === 1 ? t("order.ready") : formatTime(Math.ceil(o.remainingSec)),
     };
   });
 
@@ -541,11 +542,11 @@ export function buildViewModel(state: SaveData): ViewModel {
     : state.serverCount >= 1 ? "own"
     : "none";
   const phaseLabel =
-    phase === "center" ? "完整服务器集群（8/8）"
-    : phase === "scale" ? "规模化运营（5/8）"
-    : phase === "cluster" ? "初级集群（3/8）"
-    : phase === "own" ? "自有算力（1/8）"
-    : "未拥有服务器";
+    phase === "center" ? t("server.phase.center")
+    : phase === "scale" ? t("server.phase.scale")
+    : phase === "cluster" ? t("server.phase.cluster")
+    : phase === "own" ? t("server.phase.own")
+    : t("server.phase.none");
   const server: ServerVM = {
     ownedCount: state.serverCount,
     maxCount: MAX_SERVERS,
@@ -621,14 +622,14 @@ export function buildViewModel(state: SaveData): ViewModel {
       id: n.id,
       name: n.name,
       icon: n.icon,
-      cost: n.cost <= 0 ? "里程碑授予" : formatMoney(n.cost),
+      cost: n.cost <= 0 ? t("common.milestoneGranted") : formatMoney(n.cost),
       owned: s4Nodes.includes(n.id),
       canBuy: canBuyNode(state, n.id),
     })),
     ownedNodeCount: s4Nodes.length,
     batchUnlocked: batchPurchaseUnlocked(state),
     canBuyMaxNodes: batchPurchaseUnlocked(state) && STAGE4_NODES.some((n) => canBuyNode(state, n.id)),
-    incomePerSec: formatMoney(s4Entered ? stage4IncomePerSecond(state) : new Decimal(0)) + "/秒",
+    incomePerSec: formatMoney(s4Entered ? stage4IncomePerSecond(state) : new Decimal(0)) + t("unit.perSec"),
     nodeMult: s4Entered ? `×${nodeIncomeMultiplier(state).toFixed(2)}` : "",
     finalProject: {
       name: STAGE4_FINAL_PROJECT.name,
@@ -636,15 +637,15 @@ export function buildViewModel(state: SaveData): ViewModel {
       progressLabel: s4Active
         ? `${Math.min(100, Math.floor((s4Progress / STAGE4_FINAL_PROJECT.progressRequired) * 100))}%`
         : s4Completed
-          ? "已完成"
+          ? t("common.done")
           : s4Pending
-            ? "待领取"
+            ? t("common.pendingClaim")
             : "",
       canStart: canStartFinalProject(state),
       active: s4Active,
       pendingReward: s4Pending,
       completed: s4Completed,
-      rewardText: "完成后手动领取：地月主线完成里程碑",
+      rewardText: t("common.rewardText", { label: "stage4.rewardLabel" }),
     },
   };
 
@@ -664,12 +665,12 @@ export function buildViewModel(state: SaveData): ViewModel {
       id: n.id,
       name: n.name,
       icon: n.icon,
-      cost: n.cost <= 0 ? "里程碑授予" : formatMoney(n.cost),
+      cost: n.cost <= 0 ? t("common.milestoneGranted") : formatMoney(n.cost),
       owned: s5Nodes.includes(n.id),
       canBuy: canBuyS5Node(state, n.id),
     })),
     ownedNodeCount: s5Nodes.length,
-    incomePerSec: formatMoney(s5IncomePerSec) + "/秒",
+    incomePerSec: formatMoney(s5IncomePerSec) + t("unit.perSec"),
     nodeMult: s5Entered ? `×${s5NodeMult(state).toFixed(2)}` : "",
     finalProject: {
       name: STAGE5_FINAL_PROJECT.name,
@@ -677,15 +678,15 @@ export function buildViewModel(state: SaveData): ViewModel {
       progressLabel: s5Active
         ? `${Math.min(100, Math.floor((s5Progress / STAGE5_FINAL_PROJECT.progressRequired) * 100))}%`
         : s5Completed
-          ? "已完成"
+          ? t("common.done")
           : s5Pending
-            ? "待领取"
+            ? t("common.pendingClaim")
             : "",
       canStart: canStartDyson(state),
       active: s5Active,
       pendingReward: s5Pending,
       completed: s5Completed,
-      rewardText: "完成后手动领取：银河终局庆典 · 继续观察永续增长",
+      rewardText: t("common.rewardText", { label: "stage5.rewardLabel" }),
     },
     storyCompleted: state.singularity?.stage5?.storyCompleted === true,
     perpetualActive: perpetualActive(state),
@@ -704,21 +705,21 @@ export function buildViewModel(state: SaveData): ViewModel {
     Number.POSITIVE_INFINITY,
   );
   const achievements: AchievementVM[] = [
-    { id: "first_model", name: "第一束智能火花", description: "获得第一款AI模型", achieved: state.ownedModelIds.length > 0, achievedAtMs: Number.isFinite(firstModelAt) ? firstModelAt : 0 },
-    { id: "first_order", name: "第一笔业务", description: "完成第一笔客户请求", achieved: state.completedOrders > 0 || new Decimal(state.lifetimeIncome).gt(0), achievedAtMs: 0 },
-    { id: "first_server", name: "自己的算力", description: "取得第一台自有服务器", achieved: state.workshop.firstServerAwarded || state.serverCount > 0, achievedAtMs: 0 },
-    { id: "eight_servers", name: "完整服务器集群", description: "拥有八台服务器", achieved: state.serverCount >= 8 || state.stage2.settlementShown, achievedAtMs: state.stage2.completedAtMs },
-    { id: "first_room", name: "迈入算力中心", description: "投产第一座算力机房", achieved: state.stage3?.entered === true, achievedAtMs: state.stage3.enteredAtMs },
-    { id: "r1", name: "区域算力纪元", description: "获得第1枚奇点核心", achieved: claimedCoreIds.has("core_1"), achievedAtMs: 0 },
-    { id: "r2", name: "全球算力纪元", description: "获得第2枚奇点核心", achieved: claimedCoreIds.has("core_2"), achievedAtMs: 0 },
-    { id: "r3", name: "行星算力纪元", description: "获得第3枚奇点核心", achieved: claimedCoreIds.has("core_3"), achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
-    { id: "three_cores", name: "奇点核心 3/3", description: "集齐全部奇点核心", achieved: claimedCoreIds.size >= 3, achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
-    { id: "stage4", name: "地月算力运营商", description: "启动地外算力计划", achieved: s4Entered, achievedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 },
-    { id: "four_lunar_nodes", name: "地月节点全开", description: "取得全部四个地月算力节点", achieved: s4Nodes.length >= STAGE4_NODES.length, achievedAtMs: 0 },
-    { id: "stage5", name: "戴森算力纪元", description: "进入恒星级算力建设", achieved: s5Entered, achievedAtMs: state.singularity?.stage5?.enteredAtMs ?? 0 },
-    { id: "dyson", name: "银河算力大亨", description: "完成戴森算力球与银河终局", achieved: perpetualActive(state), achievedAtMs: state.singularity?.stage5?.legendaryArchive?.completedAtMs ?? 0 },
-    { id: "compute_scale", name: "百万级算力", description: "总算力达到100万", achieved: stage3TotalCompute(state).gte(1e6), achievedAtMs: 0 },
-    { id: "income_scale", name: "十亿级收入", description: "历史最高每秒收入达到10亿", achieved: new Decimal(state.highestIncomePerSecond).gte(1e9), achievedAtMs: 0 },
+    { id: "first_model", name: "ach.firstModel.name", description: "ach.firstModel.desc", achieved: state.ownedModelIds.length > 0, achievedAtMs: Number.isFinite(firstModelAt) ? firstModelAt : 0 },
+    { id: "first_order", name: "ach.firstOrder.name", description: "ach.firstOrder.desc", achieved: state.completedOrders > 0 || new Decimal(state.lifetimeIncome).gt(0), achievedAtMs: 0 },
+    { id: "first_server", name: "ach.firstServer.name", description: "ach.firstServer.desc", achieved: state.workshop.firstServerAwarded || state.serverCount > 0, achievedAtMs: 0 },
+    { id: "eight_servers", name: "ach.eightServers.name", description: "ach.eightServers.desc", achieved: state.serverCount >= 8 || state.stage2.settlementShown, achievedAtMs: state.stage2.completedAtMs },
+    { id: "first_room", name: "ach.firstRoom.name", description: "ach.firstRoom.desc", achieved: state.stage3?.entered === true, achievedAtMs: state.stage3.enteredAtMs },
+    { id: "r1", name: "ach.r1.name", description: "ach.r1.desc", achieved: claimedCoreIds.has("core_1"), achievedAtMs: 0 },
+    { id: "r2", name: "ach.r2.name", description: "ach.r2.desc", achieved: claimedCoreIds.has("core_2"), achievedAtMs: 0 },
+    { id: "r3", name: "ach.r3.name", description: "ach.r3.desc", achieved: claimedCoreIds.has("core_3"), achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
+    { id: "three_cores", name: "ach.threeCores.name", description: "ach.threeCores.desc", achieved: claimedCoreIds.size >= 3, achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
+    { id: "stage4", name: "ach.stage4.name", description: "ach.stage4.desc", achieved: s4Entered, achievedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 },
+    { id: "four_lunar_nodes", name: "ach.fourLunarNodes.name", description: "ach.fourLunarNodes.desc", achieved: s4Nodes.length >= STAGE4_NODES.length, achievedAtMs: 0 },
+    { id: "stage5", name: "ach.stage5.name", description: "ach.stage5.desc", achieved: s5Entered, achievedAtMs: state.singularity?.stage5?.enteredAtMs ?? 0 },
+    { id: "dyson", name: "ach.dyson.name", description: "ach.dyson.desc", achieved: perpetualActive(state), achievedAtMs: state.singularity?.stage5?.legendaryArchive?.completedAtMs ?? 0 },
+    { id: "compute_scale", name: "ach.computeScale.name", description: "ach.computeScale.desc", achieved: stage3TotalCompute(state).gte(1e6), achievedAtMs: 0 },
+    { id: "income_scale", name: "ach.incomeScale.name", description: "ach.incomeScale.desc", achieved: new Decimal(state.highestIncomePerSecond).gte(1e9), achievedAtMs: 0 },
   ];
 
   const offline: OfflineVM = state.pendingOfflineReward && !state.pendingOfflineReward.claimed
@@ -789,7 +790,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     if (d.id === "storage") {
       const preview = structuredClone(state);
       preview.stage3.infrastructure.storage = Math.min(10, lvl + 1);
-      detail = `当前工程资金奖励 ×${flagshipRewardMultiplier(state, previewProjectId).toFixed(2)} → ×${flagshipRewardMultiplier(preview, previewProjectId).toFixed(2)}`;
+      detail = `${t("stage3.flagshipRewardPreview")} ×${flagshipRewardMultiplier(state, previewProjectId).toFixed(2)} → ×${flagshipRewardMultiplier(preview, previewProjectId).toFixed(2)}`;
     }
     return {
       id: d.id,
@@ -829,15 +830,15 @@ export function buildViewModel(state: SaveData): ViewModel {
       ? new Decimal(pendingMultiplier)
       : flagshipRewardMultiplier(state, p.id);
     const requirements: string[] = [
-      `机房 ${roomsOwned}/${p.requiresRooms}`,
-      `算力 ${formatBig(compute3)}/${formatBig(p.requiresCompute)}`,
-      `光模块 Lv.${infraLevel(state, "optical")}/Lv.${p.requiresOptical ?? 0}`,
-      `存储 Lv.${infraLevel(state, "storage")}/Lv.${p.requiresStorage}`,
+      `${t("stage3.reqRooms")} ${roomsOwned}/${p.requiresRooms}`,
+      `${t("stage3.reqCompute")} ${formatBig(compute3)}/${formatBig(p.requiresCompute)}`,
+      `${t("stage3.reqOptical")} Lv.${infraLevel(state, "optical")}/Lv.${p.requiresOptical ?? 0}`,
+      `${t("stage3.reqStorage")} Lv.${infraLevel(state, "storage")}/Lv.${p.requiresStorage}`,
     ];
     if (p.id === "project_2") {
-      requirements.push(`前置工程「大模型集中训练」${(state.stage3?.flagship?.completedIds ?? []).includes("project_1") ? "已完成" : "未完成"}`);
+      requirements.push(`${t("stage3.reqPrereq")}「${t("flagship.1.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_1") ? t("common.done") : t("stage3.notDone")}`);
     } else if (p.id === "project_3") {
-      requirements.push(`前置工程「全国推理服务网络」${(state.stage3?.flagship?.completedIds ?? []).includes("project_2") ? "已完成" : "未完成"}`);
+      requirements.push(`${t("stage3.reqPrereq")}「${t("flagship.2.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_2") ? t("common.done") : t("stage3.notDone")}`);
     }
     return {
       id: p.id,
@@ -854,7 +855,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       totalCompute: formatBig(compute3),
       pendingRewardId: pendingForThisProject ? p.id : null,
       pendingRewardName: pendingForThisProject ? p.name : null,
-      rewardText: `资金 ${formatMoney(new Decimal(p.reward.money).mul(rewardMultiplier).floor())}（存储 ×${rewardMultiplier.toFixed(2)}） · 研发进度 +${p.reward.researchProgress}`,
+      rewardText: `${t("stage3.rewardMoney")} ${formatMoney(new Decimal(p.reward.money).mul(rewardMultiplier).floor())}（${t("stage3.rewardStorage")} ×${rewardMultiplier.toFixed(2)}） · ${t("stage3.rewardResearch")} +${p.reward.researchProgress}`,
       requirementsText: requirements.join(" · "),
     };
   });
@@ -868,10 +869,10 @@ export function buildViewModel(state: SaveData): ViewModel {
       const round = eraDef.id === "project_r1" ? 1 : eraDef.id === "project_r2" ? 2 : 3;
       const previousCore = round <= 1 ? null : `core_${round - 1}`;
       const requirements = [
-        `机房 ${roomsOwned}/3`,
-        `前置工程「区域推理协作网」${(state.stage3?.flagship?.completedIds ?? []).includes("project_3") ? "已完成" : "未完成"}`,
+        `${t("stage3.reqRooms")} ${roomsOwned}/3`,
+        `${t("stage3.reqPrereq")}「${t("flagship.3.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_3") ? t("common.done") : t("stage3.notDone")}`,
       ];
-      if (previousCore) requirements.push(`前置核心 ${claimedCoreIds.has(previousCore) ? "已获得" : "未获得"}`);
+      if (previousCore) requirements.push(`${t("stage3.reqCore")} ${claimedCoreIds.has(previousCore) ? t("stage3.obtained") : t("stage3.notObtained")}`);
       flagship.push({
         id: eraDef.id,
         name: eraDef.name,
@@ -887,7 +888,7 @@ export function buildViewModel(state: SaveData): ViewModel {
         totalCompute: formatBig(compute3),
         pendingRewardId: pendingForThisProject ? eraDef.id : null,
         pendingRewardName: pendingForThisProject ? eraDef.name : null,
-        rewardText: `本轮奖励：第${round}枚奇点核心 · 奇点核心总计：${round} / 3`,
+        rewardText: `${t("stage3.roundReward")}${t("common.colon")}${round} / 3`,
         requirementsText: requirements.join(" · "),
       });
     }
@@ -911,15 +912,15 @@ export function buildViewModel(state: SaveData): ViewModel {
   }));
 
   const eraArchive: EraArchiveVM[] = [
-    { id: "stage1", name: "AI创业工作室", reached: true, real: true },
-    { id: "stage2", name: "服务器集群", reached: state.serverCount > 0 || state.stage2.completedAtMs > 0, real: true },
-    { id: "stage3", name: "算力中心", reached: stage3Entered, real: true },
-    { id: "r1", name: "第一轮地球算力纪元", reached: claimedCoreIds.has("core_1"), real: true },
-    { id: "r2", name: "第二轮全球算力纪元", reached: claimedCoreIds.has("core_2"), real: true },
-    { id: "r3", name: "第三轮行星算力纪元", reached: claimedCoreIds.has("core_3"), real: true },
-    { id: "stage4", name: "地月算力纪元", reached: s4Entered, real: true },
-    { id: "stage5", name: "戴森算力纪元", reached: s5Entered, real: true },
-    { id: "dyson", name: "银河算力大亨", reached: perpetualActive(state), real: true },
+    { id: "stage1", name: "civilization.stage1", reached: true, real: true },
+    { id: "stage2", name: "civilization.stage2", reached: state.serverCount > 0 || state.stage2.completedAtMs > 0, real: true },
+    { id: "stage3", name: "civilization.stage3", reached: stage3Entered, real: true },
+    { id: "r1", name: "civilization.r1", reached: claimedCoreIds.has("core_1"), real: true },
+    { id: "r2", name: "civilization.r2", reached: claimedCoreIds.has("core_2"), real: true },
+    { id: "r3", name: "civilization.r3", reached: claimedCoreIds.has("core_3"), real: true },
+    { id: "stage4", name: "civilization.stage4", reached: s4Entered, real: true },
+    { id: "stage5", name: "civilization.stage5", reached: s5Entered, real: true },
+    { id: "dyson", name: "civilization.dyson", reached: perpetualActive(state), real: true },
   ];
 
   const stage3: Stage3VM = {
@@ -934,17 +935,21 @@ export function buildViewModel(state: SaveData): ViewModel {
       name: bottleneck.name,
       efficiency: bottleneck.efficiency,
       upgradeEfficiency: bottleneck.upgradeEfficiency,
-      projectedIncomeGain: formatMoney(bottleneck.projectedIncomeGain) + "/秒",
+      projectedIncomeGain: formatMoney(bottleneck.projectedIncomeGain) + t("unit.perSec"),
     },
     effectiveEfficiency: eff,
     totalCompute: formatBig(compute3),
-    incomePerSec: formatMoney(stage3Entered ? stage3IncomePerSecond(state) : new Decimal(0)) + "/秒",
+    incomePerSec: formatMoney(stage3Entered ? stage3IncomePerSecond(state) : new Decimal(0)) + t("unit.perSec"),
     commissionBonusActive: (state.stage3?.commissionBonusUntilMs ?? 0) > Date.now(),
     commissionBonusRemaining: (state.stage3?.commissionBonusUntilMs ?? 0) > Date.now()
-      ? `${Math.max(0, Math.ceil(((state.stage3?.commissionBonusUntilMs ?? 0) - Date.now()) / 1000))}秒`
+      ? `${t("common.sec", { value: Math.max(0, Math.ceil(((state.stage3?.commissionBonusUntilMs ?? 0) - Date.now()) / 1000)) })}`
       : "",
     blueprintChoice,
-    blueprintChoiceLabel: blueprintChoice === "server3" ? "达到 3 台服务器，选择集群架构蓝图" : blueprintChoice === "server8" ? "达到 8 台服务器，选择集群架构蓝图" : "",
+    blueprintChoiceLabel: blueprintChoice === "server3"
+      ? t("stage3.blueprintChoice3")
+      : blueprintChoice === "server8"
+        ? t("stage3.blueprintChoice8")
+        : "",
     blueprints,
     techArchive,
     eraArchive,
@@ -956,21 +961,21 @@ export function buildViewModel(state: SaveData): ViewModel {
   const iterationHistory = endgameMode(state)
     ? SINGULARITY_MULTIPLIERS.slice(0, Math.min(3, state.technologyIterationCount)).map((multiplier, index) => ({
         count: index + 1,
-        label: `第${index + 1}次技术迭代`,
+        label: t("archive.iterationLabel", { count: index + 1 }),
         multiplier: `×${multiplier}`,
       }))
     : [];
   const singularityCores = endgameMode(state)
     ? ["core_1", "core_2", "core_3"].map((id, index) => ({
         id,
-        label: `奇点核心 ${index + 1}`,
+        label: t("archive.coreLabel", { count: index + 1 }),
         claimed: claimedCoreIds.has(id),
       }))
     : [];
   const civilizationStages: GrowthHistoryVM["civilizationStages"] = [
-    { id: "stage1", name: "AI 创业工作室", reached: true, reachedAtMs: state.createdAtMs },
-    { id: "stage2", name: "服务器集群", reached: state.serverCount > 0, reachedAtMs: state.stage2?.completedAtMs ?? 0 },
-    { id: "stage3", name: "算力中心", reached: stage3Entered, reachedAtMs: state.stage3?.enteredAtMs ?? 0 },
+    { id: "stage1", name: t("civilization.stage1"), reached: true, reachedAtMs: state.createdAtMs },
+    { id: "stage2", name: t("civilization.stage2"), reached: state.serverCount > 0, reachedAtMs: state.stage2?.completedAtMs ?? 0 },
+    { id: "stage3", name: t("civilization.stage3"), reached: stage3Entered, reachedAtMs: state.stage3?.enteredAtMs ?? 0 },
     { id: "stage4", name: STAGE4_IDENTITY, reached: s4Entered, reachedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 },
     { id: "stage5", name: STAGE5_IDENTITY, reached: s5Entered, reachedAtMs: state.singularity?.stage5?.enteredAtMs ?? 0 },
   ];
@@ -979,7 +984,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     const definition = ERAS.find((candidate) => candidate.id === era.id);
     archivedEras.set(era.id, { name: definition?.name ?? era.id, reached: true, reachedAtMs: era.reachedAtMs });
   }
-  if (s4Entered) archivedEras.set("stage4_lunar", { name: "地月算力纪元", reached: true, reachedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 });
+  if (s4Entered) archivedEras.set("stage4_lunar", { name: t("civilization.stage4"), reached: true, reachedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 });
   if (s5Entered) archivedEras.set("stage5_galactic", { name: STAGE5_ERA_NAME, reached: true, reachedAtMs: state.singularity?.stage5?.enteredAtMs ?? 0 });
   const galacticEras = endgameMode(state)
     ? [...archivedEras.entries()].map(([id, era]) => ({ id, ...era }))
@@ -1003,8 +1008,8 @@ export function buildViewModel(state: SaveData): ViewModel {
     totalRequests: iter.totalRequests,
     models: iter.models,
     blueprints: iter.blueprints,
-    resetItems: ["当前资金", "工作室等级与经验", "当前服务器", "当前机房与基础设施", "本轮模型训练等级", "本轮旗舰工程状态"],
-    gainItems: ["技术迭代次数 +1", "永久收入倍率 ×2", "自动经营更早解锁", "服务器批量购买解锁", "模型研发速度永久 +25%"],
+    resetItems: ["prestige.reset.money", "prestige.reset.workshop", "prestige.reset.servers", "prestige.reset.rooms", "prestige.reset.models", "prestige.reset.flagship"],
+    gainItems: ["prestige.gain.iteration", "prestige.gain.multiplier", "prestige.gain.earlierAutomation", "prestige.gain.bulkBuy", "prestige.gain.researchSpeed"],
   };
 
   const nowMs = Date.now();
@@ -1041,44 +1046,44 @@ export function buildViewModel(state: SaveData): ViewModel {
   let primaryAction: ViewModel["primaryAction"] = null;
   if (stage5Entered(state)) {
     primaryAction = {
-      id: s5Pending ? "claim_stage5_reward" : s5Completed ? "继续经营戴森纪元" : "start_stage5_project",
+      id: s5Pending ? "claim_stage5_reward" : s5Completed ? "continue_stage5" : "start_stage5_project",
       label: s5Pending
-        ? "领取戴森算力球 · 主线完成"
+        ? t("primary.claimDyson")
         : s5Completed
-          ? "继续经营（永续增长模式）"
-          : "启动戴森算力球",
+          ? t("primary.continueDyson")
+          : t("primary.startDyson"),
       enabled: s5Pending || !s5Completed,
     };
   } else if (stage4Entered(state) && s4Completed) {
-    primaryAction = { id: "start_stage5", label: "启动戴森算力纪元", enabled: true };
+    primaryAction = { id: "start_stage5", label: t("stage4.enterDyson"), enabled: true };
   } else if (stage4Entered(state)) {
     primaryAction = {
       id: s4Pending ? "claim_stage4_reward" : "start_stage4_project",
-      label: s4Pending ? "领取地月主线里程碑" : s4Completed ? "继续经营地月算力网" : "启动地月一体化算力网",
+      label: s4Pending ? t("feel.action.claimStage4") : s4Completed ? t("primary.continueLunar") : t("primary.startMoonNetwork"),
       enabled: s4Pending || !s4Completed,
     };
   } else if (state.singularity?.spacePlanRevealed === true && state.singularity.spacePlanStarted !== true) {
-    primaryAction = { id: "start_space_plan", label: "启动地外算力计划", enabled: true };
+    primaryAction = { id: "start_space_plan", label: t("feel.action.startSpacePlan"), enabled: true };
   } else if (canClaimCore(state)) {
-    primaryAction = { id: "claim_core", label: "领取奇点核心", enabled: true };
+    primaryAction = { id: "claim_core", label: t("feel.action.claimCore"), enabled: true };
   } else if (canEndgameIterate(state)) {
     primaryAction = {
       id: "prestige",
-      label: (currentRound(state) ?? 3) === 3 ? "揭示地外算力计划" : "执行下一次技术迭代",
+      label: (currentRound(state) ?? 3) === 3 ? t("core.revealPlan") : t("prestige.executeNext"),
       enabled: true,
     };
   } else if (!state.modelProgress) {
-    primaryAction = { id: "acquire_model", label: "获取第一款模型", enabled: true };
+    primaryAction = { id: "acquire_model", label: t("action.acquireModel"), enabled: true };
   } else if (!state.automation && automationUnlocked(state)) {
-    primaryAction = { id: "enable_automation", label: "开启自动经营", enabled: true };
+    primaryAction = { id: "enable_automation", label: t("action.enableAutomation"), enabled: true };
   } else if (state.serverCount < MAX_SERVERS && nextDef) {
     primaryAction = {
       id: "buy_server",
-      label: `购买${nextName ?? "服务器"}（${formatMoney(nextDef.cost)}）`,
+      label: t("primary.buyServer", { name: nextName ?? t("server.server"), cost: formatMoney(nextDef.cost) }),
       enabled: canBuyServer(state),
     };
   } else if (canPrestige(state)) {
-    primaryAction = { id: "prestige", label: "进行技术迭代", enabled: true };
+    primaryAction = { id: "prestige", label: t("action.prestige"), enabled: true };
   }
 
   return {
@@ -1090,7 +1095,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     stage3Gateway: gateway,
     money: perpetualActive(state) ? formatLiveMoney(state.money, s5IncomePerSec) : formatHeaderMoney(state.money),
     moneyRaw: new Decimal(state.money),
-    incomePerSec: formatMoney(ips) + "/秒",
+    incomePerSec: formatMoney(ips) + t("unit.perSec"),
     lifetimeIncome: formatMoney(state.lifetimeIncome),
     compute: formatBig(stage3Entered ? compute3 : compute.mul(state.serverPower)),
     permanentMultiplier: "×" + formatBig(state.permanentMultiplier),
@@ -1128,7 +1133,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     trainPreview: buildTrainPreview(state),
     rental: {
       active: state.rentalCompute.active,
-      costPerSec: formatMoney(rentalCostPerSec(state)) + "/秒",
+      costPerSec: formatMoney(rentalCostPerSec(state)) + t("unit.perSec"),
       canEnable: canEnableRental(state),
     },
     server,
@@ -1138,7 +1143,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       serverCount: state.serverCount,
       modelCount: state.ownedModelIds.length,
       totalCompute: formatBig(compute.mul(new Decimal(state.serverPower))),
-      incomePerSec: formatMoney(ips) + "/秒",
+      incomePerSec: formatMoney(ips) + t("unit.perSec"),
       stageIncome: formatMoney(new Decimal(state.lifetimeIncome).minus(state.incomeAtLastPrestige || 0)),
       completedAtMs: state.stage2?.completedAtMs ?? 0,
     },

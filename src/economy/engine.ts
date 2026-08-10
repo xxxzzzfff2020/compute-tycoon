@@ -851,10 +851,10 @@ export function stage3Gateway(state: SaveData): boolean {
 }
 
 export function stageLabel(stage: number, gateway = false): string {
-  if (stage === 1) return "创业纪元 · AI 工作室";
-  if (stage === 2 && gateway) return "集群纪元 · 服务器集群完成 · 算力中心筹建已解锁";
-  if (stage === 2) return "集群纪元 · 服务器集群";
-  return "地球纪元 · 算力中心";
+  if (stage === 1) return "stage.era1";
+  if (stage === 2 && gateway) return "stage.era2.gateway";
+  if (stage === 2) return "stage.era2";
+  return "stage.era3";
 }
 
 // ---------- 技术迭代 ----------
@@ -892,21 +892,21 @@ export function prestigePreview(state: SaveData): PrestigePreview {
       target: new Decimal(0),
       current: new Decimal(0),
       resetItems: round === 3
-        ? ["本轮地球经营保持不变（第三次迭代转化为地外算力计划揭示）"]
+        ? ["prestige.reset.round3"]
         : [
-            "当前资金",
-            "工作室等级与经验",
-            "当前服务器",
-            "当前机房与基础设施",
-            "本轮模型训练等级",
-            "本轮旗舰工程状态",
+            "prestige.reset.money",
+            "prestige.reset.workshop",
+            "prestige.reset.servers",
+            "prestige.reset.rooms",
+            "prestige.reset.models",
+            "prestige.reset.flagship",
           ],
       gainItems: [
-        `技术迭代次数 → ${Math.min(3, coreCount + 1)}`,
-        `永久收入倍率 → ×${SINGULARITY_MULTIPLIERS[coreCount]}`,
-        ...(coreCount === 0 ? ["批量购买已验证项目解锁"] : []),
-        ...(coreCount === 1 ? ["已学早期流程压缩"] : []),
-        ...(round === 3 ? ["地外算力计划揭示"] : []),
+        `prestige.gain.iterCount:${Math.min(3, coreCount + 1)}`,
+        `prestige.gain.multTo:${SINGULARITY_MULTIPLIERS[coreCount]}`,
+        ...(coreCount === 0 ? ["prestige.gain.bulkBuy"] : []),
+        ...(coreCount === 1 ? ["prestige.gain.compression"] : []),
+        ...(round === 3 ? ["prestige.gain.spaceReveal"] : []),
       ],
       speedupEstimate: SINGULARITY_MULTIPLIERS[coreCount] ?? SINGULARITY_MULTIPLIERS[SINGULARITY_MULTIPLIERS.length - 1],
     };
@@ -919,19 +919,19 @@ export function prestigePreview(state: SaveData): PrestigePreview {
     target: new Decimal(0),
     current: new Decimal(0),
     resetItems: [
-      "当前资金",
-      "工作室等级与经验",
-      "当前服务器",
-      "当前机房与基础设施",
-      "本轮模型训练等级",
-      "本轮旗舰工程状态",
+      "prestige.reset.money",
+      "prestige.reset.workshop",
+      "prestige.reset.servers",
+      "prestige.reset.rooms",
+      "prestige.reset.models",
+      "prestige.reset.flagship",
     ],
     gainItems: [
-      "技术迭代次数 +1",
-      "永久收入倍率 ×2",
-      "自动经营更早解锁",
-      "服务器批量购买解锁",
-      "模型研发速度永久 +25%",
+      "prestige.gain.iteration",
+      "prestige.gain.multiplier",
+      "prestige.gain.earlierAutomation",
+      "prestige.gain.bulkBuy",
+      "prestige.gain.researchSpeed",
     ],
     speedupEstimate,
   };

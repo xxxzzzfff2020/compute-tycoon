@@ -15,10 +15,10 @@ export interface InfrastructureDef {
 }
 
 export const INFRASTRUCTURES: InfrastructureDef[] = [
-  { id: "power", name: "电力设施", icon: "⚡", baseCost: 2_500_000, costGrowth: 1.9, keyLevels: [3, 6, 8], desc: "决定机房可投产上限；电力不足时算力降载运行（不损坏）" },
-  { id: "computeCards", name: "算力卡", icon: "🖥️", baseCost: 3_200_000, costGrowth: 1.8, keyLevels: [3, 5, 7], desc: "直接提高总算力与请求处理速度" },
-  { id: "optical", name: "光模块", icon: "🔆", baseCost: 2_000_000, costGrowth: 1.9, keyLevels: [3, 5, 7], desc: "提高有效吞吐与算力向收入的转化率" },
-  { id: "storage", name: "存储阵列", icon: "💾", baseCost: 1_800_000, costGrowth: 2.0, keyLevels: [3, 5, 7], desc: "提高旗舰工程奖励与数据承载能力" },
+  { id: "power", name: "infra.power.name", icon: "⚡", baseCost: 2_500_000, costGrowth: 1.9, keyLevels: [3, 6, 8], desc: "infra.power.desc" },
+  { id: "computeCards", name: "infra.computeCards.name", icon: "🖥️", baseCost: 3_200_000, costGrowth: 1.8, keyLevels: [3, 5, 7], desc: "infra.computeCards.desc" },
+  { id: "optical", name: "infra.optical.name", icon: "🔆", baseCost: 2_000_000, costGrowth: 1.9, keyLevels: [3, 5, 7], desc: "infra.optical.desc" },
+  { id: "storage", name: "infra.storage.name", icon: "💾", baseCost: 1_800_000, costGrowth: 2.0, keyLevels: [3, 5, 7], desc: "infra.storage.desc" },
 ];
 
 export function infraById(id: string): InfrastructureDef {
@@ -52,8 +52,8 @@ export const MACHINE_ROOMS: MachineRoomDef[] = [
   {
     index: 1,
     id: "room_1",
-    name: "集群核心机房",
-    scaleName: "集群核心机房",
+    name: "era.room1.name",
+    scaleName: "room.1.scaleName",
     requires: { power: 0, computeCards: 0, optical: 0, storage: 0 },
     computeMult: 1,
     incomeMult: 1,
@@ -62,8 +62,8 @@ export const MACHINE_ROOMS: MachineRoomDef[] = [
   {
     index: 2,
     id: "room_2",
-    name: "企业级算力机房",
-    scaleName: "企业级算力机房",
+    name: "era.room2.name",
+    scaleName: "room.2.scaleName",
     requires: { power: 3, computeCards: 3, optical: 2, storage: 2 },
     computeMult: 3,
     incomeMult: 3,
@@ -72,8 +72,8 @@ export const MACHINE_ROOMS: MachineRoomDef[] = [
   {
     index: 3,
     id: "room_3",
-    name: "区域算力中心",
-    scaleName: "区域级算力运营商",
+    name: "era.room3.name",
+    scaleName: "room.3.scaleName",
     // 曲线协调：机房 3 在中段门槛投产，最终工程仍要求存储 8，保留后续成长段。
     requires: { power: 6, computeCards: 7, optical: 5, storage: 5 },
     computeMult: 12,
@@ -124,18 +124,18 @@ export interface FlagshipProjectDef {
 export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
   {
     id: "project_1",
-    name: "大模型集中训练",
+    name: "flagship.1.name",
     icon: "🧠",
     requiresRooms: 1,
     requiresCompute: 500,
     requiresStorage: 0,
     progressRequired: 500,
     reward: { money: 3_000_000, researchProgress: 25, unlocksRoom: null, computeCardBoost: 1 },
-    desc: "机房 1 运行后解锁；完成后获得大额资金、模型研发进度与高阶算力卡",
+    desc: "flagship.1.desc",
   },
   {
     id: "project_2",
-    name: "全国推理服务网络",
+    name: "flagship.2.name",
     icon: "🌐",
     requiresRooms: 2,
     requiresCompute: 5_000,
@@ -143,11 +143,11 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresStorage: 2,
     progressRequired: 4000,
     reward: { money: 10_000_000, researchProgress: 30, unlocksRoom: 3, rateBonus: 0.15 },
-    desc: "机房 2 投产后解锁；完成提高本轮业务费率并解锁机房 3 建设资格",
+    desc: "flagship.2.desc",
   },
   {
     id: "project_3",
-    name: "区域推理协作网",
+    name: "flagship.3.name",
     icon: "🛰️",
     requiresRooms: 3,
     requiresCompute: 20_000,
@@ -155,7 +155,7 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresStorage: 8,
     progressRequired: 15000,
     reward: { money: 30_000_000, researchProgress: 40, unlocksRoom: 0 },
-    desc: "机房 3 投产后解锁；完成解锁第一次技术迭代与算力纪元记录",
+    desc: "flagship.3.desc",
   },
 ];
 
@@ -169,36 +169,36 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
 export const ERA_PROJECTS: FlagshipProjectDef[] = [
   {
     id: "project_r1",
-    name: "区域算力协作网",
+    name: "flagship.r1.name",
     icon: "🛰️",
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
     progressRequired: 27000,
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
-    desc: "R1 时代工程：三座机房与区域算力网络完成后追加的唯一目标，完成可领取奇点核心 1",
+    desc: "flagship.r1.desc",
   },
   {
     id: "project_r2",
-    name: "全球算力骨干环",
+    name: "flagship.r2.name",
     icon: "🌍",
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
     progressRequired: 45000,
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
-    desc: "R2 时代工程：跨大洲的全球算力骨干环，完成可领取奇点核心 2",
+    desc: "flagship.r2.desc",
   },
   {
     id: "project_r3",
-    name: "行星算力统一场",
+    name: "flagship.r3.name",
     icon: "🌌",
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
     progressRequired: 43000,
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
-    desc: "R3 时代工程：将全球算力统一为行星级场域，完成可领取奇点核心 3 并揭示地外算力计划",
+    desc: "flagship.r3.desc",
   },
 ];
 
@@ -219,9 +219,9 @@ export interface BlueprintDef {
 }
 
 export const BLUEPRINTS: BlueprintDef[] = [
-  { id: "bp_general", name: "通用计算架构", icon: "⚙️", desc: "达到 3 台服务器时自动永久解锁", kind: "general" },
-  { id: "bp_gpu", name: "GPU 并行架构", icon: "🎮", desc: "达到 5 台服务器时自动永久解锁", kind: "gpu" },
-  { id: "bp_interconnect", name: "高速互联架构", icon: "🔗", desc: "达到 8 台服务器时自动永久解锁", kind: "interconnect" },
+  { id: "bp_general", name: "blueprint.general.name", icon: "⚙️", desc: "blueprint.general.desc", kind: "general" },
+  { id: "bp_gpu", name: "blueprint.gpu.name", icon: "🎮", desc: "blueprint.gpu.desc", kind: "gpu" },
+  { id: "bp_interconnect", name: "blueprint.interconnect.name", icon: "🔗", desc: "blueprint.interconnect.desc", kind: "interconnect" },
 ];
 
 export function blueprintById(id: string): BlueprintDef {
@@ -242,14 +242,14 @@ export interface TechArchiveDef {
 }
 
 export const TECH_ARCHIVES: TechArchiveDef[] = [
-  { id: "tech_gpu_array", name: "高密度GPU阵列", desc: "算力卡达到关键等级后解锁", unlock: { infra: "computeCards", level: 5 }, passive: { compute: 0.05 } },
-  { id: "tech_power_modular", name: "模块化供电系统", desc: "电力设施达到关键等级后解锁", unlock: { infra: "power", level: 4 }, passive: { income: 0.04 } },
-  { id: "tech_liquid_cooling", name: "液冷机房架构", desc: "电力设施达到关键等级后解锁", unlock: { infra: "power", level: 6 }, passive: { compute: 0.04 } },
-  { id: "tech_optical_bus", name: "高速光互联总线", desc: "光模块达到关键等级后解锁", unlock: { infra: "optical", level: 3 }, passive: { throughput: 0.06 } },
-  { id: "tech_distributed_storage", name: "分布式存储阵列", desc: "存储阵列达到关键等级后记录；存储收益由正式离线/旗舰合同统一计算", unlock: { infra: "storage", level: 3 }, passive: null },
-  { id: "tech_auto_scheduler", name: "自治调度系统", desc: "存储阵列达到关键等级后记录；不额外改变吞吐或直接收入", unlock: { infra: "storage", level: 5 }, passive: null },
-  { id: "tech_regional_network", name: "区域算力网络", desc: "机房 3 投产后解锁", unlock: { room: 3 }, passive: { income: 0.06 } },
-  { id: "tech_llm_training", name: "大模型集中训练设施", desc: "完成旗舰工程 1 后解锁", unlock: null, passive: { research: 0.05 } },
+  { id: "tech_gpu_array", name: "tech.gpuArray.name", desc: "tech.gpuArray.desc", unlock: { infra: "computeCards", level: 5 }, passive: { compute: 0.05 } },
+  { id: "tech_power_modular", name: "tech.powerModular.name", desc: "tech.liquidCooling.desc", unlock: { infra: "power", level: 4 }, passive: { income: 0.04 } },
+  { id: "tech_liquid_cooling", name: "tech.liquidCooling.name", desc: "tech.liquidCooling.desc", unlock: { infra: "power", level: 6 }, passive: { compute: 0.04 } },
+  { id: "tech_optical_bus", name: "tech.opticalBus.name", desc: "tech.opticalBus.desc", unlock: { infra: "optical", level: 3 }, passive: { throughput: 0.06 } },
+  { id: "tech_distributed_storage", name: "tech.distributedStorage.name", desc: "tech.distributedStorage.desc", unlock: { infra: "storage", level: 3 }, passive: null },
+  { id: "tech_auto_scheduler", name: "tech.autoScheduler.name", desc: "tech.autoScheduler.desc", unlock: { infra: "storage", level: 5 }, passive: null },
+  { id: "tech_regional_network", name: "tech.regionalNetwork.name", desc: "tech.regionalNetwork.desc", unlock: { room: 3 }, passive: { income: 0.06 } },
+  { id: "tech_llm_training", name: "tech.llmTraining.name", desc: "tech.llmTraining.desc", unlock: null, passive: { research: 0.05 } },
 ];
 
 // ---------- 算力纪元 ----------
@@ -261,22 +261,22 @@ export interface EraDef {
 }
 
 export const ERAS: EraDef[] = [
-  { id: "era_studio", name: "个人AI工作室", real: true },
-  { id: "era_own_server", name: "自有服务器", real: true },
-  { id: "era_cluster", name: "初级服务器集群", real: true },
-  { id: "era_full_cluster", name: "完整服务器集群", real: true },
-  { id: "era_room1", name: "集群核心机房", real: true },
-  { id: "era_room2", name: "企业级算力机房", real: true },
-  { id: "era_room3", name: "区域算力中心", real: true },
-  { id: "era_national", name: "全国级算力网络", real: true },
-  { id: "era_global", name: "全球算力网络", real: false },
-  { id: "era_planetary", name: "行星级算力网络", real: false },
-  { id: "era_orbit", name: "近地轨道算力环", real: false },
-  { id: "era_moon", name: "月球计算基地", real: false },
-  { id: "era_solar", name: "太阳系算力网络", real: false },
-  { id: "era_dyson", name: "戴森算力云", real: false },
-  { id: "era_galaxy", name: "银河计算网络", real: false },
-  { id: "era_universe", name: "宇宙模拟阵列", real: false },
+  { id: "era_studio", name: "era.studio.name", real: true },
+  { id: "era_own_server", name: "era.ownServer.name", real: true },
+  { id: "era_cluster", name: "era.cluster.name", real: true },
+  { id: "era_full_cluster", name: "era.fullCluster.name", real: true },
+  { id: "era_room1", name: "era.room1.name", real: true },
+  { id: "era_room2", name: "era.room2.name", real: true },
+  { id: "era_room3", name: "era.room3.name", real: true },
+  { id: "era_national", name: "era.national.name", real: true },
+  { id: "era_global", name: "era.global.name", real: false },
+  { id: "era_planetary", name: "era.planetary.name", real: false },
+  { id: "era_orbit", name: "era.orbit.name", real: false },
+  { id: "era_moon", name: "era.moon.name", real: false },
+  { id: "era_solar", name: "era.solar.name", real: false },
+  { id: "era_dyson", name: "era.dyson.name", real: false },
+  { id: "era_galaxy", name: "era.galaxy.name", real: false },
+  { id: "era_universe", name: "era.universe.name", real: false },
 ];
 
 // ---------- 开发验收档位 ----------

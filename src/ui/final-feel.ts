@@ -3,6 +3,7 @@ import type {
   FeelViewModel,
   GrowthFeedbackEvent,
 } from "../economy/feel";
+import { t } from "../i18n";
 
 export interface FinalFeelMetrics {
   stableNodeCount: number;
@@ -45,7 +46,7 @@ function exactActionTarget(root: HTMLElement, action: string): HTMLElement | nul
 
 export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLElement): FinalFeelController {
   const element = node("section", "final-feel-panel");
-  element.setAttribute("aria-label", "算力系统运行状态");
+  element.setAttribute("aria-label", t("feel.aria.running"));
   element.dataset.tier = "idle";
   element.dataset.running = "false";
 
@@ -68,9 +69,9 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   visual.append(ringOuter, ringMiddle, ringInner, orbit, particleField, core);
 
   const readout = node("div", "compute-engine-readout");
-  const label = node("div", "compute-engine-label", "总算力");
+  const label = node("div", "compute-engine-label", t("feel.computeLabel.total"));
   const value = node("strong", "compute-engine-value", "0");
-  const status = node("div", "compute-engine-status", "等待第一项业务启动");
+  const status = node("div", "compute-engine-status", t("feel.status.idle"));
   const cosmic = node("div", "compute-engine-cosmic");
   cosmic.hidden = true;
   const cosmicNodes = node("span", "compute-cosmic-nodes");
@@ -97,8 +98,8 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
 
   const actionSummary = node("div", "investment-summary");
   const actionHeader = node("div", "investment-summary-header");
-  const actionTitle = node("strong", "investment-summary-title", "现在可投入 0 项");
-  const actionRecommendation = node("span", "investment-summary-recommendation", "系统正在积累下一次升级资金");
+  const actionTitle = node("strong", "investment-summary-title", t("feel.actions.available", { count: 0 }));
+  const actionRecommendation = node("span", "investment-summary-recommendation", t("feel.actions.accumulating"));
   actionHeader.append(actionTitle, actionRecommendation);
   const actionSlots = node("div", "investment-summary-actions");
   const actionButtons: HTMLButtonElement[] = [];
@@ -106,7 +107,7 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
     const button = node("button", "investment-action") as HTMLButtonElement;
     button.type = "button";
     button.hidden = true;
-    button.setAttribute("aria-label", "定位到可投入项目");
+    button.setAttribute("aria-label", t("feel.actions.locate"));
     actionSlots.appendChild(button);
     actionButtons.push(button);
   }
@@ -114,7 +115,7 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
 
   const growthReview = node("aside", "growth-review-card");
   growthReview.hidden = true;
-  const growthReviewKicker = node("div", "growth-review-kicker", "增长回顾");
+  const growthReviewKicker = node("div", "growth-review-kicker", t("feel.growthReview.kicker"));
   const growthReviewRoute = node("strong", "growth-review-route");
   const growthReviewMetrics = node("div", "growth-review-metrics");
   const growthReviewSummary = node("div", "growth-review-summary");
@@ -150,13 +151,13 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   }
 
   function patchActions(actions: FeelActionVM[]): void {
-    setText(actionTitle, `现在可投入 ${actions.length} 项`);
+    setText(actionTitle, t("feel.actions.available", { count: actions.length }));
     const recommended = actions[0];
     setText(
       actionRecommendation,
       recommended
-        ? `推荐：${recommended.label}${recommended.projectedIncomeGain ? ` · ${recommended.projectedIncomeGain}` : ""}`
-        : "系统正在积累下一次升级资金",
+        ? `${t("feel.actions.recommended")}: ${recommended.label}${recommended.projectedIncomeGain ? ` · ${recommended.projectedIncomeGain}` : ""}`
+        : t("feel.actions.accumulating"),
     );
     const nextIds = new Set(actions.map((action) => action.id));
     for (let index = 0; index < actionButtons.length; index += 1) {
@@ -171,7 +172,7 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
       }
       button.dataset.feelAnchor = action.anchorAction;
       button.dataset.feelActionId = action.id;
-      button.textContent = index === 0 ? `前往 · ${action.label}` : action.label;
+      button.textContent = index === 0 ? `${t("feel.actions.goTo")} · ${action.label}` : action.label;
       if (initialized && !previousActionIds.has(action.id)) pulseAction(button);
     }
     previousActionIds = nextIds;
@@ -185,7 +186,7 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
     setText(growthReviewRoute, `${review.fromLabel} → ${review.currentLabel}`);
     setText(
       growthReviewMetrics,
-      `已经营 ${review.elapsedLabel} · 算力 ${review.computeLabel} · 收入 ${review.incomeLabel} · 关键跨越 ${review.milestoneCount}`,
+      `${t("feel.growthReview.elapsed")} ${review.elapsedLabel} · ${t("feel.computeLabel.total")} ${review.computeLabel} · ${t("feel.income")} ${review.incomeLabel} · ${t("feel.growthReview.milestones")} ${review.milestoneCount}`,
     );
     setText(growthReviewSummary, review.summary);
   }
@@ -197,18 +198,18 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
     element.style.setProperty("--feel-period", `${(6 - feel.activity01 * 2.5).toFixed(2)}s`);
     setText(label, feel.computeLabel);
     setText(value, feel.computeValue);
-    setText(status, feel.activity01 > 0 ? `系统持续运行 · ${feel.incomeValue}` : "等待第一项业务启动");
+    setText(status, feel.activity01 > 0 ? `${t("feel.status.running")} · ${feel.incomeValue}` : t("feel.status.idle"));
 
     const hasCosmic = feel.cosmicNodeOwned !== null && feel.cosmicNodeTotal !== null;
     cosmic.hidden = !hasCosmic;
     if (hasCosmic) {
-      setText(cosmicNodes, `节点 ${feel.cosmicNodeOwned}/${feel.cosmicNodeTotal}`);
-      setText(cosmicMultiplier, `网络倍率 ${feel.cosmicMultiplier ?? "×1.00"}`);
+      setText(cosmicNodes, `${t("feel.cosmic.nodes")} ${feel.cosmicNodeOwned}/${feel.cosmicNodeTotal}`);
+      setText(cosmicMultiplier, `${t("feel.cosmic.multiplier")} ${feel.cosmicMultiplier ?? "×1.00"}`);
       setText(
         cosmicProject,
         feel.activeProjectProgress01 === null
-          ? "工程待启动"
-          : `工程 ${Math.round(feel.activeProjectProgress01 * 100)}%`,
+          ? t("feel.cosmic.projectIdle")
+          : `${t("feel.cosmic.project")} ${Math.round(feel.activeProjectProgress01 * 100)}%`,
       );
     }
     progress.hidden = feel.activeProjectProgress01 === null;
@@ -216,7 +217,7 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
       const percent = Math.max(0, Math.min(100, feel.activeProjectProgress01 * 100));
       progressBar.style.width = `${percent}%`;
       progress.setAttribute("aria-valuenow", percent.toFixed(0));
-      progress.setAttribute("aria-label", `当前工程进度 ${percent.toFixed(0)}%`);
+      progress.setAttribute("aria-label", `${t("feel.cosmic.projectProgress", { value: percent.toFixed(0) })}`);
     }
     patchActions(feel.affordableActions);
     patchGrowthReview(feel);

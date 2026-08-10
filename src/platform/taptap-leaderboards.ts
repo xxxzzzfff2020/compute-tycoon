@@ -68,7 +68,7 @@ export class TapLeaderboardController {
   supported(): boolean { return this.leaderboard !== null; }
 
   async open(kind: "fastest" | "wealth"): Promise<{ ok: boolean; error?: string }> {
-    if (!this.leaderboard) return { ok: false, error: "请在 TapTap 小游戏中查看名人堂" };
+    if (!this.leaderboard) return { ok: false, error: "leaderboard.err.tapOnly" };
     const leaderboardId = kind === "fastest" ? FASTEST_LEADERBOARD_ID : WEALTH_LEADERBOARD_ID;
     try {
       await new Promise<void>((resolve, reject) => this.leaderboard!.openLeaderboard({
@@ -78,7 +78,7 @@ export class TapLeaderboardController {
       }));
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "排行榜打开失败" };
+      return { ok: false, error: error instanceof Error ? error.message : "leaderboard.err.openFailed" };
     }
   }
 
@@ -110,7 +110,7 @@ export class TapLeaderboardController {
       }));
       return { ok: true };
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : "排行榜提交失败" };
+      return { ok: false, error: error instanceof Error ? error.message : "leaderboard.err.submitFailed" };
     } finally {
       this.submitting = false;
     }

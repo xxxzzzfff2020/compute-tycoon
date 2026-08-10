@@ -43,14 +43,14 @@ function errorMessage(error: { errCode?: number; errMsg?: string } | unknown): s
     const detail = value.errMsg ?? value.message;
     if (detail) return value.errCode == null ? detail : `${value.errCode}: ${detail}`;
   }
-  return "未知错误";
+  return "ads.err.unknown";
 }
 
 export class TapRewardedAdController {
   private readonly adUnitId: string;
   private readonly injectedApi?: TapAdsApi;
   private ad: TapRewardedVideoAd | null = null;
-  private snapshot: TapRewardedAdSnapshot = { state: "idle", message: "尚未初始化" };
+  private snapshot: TapRewardedAdSnapshot = { state: "idle", message: "ads.state.idle" };
   private listeners = new Set<SnapshotListener>();
   private pendingCompletion: CompletionListener | null = null;
 
@@ -73,19 +73,19 @@ export class TapRewardedAdController {
     if (this.snapshot.state !== "idle") return;
     const tapApi = this.injectedApi ?? globalTapApi();
     if (!tapApi) {
-      this.setSnapshot("unsupported", "当前不是 TapTap 小游戏环境");
+      this.setSnapshot("unsupported", "ads.err.tapOnly");
       return;
     }
 
     try {
       this.ad = tapApi.createRewardedVideoAd({ adUnitId: this.adUnitId });
       this.ad.onLoad(() => {
-        if (this.snapshot.state !== "destroyed") this.setSnapshot("ready", "激励视频已就绪");
+        if (this.snapshot.state !== "destroyed") this.setSnapshot("ready", "ads.state.ready");
       });
       this.ad.onError((error) => {
         const pending = this.pendingCompletion;
         this.pendingCompletion = null;
-        this.setSnapshot("error", `广告错误：${errorMessage(error)}`);
+        this.setSnapshot("error", `ads.err.ad:${errorMessage(error)}`);
         pending?.(false);
       });
       this.ad.onClose((result) => {
@@ -94,27 +94,27 @@ export class TapRewardedAdController {
         pending?.(result?.isEnded === true);
         if (this.snapshot.state !== "destroyed") {
           // 平台会自动加载下一条；等待下一次 onLoad 再允许播放。
-          this.setSnapshot("loading", "正在加载下一条激励视频");
+          this.setSnapshot("loading", "ads.state.loadingNext");
         }
       });
-      this.setSnapshot("loading", "正在加载激励视频");
+      this.setSnapshot("loading", "ads.state.loading");
       this.ad.load?.();
     } catch (error) {
       this.ad = null;
-      this.setSnapshot("error", `初始化失败：${errorMessage(error)}`);
+      this.setSnapshot("error", `ads.err.init:${errorMessage(error)}`);
     }
   }
 
   show(onComplete: CompletionListener): boolean {
     if (!this.ad || this.snapshot.state !== "ready") return false;
     this.pendingCompletion = onComplete;
-    this.setSnapshot("showing", "激励视频播放中");
+    this.setSnapshot("showing", "ads.state.showing");
     try {
       this.ad.show();
       return true;
     } catch (error) {
       this.pendingCompletion = null;
-      this.setSnapshot("error", `播放失败：${errorMessage(error)}`);
+      this.setSnapshot("error", `ads.err.play:${errorMessage(error)}`);
       onComplete(false);
       return false;
     }
@@ -127,7 +127,7 @@ export class TapRewardedAdController {
       this.ad?.destroy?.();
     } finally {
       this.ad = null;
-      this.setSnapshot("destroyed", "广告联调已关闭");
+      this.setSnapshot("destroyed", "ads.state.destroyed");
       this.listeners.clear();
     }
   }
@@ -147,13 +147,13 @@ export function installTapRewardedAdTest(
   const controller = options.controller ?? new TapRewardedAdController();
   const panel = document.createElement("aside");
   panel.className = "ad-test-panel";
-  panel.setAttribute("aria-label", "TapTap 激励视频联调");
+  panel.setAttribute("aria-label", "ads.debug.aria");
 
   const title = document.createElement("strong");
-  title.textContent = "激励视频联调";
+  title.textContent = "ads.debug.title";
   const note = document.createElement("div");
   note.className = "ad-test-note";
-  note.textContent = "仅验证播放回调，不发游戏奖励、不修改存档";
+  note.textContent = "ads.debug.note";
   const status = document.createElement("div");
   status.className = "ad-test-status";
   const result = document.createElement("div");
@@ -161,7 +161,7 @@ export function installTapRewardedAdTest(
   const button = document.createElement("button");
   button.type = "button";
   button.className = "btn btn-primary";
-  button.textContent = "播放激励视频";
+  button.textContent = "ads.debug.play";
   button.disabled = true;
   button.setAttribute("aria-disabled", "true");
   panel.append(title, note, status, result, button);
@@ -179,10 +179,10 @@ export function installTapRewardedAdTest(
     result.textContent = "";
     const started = controller.show((completed) => {
       result.textContent = completed
-        ? "完整观看回调已收到 · 联调成功（未修改存档）"
-        : "视频未完整观看或播放失败 · 未产生任何游戏变化";
+        ? "ads.debug.success"
+        : "ads.debug.incomplete";
     });
-    if (!started) result.textContent = "广告尚未就绪，请稍后重试";
+    if (!started) result.textContent = "ads.debug.notReady";
   });
 
   controller.init();

@@ -163,7 +163,7 @@ function ensureRoomOne(stage3: Stage3State): Stage3State {
   return {
     ...stage3,
     machineRooms: [
-      { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: stage3.enteredAtMs },
+      { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: stage3.enteredAtMs },
       ...stage3.machineRooms,
     ],
   };

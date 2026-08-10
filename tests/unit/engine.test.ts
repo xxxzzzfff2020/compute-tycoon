@@ -264,7 +264,7 @@ describe("engine: prestige", () => {
     const pp = prestigePreview(s);
     expect(pp.canPrestige).toBe(true);
     expect(pp.resetItems.length).toBeGreaterThan(0);
-    expect(pp.gainItems).toContain("永久收入倍率 ×2");
+    expect(pp.gainItems).toContain("prestige.gain.multiplier");
   });
 
   it("applies prestige atomically", () => {

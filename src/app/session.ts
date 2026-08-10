@@ -130,7 +130,7 @@ export interface ResearchReceipt {
   incomeDelta: string;
   switched: boolean;
   switchReason: string;
-  conclusion: "已切换为更强主力" | "已收录，当前主力更强，保持不变";
+  conclusion: string;
 }
 
 function formatResearchMetric(value: Decimal): string {
@@ -439,11 +439,11 @@ export class GameSession {
       incomeDelta: formatResearchMetric(incomePerSecond(after).minus(beforeIncome)),
       switched,
       switchReason: switched
-        ? "新蓝图的等级、模型算力与每秒收入都不低于当前主力，并且至少一项更强"
+        ? "receipt.reason.switched"
         : resultModelId === beforeModelId
-          ? "当前主力蓝图升级，模型算力与每秒收入都已提高"
-          : "新蓝图尚未全面超过当前主力，已收入荣誉馆但不替换主力",
-      conclusion: switched ? "已切换为更强主力" : "已收录，当前主力更强，保持不变",
+          ? "receipt.reason.upgraded"
+          : "receipt.reason.kept",
+      conclusion: switched ? "receipt.conclusion.switched" : "receipt.conclusion.kept",
     };
     return {
       ...result,

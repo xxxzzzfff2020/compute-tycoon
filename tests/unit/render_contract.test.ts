@@ -12,6 +12,7 @@ import { freshSaveData } from "../../src/save/storage";
 import type { SaveData } from "../../src/save/types";
 import { infraUpgradeCost } from "../../src/data/stage3";
 import { buildReviewSave } from "../../src/review/checkpoints";
+import { t } from "../../src/i18n";
 import { STAGE4_FINAL_PROJECT } from "../../src/economy/stage4";
 import { STAGE5_FINAL_PROJECT } from "../../src/economy/stage5";
 
@@ -106,14 +107,14 @@ describe("render contract", () => {
     const shell = shellFor(container, session);
     shell.render(buildViewModel(session.getState()));
     const tabs = [...document.querySelectorAll<HTMLButtonElement>(".toolbar button")];
-    expect(tabs.map((tab) => tab.textContent)).toEqual(["经营", "荣誉馆", "赞助", "菜单"]);
+    expect(tabs.map((tab) => tab.textContent)).toEqual([t("page.business"), t("page.honor"), t("page.sponsor"), t("page.menu")]);
     expect(tabs.every((tab) => tab.querySelector("svg.game-icon") !== null)).toBe(true);
     expect(tabs.every((tab) => !tab.hasAttribute("data-icon"))).toBe(true);
     expect(document.querySelector(".stage-line")?.children.length).toBe(2);
     expect(document.querySelector(".status-bar")).toBeNull();
     expect(document.body.textContent).not.toContain("存档 ");
     (document.querySelector("[data-command='page:honor']") as HTMLButtonElement).click();
-    expect([...document.querySelectorAll(".archive-tabs .btn")].map((tab) => tab.textContent)).toEqual(["档案", "里程碑", "名人堂"]);
+    expect([...document.querySelectorAll(".archive-tabs .btn")].map((tab) => tab.textContent)).toEqual([t("archive.tab.catalog"), t("archive.tab.achievements"), t("archive.tab.hall")]);
     (document.querySelector("[data-command='page:sponsor']") as HTMLButtonElement).click();
     expect(document.querySelector(".app-page-sponsor")?.textContent).toContain("离线经营扩容");
     expect(document.querySelector(".app-page-sponsor")?.textContent).toContain("经营收入 ×2");
@@ -140,7 +141,7 @@ describe("render contract", () => {
     });
 
     (document.querySelector("[data-command='page:menu']") as HTMLButtonElement).click();
-    expect(document.querySelector(".game-menu-status")?.textContent).toContain("真机测试包");
+    expect(document.querySelector(".game-menu-status")?.textContent).toContain("真机构建");
     expect(document.querySelector(".game-menu-status")?.textContent).toContain("双设备冲突保护");
     expect(document.querySelector(".game-menu-status")?.textContent).not.toContain("Production");
     expect(document.querySelector(".game-menu-status")?.textContent).not.toContain("Platform Review");
@@ -416,9 +417,9 @@ describe("render contract", () => {
     shell.render(buildViewModel(session.getState()));
 
     const prestige = document.querySelector("#section-prestige") as HTMLElement;
-    expect(prestige.textContent).toContain("本版本技术迭代已完成");
-    expect(prestige.textContent).toContain("第1次迭代 · 永久收入×2");
-    expect(prestige.textContent).toContain("本轮技术路线已稳定，可继续扩张现有网络");
+    expect(prestige.textContent).toContain("本轮迭代已完成");
+    expect(prestige.textContent).toContain("第一次技术迭代已完成");
+    expect(prestige.textContent).toContain("下一轮将获得更高永久收入倍率");
     expect(prestige.querySelector("[data-action='prestige']")).toBeNull();
     expect(buildViewModel(session.getState()).iteration.canIterate).toBe(false);
   });
@@ -1306,7 +1307,7 @@ describe("CARD-03 stage5 render contract", () => {
   it("perpetual keeps manual reset entry (toolbar reset still present)", () => {
     const { session, shell } = stage5Harness(true);
     expect(document.querySelector("[data-command='reset']")).not.toBeNull();
-    expect(document.querySelector(".stage5-story-done")?.textContent).toContain("主线完成");
+    expect(document.querySelector(".stage5-story-done")?.textContent).toContain("银河终局庆典");
     expect(document.querySelector(".money")?.textContent).toContain("¥890.123兆");
     expect(document.querySelector(".perpetual-growth")?.textContent).toContain("银河网络实时结算");
     expect(document.querySelector(".perpetual-growth-income")?.textContent).toContain("每秒持续注入");
@@ -1323,11 +1324,11 @@ describe("CARD-03 stage5 render contract", () => {
     expect(document.querySelector("[data-action='archive_category:growth']")).not.toBeNull();
     expect(document.querySelector("[data-action='archive_category:legendary']")).not.toBeNull();
     (document.querySelector("[data-action='archive_category:growth']") as HTMLButtonElement).click();
-    expect(document.querySelector(".archive-growth")?.textContent).toContain("技术迭代历史");
+    expect(document.querySelector(".archive-growth")?.textContent).toContain("技术迭代");
     expect(document.querySelector(".archive-growth")?.textContent).toContain("文明阶段");
     (document.querySelector("[data-action='archive_category:legendary']") as HTMLButtonElement).click();
-    expect(document.querySelector(".archive-legendary")?.textContent).toContain("最大算力");
-    expect(document.querySelector(".archive-legendary")?.textContent).toContain("达成纪元");
+    expect(document.querySelector(".archive-legendary")?.textContent).toContain("最高算力");
+    expect(document.querySelector(".archive-legendary")?.textContent).toContain("已抵达纪元");
     expect(document.querySelectorAll("#section-archive svg.game-icon").length).toBeGreaterThan(6);
     expect(document.querySelector("#section-archive")?.textContent).not.toMatch(/[🔒🔓⭐🏅🏆🤖🎨🎙🔬🧠]/u);
   });
@@ -1358,15 +1359,15 @@ describe("CARD-04 offline return receipt", () => {
     const card = document.querySelector(".offline-card") as HTMLElement;
     expect(card).not.toBeNull();
     const text = card.textContent ?? "";
-    expect(text).toContain("回归结算");
-    expect(text).toContain("本次离线：");
-    expect(text).toContain("有效结算：");
-    expect(text).toContain("本阶段上限：");
-    expect(text).toContain("超出未计入：2小时");
-    expect(text).toContain("获得资金：");
-    expect(text).toContain("获得研发进度：");
+    expect(text).toContain("离线经营回执");
+    expect(text).toContain("本次离线");
+    expect(text).toContain("离线时长");
+    expect(text).toContain("上限");
+    expect(text).toContain("超出部分 2小时");
+    expect(text).toContain("获得资金");
+    expect(text).toContain("研发进度");
     // 工程推进（无激活工程 → 占位）
-    expect(text).toContain("推进工程：—");
+    expect(text).toContain("暂无进行中的工程");
     // 领取一次后卡片消失
     session.claimOffline();
     shell.render(buildViewModel(session.getState()));

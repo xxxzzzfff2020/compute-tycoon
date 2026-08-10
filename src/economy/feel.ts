@@ -54,6 +54,7 @@ import {
 } from "../data/stage3";
 import { SERVERS } from "../data/content";
 import { formatBig, formatHeaderMoney, formatMoney, formatTime, toStoredBig } from "../core/big";
+import { t } from "../i18n";
 import type { SaveData } from "../save/types";
 
 export type ComputeTier =
@@ -101,7 +102,7 @@ export interface OfflineFeelPreviewVM {
 
 export interface FeelViewModel {
   computeTier: ComputeTier;
-  computeLabel: "总算力" | "地球基底算力";
+  computeLabel: string;
   computeValue: string;
   computeRaw: string;
   incomeValue: string;
@@ -180,53 +181,53 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
     const definition = FLAGSHIP_PROJECTS.find((project) => project.id === pendingFlagship);
     addAction(actions, {
       id: "claim_flagship_reward",
-      label: `领取${definition?.name ?? "时代工程"}成果`,
+      label: `${t("feel.action.claim")}${t(definition?.name ?? "stage3.eraProject")}${t("feel.action.reward")}`,
       anchorAction: "claim_flagship_reward",
       priority: 130,
     });
   }
   if (s5 && hasPendingStage5Reward(state)) {
-    addAction(actions, { id: "claim_stage5_reward", label: "领取银河主线里程碑", anchorAction: "claim_stage5_reward", priority: 140 });
+    addAction(actions, { id: "claim_stage5_reward", label: t("feel.action.claimStage5"), anchorAction: "claim_stage5_reward", priority: 140 });
   }
   if (s4 && !s5 && hasPendingStage4Reward(state)) {
-    addAction(actions, { id: "claim_stage4_reward", label: "领取地月主线里程碑", anchorAction: "claim_stage4_reward", priority: 140 });
+    addAction(actions, { id: "claim_stage4_reward", label: t("feel.action.claimStage4"), anchorAction: "claim_stage4_reward", priority: 140 });
   }
   if (canClaimCore(state)) {
-    addAction(actions, { id: "claim_core", label: "领取奇点核心", anchorAction: "claim_core", priority: 135 });
+    addAction(actions, { id: "claim_core", label: t("feel.action.claimCore"), anchorAction: "claim_core", priority: 135 });
   }
   if (canEndgameIterate(state)) {
-    addAction(actions, { id: "prestige", label: "推进下一轮技术迭代", anchorAction: "prestige", priority: 125 });
+    addAction(actions, { id: "prestige", label: t("feel.action.prestige"), anchorAction: "prestige", priority: 125 });
   }
   if (state.singularity?.spacePlanRevealed === true && state.singularity.spacePlanStarted !== true) {
-    addAction(actions, { id: "start_space_plan", label: "启动地外算力计划", anchorAction: "start_space_plan", priority: 125 });
+    addAction(actions, { id: "start_space_plan", label: t("feel.action.startSpacePlan"), anchorAction: "start_space_plan", priority: 125 });
   }
 
   if (!state.modelProgress) {
-    addAction(actions, { id: "acquire_model", label: "获取第一款模型", anchorAction: "acquire_model", priority: 120 });
+    addAction(actions, { id: "acquire_model", label: t("action.acquireModel"), anchorAction: "acquire_model", priority: 120 });
   } else if (!state.automation && automationUnlocked(state)) {
-    addAction(actions, { id: "enable_automation", label: "开启自动经营", anchorAction: "enable_automation", priority: 120 });
+    addAction(actions, { id: "enable_automation", label: t("action.enableAutomation"), anchorAction: "enable_automation", priority: 120 });
   }
 
   if (state.serverCount >= MAX_SERVERS && !state.stage2.settlementShown) {
-    addAction(actions, { id: "complete_stage2_settlement", label: "完成服务器集群里程碑", anchorAction: "complete_stage2_settlement", priority: 120 });
+    addAction(actions, { id: "complete_stage2_settlement", label: t("feel.action.stage2Settlement"), anchorAction: "complete_stage2_settlement", priority: 120 });
   }
   if (!stage3 && state.stage2.settlementShown && stage3EntryMet(state)) {
-    addAction(actions, { id: "enter_stage3", label: "进入算力中心", anchorAction: "enter_stage3", priority: 120 });
+    addAction(actions, { id: "enter_stage3", label: t("stage3.enterCenter"), anchorAction: "enter_stage3", priority: 120 });
   }
 
   if (s4 && !s5) {
     const nextNode = STAGE4_NODES.find((node) => canBuyStage4Node(state, node.id));
     if (nextNode) addAction(actions, {
       id: `buy_node:${nextNode.id}`,
-      label: `部署${nextNode.name}`,
+      label: `${t("feel.action.deploy")}${t(nextNode.name)}`,
       anchorAction: `buy_node:${nextNode.id}`,
       priority: 95,
     });
     if (canStartStage4Project(state)) {
-      addAction(actions, { id: "start_stage4_project", label: `启动${STAGE4_FINAL_PROJECT.name}`, anchorAction: "start_stage4_project", priority: 110 });
+      addAction(actions, { id: "start_stage4_project", label: `${t("feel.action.start")}${t(STAGE4_FINAL_PROJECT.name)}`, anchorAction: "start_stage4_project", priority: 110 });
     }
     if ((state.singularity?.stage4?.completedProjectIds ?? []).includes(STAGE4_FINAL_PROJECT.id) && !s5) {
-      addAction(actions, { id: "start_stage5", label: "进入戴森算力纪元", anchorAction: "start_stage5", priority: 125 });
+      addAction(actions, { id: "start_stage5", label: t("stage4.enterDyson"), anchorAction: "start_stage5", priority: 125 });
     }
   }
 
@@ -234,12 +235,12 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
     const nextNode = STAGE5_NODES.find((node) => canBuyStage5Node(state, node.id));
     if (nextNode) addAction(actions, {
       id: `buy_stage5_node:${nextNode.id}`,
-      label: `部署${nextNode.name}`,
+      label: `${t("feel.action.deploy")}${t(nextNode.name)}`,
       anchorAction: `buy_stage5_node:${nextNode.id}`,
       priority: 95,
     });
     if (canStartStage5Project(state)) {
-      addAction(actions, { id: "start_stage5_project", label: `启动${STAGE5_FINAL_PROJECT.name}`, anchorAction: "start_stage5_project", priority: 110 });
+      addAction(actions, { id: "start_stage5_project", label: `${t("feel.action.start")}${t(STAGE5_FINAL_PROJECT.name)}`, anchorAction: "start_stage5_project", priority: 110 });
     }
   }
 
@@ -247,16 +248,16 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
     const next = nextServerDef(state);
     if (next) addAction(actions, {
       id: "buy_server",
-      label: `购买${serverName(next.index)}`,
+      label: `${t("feel.action.buy")}${t(serverName(next.index))}`,
       anchorAction: "buy_server",
       priority: 90,
     });
   }
   if (!s4 && !s5 && canBuyMaxServers(state)) {
-    addAction(actions, { id: "buy_max_servers", label: "批量购买可负担服务器", anchorAction: "buy_max_servers", priority: 75 });
+    addAction(actions, { id: "buy_max_servers", label: t("feel.action.buyMaxServers"), anchorAction: "buy_max_servers", priority: 75 });
   }
   if (!s4 && !s5 && state.serverCount === 0 && canEnableRental(state)) {
-    addAction(actions, { id: "enable_rental", label: "启用租赁算力", anchorAction: "enable_rental", priority: 80 });
+    addAction(actions, { id: "enable_rental", label: t("action.enableRental"), anchorAction: "enable_rental", priority: 80 });
   }
 
   if (stage3 && !s4 && !s5) {
@@ -264,17 +265,17 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
     if (canUpgradeInfrastructure(state, bottleneck.id)) {
       addAction(actions, {
         id: `upgrade_infra:${bottleneck.id}`,
-        label: `升级${bottleneck.name}`,
+        label: `${t("feel.action.upgrade")}${t(bottleneck.name)}`,
         anchorAction: `upgrade_infra:${bottleneck.id}`,
         priority: 100,
-        projectedIncomeGain: `预计收入 +${formatMoney(bottleneck.projectedIncomeGain)}/秒`,
+        projectedIncomeGain: `${t("feel.projectedGain", { value: formatMoney(bottleneck.projectedIncomeGain) })}`,
       });
     }
     for (const room of MACHINE_ROOMS) {
       if (canCommissionRoom(state, room.index)) {
         addAction(actions, {
           id: `commission_room:${room.index}`,
-          label: `投产${room.name}`,
+        label: `${t("feel.action.commission")}${t(room.name)}`,
           anchorAction: `commission_room:${room.index}`,
           priority: 105,
         });
@@ -284,7 +285,7 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
       if (canStartFlagship(state, project.id)) {
         addAction(actions, {
           id: `start_flagship:${project.id}`,
-          label: `启动${project.name}`,
+          label: `${t("feel.action.start")}${t(project.name)}`,
           anchorAction: `start_flagship:${project.id}`,
           priority: 105,
         });
@@ -294,7 +295,7 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
       if (infrastructure.id === bottleneck.id || !canUpgradeInfrastructure(state, infrastructure.id)) continue;
       addAction(actions, {
         id: `upgrade_infra:${infrastructure.id}`,
-        label: `升级${infrastructure.name}`,
+        label: `${t("feel.action.upgrade")}${t(infrastructure.name)}`,
         anchorAction: `upgrade_infra:${infrastructure.id}`,
         priority: 45,
       });
@@ -302,10 +303,10 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
   }
 
   if (canResearchModel(state)) {
-    addAction(actions, { id: "research_model", label: "继续研发模型蓝图", anchorAction: "research_model", priority: 65 });
+    addAction(actions, { id: "research_model", label: t("feel.action.researchModel"), anchorAction: "research_model", priority: 65 });
   }
   if (canTrain(state)) {
-    addAction(actions, { id: "train_model", label: "训练当前模型", anchorAction: "train_model", priority: 55 });
+    addAction(actions, { id: "train_model", label: t("action.trainModel"), anchorAction: "train_model", priority: 55 });
   }
 
   return [...actions.values()]
@@ -327,12 +328,12 @@ function baseCompute(state: SaveData): Decimal {
 }
 
 function identityLabel(state: SaveData, stage: number): string {
-  if (stage >= 5) return "银河算力大亨";
-  if (stage === 4) return "地月算力运营商";
-  if (stage === 3) return "算力中心运营商";
-  if (state.serverCount >= 8) return "完整服务器集群";
-  if (state.serverCount >= 1) return "服务器集群";
-  return "AI创业工作室";
+  if (stage >= 5) return t("civilization.dyson");
+  if (stage === 4) return t("civilization.stage4");
+  if (stage === 3) return t("feel.identity.centerOperator");
+  if (state.serverCount >= 8) return t("feel.identity.fullCluster");
+  if (state.serverCount >= 1) return t("civilization.stage2");
+  return t("civilization.stage1");
 }
 
 function buildGrowthReview(state: SaveData, stage: number, compute: Decimal, income: Decimal): GrowthReviewVM {
@@ -347,21 +348,21 @@ function buildGrowthReview(state: SaveData, stage: number, compute: Decimal, inc
   const currentLabel = identityLabel(state, stage);
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.createdAtMs) / 1000));
   const summary = perpetualActive(state)
-    ? "主线已经完成，银河网络仍在刷新你的经营纪录。"
+    ? t("feel.summary.perpetual")
     : stage >= 4
-      ? "从地球机房到宇宙节点，你的算力版图已经跨越行星尺度。"
+      ? t("feel.summary.cosmic")
       : state.technologyIterationCount > 0
-        ? "每次技术迭代都在压缩旧路程，把公司推向更大的算力尺度。"
+        ? t("feel.summary.iterated")
         : state.serverCount >= 1
-          ? "第一台服务器已经把创业工作室变成持续运转的算力资产。"
-          : "第一笔自动收入会成为这家算力公司的起点。";
+          ? t("feel.summary.firstServer")
+          : t("feel.summary.fresh");
   return {
     visible: milestoneCount > 0,
-    fromLabel: "AI创业工作室",
+    fromLabel: t("civilization.stage1"),
     currentLabel,
     elapsedLabel: formatTime(elapsedSeconds),
     computeLabel: formatBig(compute),
-    incomeLabel: `${formatMoney(income)}/秒`,
+    incomeLabel: `${formatMoney(income)}${t("unit.perSec")}`,
     milestoneCount,
     summary,
   };
@@ -394,7 +395,7 @@ function offlinePreview(state: SaveData, compute: Decimal): OfflineFeelPreviewVM
   return {
     moneyBefore: formatHeaderMoney(state.money),
     moneyAfter: formatHeaderMoney(preview.money),
-    computeLabel: `保持 ${formatBig(compute)}`,
+    computeLabel: `${t("feel.keepCompute")} ${formatBig(compute)}`,
     affordableAfterCount: actions.length,
     recommendedAfterLabel: actions[0]?.label ?? null,
   };
@@ -410,10 +411,10 @@ export function buildFeelViewModel(state: SaveData): FeelViewModel {
   const s5Nodes = stage >= 5 ? ownedStage5Nodes(state) : [];
   return {
     computeTier: resolveComputeTier(compute, stage),
-    computeLabel: stage >= 4 ? "地球基底算力" : "总算力",
+    computeLabel: stage >= 4 ? t("feel.computeLabel.base") : t("feel.computeLabel.total"),
     computeValue: formatBig(compute),
     computeRaw: compute.toString(),
-    incomeValue: `${formatMoney(income)}/秒`,
+    incomeValue: `${formatMoney(income)}${t("unit.perSec")}`,
     incomeRaw: income.toString(),
     moneyValue: formatHeaderMoney(state.money),
     moneyRaw: new Decimal(state.money).toString(),
@@ -463,23 +464,23 @@ function feedbackAllowed(command: string): boolean {
 }
 
 function milestoneHeadline(command: string): string {
-  if (command === "acquire_model") return "第一束智能火花已点亮";
-  if (command === "enable_automation") return "自动经营开始运转";
-  if (command === "buy_server" || command === "buy_max_servers") return "服务器集群扩容";
-  if (command.startsWith("commission_room")) return "新机房正式投产";
-  if (command === "claim_core") return "奇点核心已入库";
-  if (command === "prestige") return "技术迭代完成";
-  if (command === "start_space_plan") return "地外算力计划启动";
-  if (command.startsWith("buy_node")) return "地月节点接入网络";
-  if (command === "start_stage5") return "戴森算力纪元启动";
-  if (command.startsWith("buy_stage5_node")) return "恒星节点接入网络";
-  if (command === "claim_stage5_reward") return "银河主线里程碑达成";
-  if (command === "claim_stage4_reward") return "地月主线里程碑达成";
-  if (command === "claim_flagship_reward") return "时代工程成果已领取";
-  if (command === "enter_stage3") return "算力中心正式启用";
-  if (command === "complete_stage2_settlement") return "服务器集群阶段完成";
-  if (command === "claim_offline") return "公司成长报告已入账";
-  return "经营能力提升";
+  if (command === "acquire_model") return t("feedback.acquireModel");
+  if (command === "enable_automation") return t("feedback.automation");
+  if (command === "buy_server" || command === "buy_max_servers") return t("feedback.serverFleet");
+  if (command.startsWith("commission_room")) return t("feedback.roomOnline");
+  if (command === "claim_core") return t("feedback.coreClaimed");
+  if (command === "prestige") return t("feedback.prestigeDone");
+  if (command === "start_space_plan") return t("feedback.spacePlan");
+  if (command.startsWith("buy_node")) return t("feedback.lunarNode");
+  if (command === "start_stage5") return t("feedback.dysonEra");
+  if (command.startsWith("buy_stage5_node")) return t("feedback.stellarNode");
+  if (command === "claim_stage5_reward") return t("feedback.galaxyMilestone");
+  if (command === "claim_stage4_reward") return t("feedback.lunarMilestone");
+  if (command === "claim_flagship_reward") return t("feedback.eraReward");
+  if (command === "enter_stage3") return t("feedback.centerOnline");
+  if (command === "complete_stage2_settlement") return t("feedback.clusterDone");
+  if (command === "claim_offline") return t("feedback.offlineReport");
+  return t("feedback.boost");
 }
 
 export function createGrowthFeedback(
@@ -504,12 +505,12 @@ export function createGrowthFeedback(
     const afterBottleneck = after.bottleneck;
     if (beforeBottleneck && beforeBottleneck.efficiency < 1 && (afterBottleneck?.efficiency ?? 0) >= 1) {
       kind = "bottleneck";
-      headline = "瓶颈解除 · 效率达到100%";
+      headline = t("feedback.bottleneckCleared");
     } else if (beforeBottleneck && afterBottleneck && beforeBottleneck.id !== afterBottleneck.id) {
       kind = "bottleneck";
-      headline = `瓶颈转移 · 现在关注${afterBottleneck.name}`;
+      headline = `${t("feedback.bottleneckShift")} ${t(afterBottleneck.name)}`;
     } else {
-      headline = "产能提升";
+      headline = t("feedback.capacityUp");
     }
   }
   if ([
@@ -521,11 +522,11 @@ export function createGrowthFeedback(
   }
 
   const details: string[] = [];
-  if (computeAfter.gt(computeBefore)) details.push(`算力 ${before.computeValue} → ${after.computeValue}`);
-  if (incomeAfter.gt(incomeBefore)) details.push(`收入 ${before.incomeValue} → ${after.incomeValue}`);
-  if (command === "claim_offline" && moneyIncreased) details.push(`资金 ${before.moneyValue} → ${after.moneyValue}`);
+  if (computeAfter.gt(computeBefore)) details.push(`${t("feel.computeLabel.total")} ${before.computeValue} → ${after.computeValue}`);
+  if (incomeAfter.gt(incomeBefore)) details.push(`${t("feel.income")} ${before.incomeValue} → ${after.incomeValue}`);
+  if (command === "claim_offline" && moneyIncreased) details.push(`${t("feel.money")} ${before.moneyValue} → ${after.moneyValue}`);
   if (details.length === 0 && !["major", "scale", "bottleneck"].includes(kind)) return null;
-  if (details.length === 0) details.push("新的经营尺度已经生效");
+  if (details.length === 0) details.push(t("feedback.newScale"));
 
   const durationMs = kind === "scale" ? 2400 : kind === "major" ? 1800 : kind === "bottleneck" ? 1600 : kind === "offline" ? 1400 : 850;
   return { command, kind, headline, detail: details.join(" · "), durationMs, tierChanged, moneyIncreased };

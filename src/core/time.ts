@@ -39,3 +39,14 @@ export function dayKey(ms: number): string {
   const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+
+/** 排行榜/档案日期显示：按 locale 输出本地化日期（UTC 存储，本地展示）。 */
+export function formatDate(ms: number): string {
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "—";
+  try {
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}

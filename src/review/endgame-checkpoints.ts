@@ -88,9 +88,9 @@ function seedEndgameBase(state: SaveData, nowMs: number, iterations: number): vo
     enteredAtMs: nowMs - 60_000,
     infrastructure: { power: 8, computeCards: 8, optical: 8, storage: 8 },
     machineRooms: [
-      { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs - 45_000 },
-      { index: 2, id: "room_2", name: "区域算力机房", commissionedAtMs: nowMs - 30_000 },
-      { index: 3, id: "room_3", name: "骨干算力机房", commissionedAtMs: nowMs - 15_000 },
+      { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs - 45_000 },
+      { index: 2, id: "room_2", name: "era.room2.name", commissionedAtMs: nowMs - 30_000 },
+      { index: 3, id: "room_3", name: "era.room3.name", commissionedAtMs: nowMs - 15_000 },
     ],
     flagship: {
       activeId: null,

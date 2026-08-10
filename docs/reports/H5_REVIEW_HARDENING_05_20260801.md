@@ -15,13 +15,13 @@ baseline:
   workspace_clean_after_closure: true
 
 backup:
-  git_bundle: /Users/xxxzzzfff2002/code/TaptapMaker/STUDIO_CONTROL/04_LOCAL_OPERATIONS/PM_RUNTIME/compute_tycoon/h5_review_hardening_05_20260801/backup/compute-tycoon-h5-review-candidate-20260801.bundle
+  git_bundle: <LOCAL_REPO_PATH>/compute-tycoon-h5-review-candidate-20260801.bundle
   sha256: b9c26776a68a62885c52bc0c0b05395ae69fe0d354aa32428f66b12783502360
   ordinary_git_remote: NONE
   ordinary_remote_push_status: REMOTE_PENDING
 
 review_build:
-  url: https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site
+  url: <PRIVATE_REVIEW_URL>
   isolated_storage_namespace: compute_tycoon_h5_review_v2:<checkpoint_id>
   natural_new_game: PASS_REAL_STATE_MACHINE
   checkpoint_count: 10

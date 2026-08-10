@@ -10,6 +10,7 @@ import type { GrowthFeedbackEvent } from "../economy/feel";
 import type { ArchitectureReceipt, CommandResult, ResearchReceipt } from "../app/session";
 import { AUTOMATION_ORDER_CAP } from "../data/content";
 import { loadAudioPreferences, saveAudioPreferences } from "../audio/game-audio";
+import { getLocale, t } from "../i18n";
 import {
   contentGameIcon,
   createGameIcon,
@@ -53,12 +54,23 @@ export interface AppShell {
   setPlatformStatus(status: PlatformPresentationStatus): void;
   showGrowthFeedback(event: GrowthFeedbackEvent): void;
   setVisualPaused(paused: boolean): void;
-  /** 统计：累计订单完成数（由 session 回调驱动） */
+  /** 统计：累计订单完成数(由 session 回调驱动) */
   incrementOrderCompletion(by: number): void;
 }
 
 const hasText = (node: Node, text: string): boolean =>
   node instanceof HTMLElement && node.textContent !== null && node.textContent.includes(text);
+
+/** VM 字段可能携带 i18n key；统一转显示文本(未知 key 原样返回)。 */
+const tr = (value: string | null | undefined): string =>
+  value == null || value === "" ? "" : t(value);
+
+/** 迭代列表项：支持 "key" 或 "key:param"(动态数值追加显示)。 */
+const prestigeItemText = (item: string): string => {
+  const [key, param] = item.split(":");
+  if (param === undefined) return t(key);
+  return `${t(key)} → ${param}`;
+};
 
 export function createAppShell(container: HTMLElement): AppShell {
   const root = document.createElement("div");
@@ -104,14 +116,14 @@ export function createAppShell(container: HTMLElement): AppShell {
   singularityBadgeEl.hidden = true;
   const iterationBadgeEl = el("div", "iteration-badge");
   iterationBadgeEl.hidden = true;
-  const moneyEl = el("div", "money", "当前资金 ¥0");
+  const moneyEl = el("div", "money", t("app.currentMoney", { money: "0" }));
   const statsEl = el("div", "stats");
-  const incomeEl = el("span", "stat", "收入 0/秒");
-  const computeEl = el("span", "stat", "算力 0");
-  const multEl = el("span", "stat", "倍率 ×1");
-  const architectureEl = el("span", "stat stat-architecture", "架构蓝图 0/3 · 全局倍率 ×1.00 · 下一解锁：3 台服务器");
-  const workshopEl = el("span", "stat", "工作室 Lv.1 · 经验 0/100");
-  const revenueEl = el("span", "stat", "累计营业收入 ¥0");
+  const incomeEl = el("span", "stat", t("app.incomePerSec", { value: "0" }));
+  const computeEl = el("span", "stat", t("app.compute", { value: "0" }));
+  const multEl = el("span", "stat", t("app.multiplier", { value: "1" }));
+  const architectureEl = el("span", "stat stat-architecture", t("app.architecture", { unlocked: "0", total: "3", mult: "1.00", next: t("app.architectureNext", { count: "3", name: "" }) }));
+  const workshopEl = el("span", "stat", t("app.workshop", { level: "1", exp: "0", next: "100" }));
+  const revenueEl = el("span", "stat", t("app.revenue", { value: "0" }));
   incomeEl.classList.add("stat-income");
   computeEl.classList.add("stat-compute");
   multEl.classList.add("stat-multiplier");
@@ -138,11 +150,11 @@ export function createAppShell(container: HTMLElement): AppShell {
   const finalFeel = createFinalFeelController(root, moneyEl);
   businessPage.appendChild(finalFeel.element);
 
-  const modelSection = section("section-model", "① 模型与订单");
+  const modelSection = section("section-model", t("section.model"));
   const modelBody = modelSection.querySelector(".section-body") as HTMLElement;
   const modelCard = el("div", "card");
-  const modelNameEl = el("div", "model-name", "未获取模型 Lv.1");
-  const modelStatsEl = el("div", "model-stats", "处理能力 0 · 训练成本 -");
+  const modelNameEl = el("div", "model-name", t("model.notAcquired"));
+  const modelStatsEl = el("div", "model-stats", t("model.stats", { compute: "0", cost: "-" }));
   const modelActionsEl = el("div", "model-actions");
   const trainPreviewEl = el("div", "train-preview", "");
   const researchProgressEl = el("div", "research-progress", "");
@@ -152,7 +164,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   modelBody.appendChild(modelCard);
   businessPage.appendChild(modelSection);
 
-  const orderSection = section("section-orders", "② 订单", true);
+  const orderSection = section("section-orders", t("section.orders"), true);
   const orderBody = orderSection.querySelector(".section-body") as HTMLElement;
   const orderListEl = el("div", "order-list");
   const activeListEl = el("div", "active-orders");
@@ -161,7 +173,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   orderBody.append(orderSummaryEl, orderListEl, activeListEl, orderHintEl);
   businessPage.appendChild(orderSection);
 
-  const serverSection = section("section-server", "③ 租赁与服务器", true);
+  const serverSection = section("section-server", t("section.server"), true);
   const serverBody = serverSection.querySelector(".section-body") as HTMLElement;
   const srvBody = el("div", "server-body");
   const fleetEl = el("div", "fleet", "");
@@ -171,14 +183,14 @@ export function createAppShell(container: HTMLElement): AppShell {
   serverBody.appendChild(srvBody);
   businessPage.appendChild(serverSection);
 
-  const centerSection = section("section-center", "④ 集群与算力中心", true);
+  const centerSection = section("section-center", t("section.center"), true);
   const centerBody = centerSection.querySelector(".section-body") as HTMLElement;
   const centerInfoEl = el("div", "center-info", "");
   const centerActionsEl = el("div", "center-actions");
   centerBody.append(centerInfoEl, centerActionsEl);
   businessPage.appendChild(centerSection);
 
-  const stage3Section = section("section-stage3", "① 算力中心与机房", true);
+  const stage3Section = section("section-stage3", t("section.stage3"), true);
   const stage3Body = stage3Section.querySelector(".section-body") as HTMLElement;
   const stage3EntryEl = el("div", "stage3-entry", "");
   const infraGridEl = el("div", "infra-grid");
@@ -191,7 +203,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   businessPage.appendChild(stage3Section);
 
   // CARD-02 Stage 4：地月算力网（隔离终局档专属；进入后取代地球经营区）
-  const stage4Section = section("section-stage4", "① 地月算力网", true);
+  const stage4Section = section("section-stage4", t("section.stage4"), true);
   const stage4Body = stage4Section.querySelector(".section-body") as HTMLElement;
   const stage4EntryEl = el("div", "stage4-entry", "");
   const stage4NodesEl = el("div", "stage4-nodes", "");
@@ -200,7 +212,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   businessPage.appendChild(stage4Section);
 
   // CARD-03 Stage 5：戴森算力纪元（进入后取代 Stage 4 经营区）
-  const stage5Section = section("section-stage5", "① 戴森算力纪元", true);
+  const stage5Section = section("section-stage5", t("section.stage5"), true);
   const stage5Body = stage5Section.querySelector(".section-body") as HTMLElement;
   const stage5EntryEl = el("div", "stage5-entry", "");
   const stage5NodesEl = el("div", "stage5-nodes", "");
@@ -212,12 +224,12 @@ export function createAppShell(container: HTMLElement): AppShell {
   // CARD-03 主线结局：戴森算力球完成全屏反馈（只触发一次；可关闭）
   const storyCompleteOverlay = el("div", "story-complete-overlay");
   const storyCompleteCard = el("div", "story-complete-card");
-  const storyCompleteCloseEl = el("button", "story-complete-close", "关闭");
+  const storyCompleteCloseEl = el("button", "story-complete-close", t("action.close"));
   storyCompleteCloseEl.setAttribute("data-command", "close_story_complete");
   const storyCompleteVisualEl = document.createElement("img");
   storyCompleteVisualEl.className = "story-complete-visual";
   storyCompleteVisualEl.dataset.src = `${import.meta.env.BASE_URL}assets/visuals/dyson-compute-sphere-keyart-v1.jpg`;
-  storyCompleteVisualEl.alt = "戴森计算球点亮恒星并连接银河算力网络";
+  storyCompleteVisualEl.alt = t("story.visualAlt");
   storyCompleteVisualEl.loading = "lazy";
   storyCompleteVisualEl.decoding = "async";
   const storyCompleteTitleEl = el("div", "story-complete-title", "");
@@ -231,7 +243,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   // CARD-02 惊喜事件：地外算力计划全屏揭示（只触发一次；可关闭后从档案馆重新打开）
   const spaceRevealOverlay = el("div", "space-reveal-overlay");
   const spaceRevealCard = el("div", "space-reveal-card");
-  const spaceRevealCloseEl = el("button", "space-reveal-close", "关闭");
+  const spaceRevealCloseEl = el("button", "space-reveal-close", t("action.close"));
   spaceRevealCloseEl.setAttribute("data-command", "close_space_reveal");
   const spaceRevealTitleEl = el("div", "space-reveal-title", "");
   const spaceRevealBodyEl = el("div", "space-reveal-body", "");
@@ -241,14 +253,14 @@ export function createAppShell(container: HTMLElement): AppShell {
   spaceRevealOverlay.hidden = true;
   root.appendChild(spaceRevealOverlay);
 
-  const archiveSection = section("section-archive", "算力荣誉馆");
+  const archiveSection = section("section-archive", t("section.archive"));
   const archiveBody = archiveSection.querySelector(".section-body") as HTMLElement;
   const archiveTabsEl = el("div", "archive-tabs");
   const archivePanelEl = el("div", "archive-panel", "");
   archiveBody.append(archiveTabsEl, archivePanelEl);
   honorPage.appendChild(archiveSection);
 
-  const prestigeSection = section("section-prestige", "⑤ 技术迭代", true);
+  const prestigeSection = section("section-prestige", t("section.prestige"), true);
   const prestigeBody = prestigeSection.querySelector(".section-body") as HTMLElement;
   const prestigeInfoEl = el("div", "prestige-info", "");
   const prestigeListEl = el("ul", "prestige-list");
@@ -256,9 +268,9 @@ export function createAppShell(container: HTMLElement): AppShell {
   prestigeBody.append(prestigeInfoEl, prestigeListEl, prestigeActionsEl);
   businessPage.appendChild(prestigeSection);
 
-  const sponsorSection = section("section-sponsor", "赞助中心");
+  const sponsorSection = section("section-sponsor", t("section.sponsor"));
   const sponsorBody = sponsorSection.querySelector(".section-body") as HTMLElement;
-  const sponsorIntroEl = el("div", "sponsor-intro", "赞助权益只提供可选加速，不观看广告也能完成全部主线。");
+  const sponsorIntroEl = el("div", "sponsor-intro", t("sponsor.intro"));
   const offlineSponsorCardEl = el("div", "sponsor-card");
   const incomeSponsorCardEl = el("div", "sponsor-card");
   sponsorBody.append(sponsorIntroEl, offlineSponsorCardEl, incomeSponsorCardEl);
@@ -266,10 +278,10 @@ export function createAppShell(container: HTMLElement): AppShell {
 
   const toolbar = el("div", "toolbar");
   const toolbarItems: Array<{ page: AppPage; label: string; icon: GameIconName }> = [
-    { page: "business", label: "经营", icon: "business" },
-    { page: "honor", label: "荣誉馆", icon: "honor" },
-    { page: "sponsor", label: "赞助", icon: "sponsor" },
-    { page: "menu", label: "菜单", icon: "menu" },
+    { page: "business", label: t("page.business"), icon: "business" },
+    { page: "honor", label: t("page.honor"), icon: "honor" },
+    { page: "sponsor", label: t("page.sponsor"), icon: "sponsor" },
+    { page: "menu", label: t("page.menu"), icon: "menu" },
   ];
   for (const item of toolbarItems) {
     const button = document.createElement("button");
@@ -284,28 +296,29 @@ export function createAppShell(container: HTMLElement): AppShell {
 
   const menuCard = el("div", "game-menu-card");
   menuCard.innerHTML = `
-    <div class="game-menu-heading"><strong>游戏菜单</strong></div>
-    <div class="game-menu-group"><span>声音</span><button type="button" class="btn" data-command="toggle_bgm"></button><button type="button" class="btn" data-command="toggle_sfx"></button></div>
-    <label class="game-menu-volume">音量 <input type="range" min="0" max="100" step="5" aria-label="游戏音量"></label>
-    <div class="game-menu-status">本地自动保存已开启 · 平台云备份将在真容器中启用</div>
-    <div class="game-menu-group"><span>云存档</span><button type="button" class="btn" data-command="cloud_upload">立即备份</button><button type="button" class="btn" data-command="cloud_restore">从云端恢复</button></div>
-    <div class="game-menu-group"><span>数据</span><button type="button" class="btn btn-danger" data-command="reset">完整重置</button></div>
+    <div class="game-menu-heading"><strong>${t("menu.title")}</strong></div>
+    <div class="game-menu-group"><span>${t("menu.sound")}</span><button type="button" class="btn" data-command="toggle_bgm"></button><button type="button" class="btn" data-command="toggle_sfx"></button></div>
+    <label class="game-menu-volume">${t("menu.volume")} <input type="range" min="0" max="100" step="5" aria-label="${t("menu.volume")}"></label>
+    <div class="game-menu-group"><span>${t("menu.language")}</span><button type="button" class="btn" data-command="set_locale:zh-CN">${t("menu.languageZh")}</button><button type="button" class="btn" data-command="set_locale:en-US">${t("menu.languageEn")}</button></div>
+    <div class="game-menu-status">${t("menu.statusLocal")}</div>
+    <div class="game-menu-group"><span>${t("menu.cloud")}</span><button type="button" class="btn" data-command="cloud_upload">${t("menu.cloudUpload")}</button><button type="button" class="btn" data-command="cloud_restore">${t("menu.cloudRestore")}</button></div>
+    <div class="game-menu-group"><span>${t("menu.data")}</span><button type="button" class="btn btn-danger" data-command="reset">${t("menu.reset")}</button></div>
     <div class="game-menu-debug platform-review-debug" hidden>
-      <strong>真机体验工具</strong>
-      <label class="game-menu-speed">体验倍率
-        <select aria-label="真机体验倍率">
+      <strong>${t("menu.debugTitle")}</strong>
+      <label class="game-menu-speed">${t("menu.debugSpeed")}
+        <select aria-label="${t("menu.debugSpeed")}">
           <option value="1">1×</option><option value="2">2×</option><option value="4">4×</option>
           <option value="8">8×</option><option value="16">16×</option><option value="32">32×</option>
           <option value="64">64×</option><option value="128">128×</option><option value="256">256×</option>
         </select>
       </label>
     </div>
-    <div class="review-tools-host" hidden aria-label="体验工具"></div>`;
+    <div class="review-tools-host" hidden aria-label="${t("menu.debugTitle")}"></div>`;
   menuPage.appendChild(menuCard);
   const menuStatusEl = menuCard.querySelector(".game-menu-status") as HTMLElement;
   let platformStatus: PlatformPresentationStatus = {
-    cloud: "本地自动保存已开启；云备份等待平台验证",
-    leaderboard: "名人堂等待平台验证",
+    cloud: t("menu.statusCloud"),
+    leaderboard: t("menu.leaderboard"),
     platformReview: false,
   };
   const volumeInput = menuCard.querySelector("input[type='range']") as HTMLInputElement;
@@ -315,8 +328,8 @@ export function createAppShell(container: HTMLElement): AppShell {
     const preferences = loadAudioPreferences();
     const bgm = menuCard.querySelector("button[data-command='toggle_bgm']") as HTMLButtonElement;
     const sfx = menuCard.querySelector("button[data-command='toggle_sfx']") as HTMLButtonElement;
-    bgm.textContent = `BGM ${preferences.bgmEnabled ? "开启" : "关闭"}`;
-    sfx.textContent = `音效 ${preferences.sfxEnabled ? "开启" : "关闭"}`;
+    bgm.textContent = preferences.bgmEnabled ? t("menu.bgmOn") : t("menu.bgmOff");
+    sfx.textContent = preferences.sfxEnabled ? t("menu.sfxOn") : t("menu.sfxOff");
     volumeInput.value = String(Math.round(preferences.volume * 100));
   };
   refreshAudioMenu();
@@ -328,11 +341,11 @@ export function createAppShell(container: HTMLElement): AppShell {
     const speed = Number(speedSelect.value);
     const result = handler("set_debug_speed", { speed });
     if (result.ok) {
-      showToast(`体验倍率已切换为 ${speed}×`);
+      showToast(t("menu.speedChanged", { speed }));
       return;
     }
     speedSelect.value = String(platformStatus.runtimeSpeed ?? 1);
-    showToast("当前包体不允许调整体验倍率");
+    showToast(t("menu.speedForbidden"));
   });
 
   // ---------- 事件委托（root 捕获，一次绑定） ----------
@@ -343,7 +356,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   const setPlatformStatus = (status: PlatformPresentationStatus): void => {
     platformStatus = { ...status };
     setText(menuStatusEl,
-      `${status.platformReview ? "真机测试包 · " : ""}本地自动保存已开启\n云备份：${status.cloud}\n名人堂：${status.leaderboard}`);
+      `${status.platformReview ? t("menu.deviceBuild") + " · " : ""}${t("menu.statusLocal")}\n${t("menu.cloudBackup")}${t("common.colon")}${tr(status.cloud)}\n${t("menu.leaderboardLabel")}${t("common.colon")}${tr(status.leaderboard)}`);
     platformReviewDebugEl.hidden = !status.platformReview;
     speedSelect.value = String(status.runtimeSpeed ?? 1);
     if (currentPage === "honor" && archiveTab === "hall" && lastVm) {
@@ -396,9 +409,9 @@ export function createAppShell(container: HTMLElement): AppShell {
     }
     if (command === "reset") {
       confirmDialog({
-        title: "重置存档",
-        body: "将删除当前全部进度并新建存档，此操作不可撤销。确定继续吗？",
-        confirmText: "确认重置",
+        title: t("menu.resetTitle"),
+        body: t("menu.resetBody"),
+        confirmText: t("menu.resetConfirm"),
         onConfirm: () => { handler("reset"); },
       });
       return;
@@ -558,97 +571,68 @@ export function createAppShell(container: HTMLElement): AppShell {
     root.dataset.iteration = vm.iterationCount > 0 ? "active" : "base";
     singularityBadgeEl.hidden = !vm.singularity.active;
     if (vm.singularity.active) {
-      setText(singularityBadgeEl, `奇点核心 ${vm.singularity.label ?? "0/3"}`);
+      setText(singularityBadgeEl, t("app.singularityBadge", { label: vm.singularity.label ?? "0/3" }));
     }
-    setText(stageEl, vm.stageLabel + (vm.iterationCount > 0 ? ` · 第${vm.iterationCount}次迭代` : ""));
+    setText(stageEl, tr(vm.stageLabel) + (vm.iterationCount > 0 ? t("app.stageIteration", { count: vm.iterationCount }) : ""));
     iterationBadgeEl.hidden = vm.iterationCount === 0;
     if (vm.iterationCount > 0) {
-      setText(iterationBadgeEl, `迭代 ${vm.iterationCount} · 永久 ${vm.permanentMultiplier}`);
+      setText(iterationBadgeEl, t("app.iterationBadge", { count: vm.iterationCount, mult: vm.permanentMultiplier }));
     }
-    setText(moneyEl, "当前资金 " + vm.money);
-    setText(incomeEl, "收入 " + vm.incomePerSec);
-    setText(computeEl, "算力 " + vm.compute);
-    setText(multEl, "倍率 " + vm.permanentMultiplier);
+    setText(moneyEl, t("app.currentMoney", { money: vm.money }));
+    setText(incomeEl, t("app.incomePerSec", { value: vm.incomePerSec }));
+    setText(computeEl, t("app.compute", { value: vm.compute }));
+    setText(multEl, t("app.multiplier", { value: vm.permanentMultiplier }));
     const nextArchitecture = vm.architecture.nextServerCount === null
-      ? "全部解锁"
-      : `下一解锁：${vm.architecture.nextServerCount} 台服务器 · ${vm.architecture.nextBlueprintName ?? "架构蓝图"}`;
+      ? t("app.architectureAllUnlocked")
+      : vm.architecture.nextBlueprintName
+        ? t("app.architectureNext", { count: vm.architecture.nextServerCount, name: tr(vm.architecture.nextBlueprintName) })
+        : t("app.architectureNextDefault", { count: vm.architecture.nextServerCount });
     setText(architectureEl,
-      `架构蓝图 ${vm.architecture.unlockedCount}/${vm.architecture.total} · 全局倍率 ×${vm.architecture.multiplier} · ${nextArchitecture}`);
-    setText(workshopEl, `工作室 Lv.${vm.workshop.level} · 经验 ${vm.workshop.experience}/${vm.workshop.experienceToNextLevel}`);
-    setText(revenueEl, "累计营业收入 " + vm.workshop.lifetimeRevenue);
+      t("app.architecture", { unlocked: vm.architecture.unlockedCount, total: vm.architecture.total, mult: vm.architecture.multiplier, next: nextArchitecture }));
+    setText(workshopEl, t("app.workshop", { level: vm.workshop.level, exp: vm.workshop.experience, next: vm.workshop.experienceToNextLevel }));
+    setText(revenueEl, t("app.revenue", { value: vm.workshop.lifetimeRevenue }));
   }
 
-  function sigForModel(vm: ViewModel): string {
+function sigForModel(vm: ViewModel): string {
     return `${vm.model.acquired}|${vm.model.name}|${vm.model.level}|${vm.model.roleLabel}|${vm.model.effectText}|${vm.model.atMaxLevel}|${vm.automationUnlocked}|${vm.automationEnabled}|${vm.research.canResearch}|${vm.research.archiveComplete}`;
   }
   function rebuildModel(vm: ViewModel): void {
     metrics.fullRenderCount += 1;
-    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), `${vm.model.name} Lv.${vm.model.level}`);
+    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), t("model.nameLevel", { name: tr(vm.model.name), level: vm.model.level }));
     setText(modelStatsEl, vm.model.acquired
-      ? `${vm.model.roleLabel} · ${vm.model.effectText} · 处理能力 ${vm.model.compute}${vm.model.atMaxLevel ? ` · 已达最高等级 Lv.${vm.model.level}` : ` · 训练成本 ${vm.model.trainCost}`}`
-      : `处理能力 ${vm.model.compute} · 训练成本 ${vm.model.trainCost}`);
+      ? `${t("model.statsAcquired", { role: tr(vm.model.roleLabel), effect: tr(vm.model.effectText), compute: vm.model.compute })} · ${vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost })}`
+      : t("model.stats", { compute: vm.model.compute, cost: vm.model.trainCost }));
     modelActionsEl.replaceChildren();
     if (!vm.model.acquired) {
-      modelActionsEl.appendChild(btn("获取第一款模型", "acquire_model", true));
+      modelActionsEl.appendChild(btn(t("action.acquireModel"), "acquire_model", true));
     } else {
       if (vm.model.atMaxLevel) {
-        modelActionsEl.appendChild(el("div", "model-max-level", `已达最高等级 Lv.${vm.model.level}`));
+        modelActionsEl.appendChild(el("div", "model-max-level", t("model.maxLevel", { level: vm.model.level })));
       } else {
-        modelActionsEl.appendChild(btn("训练当前模型", "train_model", false, vm.model.canTrain));
+        modelActionsEl.appendChild(btn(t("action.trainModel"), "train_model", false, vm.model.canTrain));
       }
       if (vm.automationUnlocked && !vm.automationEnabled) {
-        modelActionsEl.appendChild(btn("开启自动经营", "enable_automation", true));
+        modelActionsEl.appendChild(btn(t("action.enableAutomation"), "enable_automation", true));
       }
     }
     // 模型研发循环（自动经营解锁后持续保留）
     if (vm.model.acquired && vm.automationUnlocked) {
       setText(researchProgressEl,
         vm.research.archiveComplete
-          ? "模型蓝图已完成"
-          : `模型研发进度：${vm.research.progressLabel}${vm.research.canResearch ? " · 可研发！" : ""}`);
+          ? t("model.researchComplete")
+          : t(vm.research.canResearch ? "model.researchReady" : "model.researchProgress", { progress: vm.research.progressLabel }));
       researchProgressEl.style.display = "";
       syncProgress(researchProgressEl, vm.research.progress);
       if (!vm.research.archiveComplete && vm.research.canResearch) {
-        modelActionsEl.appendChild(btn("继续研发蓝图", "research_model", true));
+        modelActionsEl.appendChild(btn(t("action.researchModel"), "research_model", true));
       }
     } else {
       setText(researchProgressEl, "");
       researchProgressEl.style.display = "none";
     }
-    // 训练反馈：处理速度与收入预计提升
     if (vm.trainPreview) {
       setText(trainPreviewEl,
-        `训练后：处理速度 ${vm.trainPreview.computeNow} → ${vm.trainPreview.computeAfter} · 预计收入/秒 ${vm.trainPreview.incomeNow} → ${vm.trainPreview.incomeAfter}`);
-      trainPreviewEl.style.display = "";
-    } else {
-      setText(trainPreviewEl, "");
-      trainPreviewEl.style.display = "none";
-    }
-  }
-  function patchModel(vm: ViewModel): void {
-    metrics.partialPatchCount += 1;
-    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), `${vm.model.name} Lv.${vm.model.level}`);
-    setText(modelStatsEl, vm.model.acquired
-      ? `${vm.model.roleLabel} · ${vm.model.effectText} · 处理能力 ${vm.model.compute}${vm.model.atMaxLevel ? ` · 已达最高等级 Lv.${vm.model.level}` : ` · 训练成本 ${vm.model.trainCost}`}`
-      : `处理能力 ${vm.model.compute} · 训练成本 ${vm.model.trainCost}`);
-    // 训练/自动经营按钮禁用态
-    const trainBtn = modelActionsEl.querySelector("button[data-action='train_model']") as HTMLButtonElement | null;
-    if (trainBtn) syncButtonAffordance(trainBtn, vm.model.canTrain);
-    const autoBtn = modelActionsEl.querySelector("button[data-action='enable_automation']") as HTMLButtonElement | null;
-    if (autoBtn) syncButtonAffordance(autoBtn, true);
-    const researchBtn = modelActionsEl.querySelector("button[data-action='research_model']") as HTMLButtonElement | null;
-    if (researchBtn) syncButtonAffordance(researchBtn, vm.research.canResearch);
-    if (vm.model.acquired && vm.automationUnlocked) {
-      setText(researchProgressEl,
-        vm.research.archiveComplete
-          ? "模型蓝图已完成"
-          : `模型研发进度：${vm.research.progressLabel}${vm.research.canResearch ? " · 可研发！" : ""}`);
-      researchProgressEl.style.display = "";
-      syncProgress(researchProgressEl, vm.research.progress);
-    }
-    if (vm.trainPreview) {
-      setText(trainPreviewEl,
-        `训练后：处理速度 ${vm.trainPreview.computeNow} → ${vm.trainPreview.computeAfter} · 预计收入/秒 ${vm.trainPreview.incomeNow} → ${vm.trainPreview.incomeAfter}`);
+        t("model.trainPreview", { from: vm.trainPreview.computeNow, to: vm.trainPreview.computeAfter, incomeFrom: vm.trainPreview.incomeNow, incomeTo: vm.trainPreview.incomeAfter }));
       trainPreviewEl.style.display = "";
     } else {
       setText(trainPreviewEl, "");
@@ -661,10 +645,43 @@ export function createAppShell(container: HTMLElement): AppShell {
     }
   }
 
-  // 订单区结构签名：只含结构性维度（可接单、自动化解锁/开启）。
-  // 活跃订单列表是子结构：接单/领取（行数/构成变化）只重建 active 子区；
-  // 订单完成（status 0→1，行数不变）走局部 patch，不重建任何节点。
-  function sigForOrders(vm: ViewModel): string {
+function patchModel(vm: ViewModel): void {
+    metrics.partialPatchCount += 1;
+    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), t("model.nameLevel", { name: tr(vm.model.name), level: vm.model.level }));
+    setText(modelStatsEl, vm.model.acquired
+      ? `${t("model.statsAcquired", { role: tr(vm.model.roleLabel), effect: tr(vm.model.effectText), compute: vm.model.compute })} · ${vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost })}`
+      : t("model.stats", { compute: vm.model.compute, cost: vm.model.trainCost }));
+    // 训练/自动经营按钮禁用态
+    const trainBtn = modelActionsEl.querySelector("button[data-action='train_model']") as HTMLButtonElement | null;
+    if (trainBtn) syncButtonAffordance(trainBtn, vm.model.canTrain);
+    const autoBtn = modelActionsEl.querySelector("button[data-action='enable_automation']") as HTMLButtonElement | null;
+    if (autoBtn) syncButtonAffordance(autoBtn, true);
+    const researchBtn = modelActionsEl.querySelector("button[data-action='research_model']") as HTMLButtonElement | null;
+    if (researchBtn) syncButtonAffordance(researchBtn, vm.research.canResearch);
+    if (vm.model.acquired && vm.automationUnlocked) {
+      setText(researchProgressEl,
+        vm.research.archiveComplete
+          ? t("model.researchComplete")
+          : t(vm.research.canResearch ? "model.researchReady" : "model.researchProgress", { progress: vm.research.progressLabel }));
+      researchProgressEl.style.display = "";
+      syncProgress(researchProgressEl, vm.research.progress);
+    }
+    if (vm.trainPreview) {
+      setText(trainPreviewEl,
+        t("model.trainPreview", { from: vm.trainPreview.computeNow, to: vm.trainPreview.computeAfter, incomeFrom: vm.trainPreview.incomeNow, incomeTo: vm.trainPreview.incomeAfter }));
+      trainPreviewEl.style.display = "";
+    } else {
+      setText(trainPreviewEl, "");
+      trainPreviewEl.style.display = "none";
+    }
+    // 档案馆已打开时，同步刷新模型蓝图等级（研发/训练后的收藏成长立即可见，
+    // 无需先关闭再打开档案馆；未打开时由 render 的签名重建覆盖）。
+    if (!archiveSection.classList.contains("hidden")) {
+      patchArchive(vm);
+    }
+  }
+
+function sigForOrders(vm: ViewModel): string {
     // 静态订单列表只随结构性事件重建：模型获得/自动化解锁/自动化开关。
     // canAcceptAnyOrder（含空槽状态）不在此签名内：满槽/空槽只重建 active 子区，
     // 静态列表与按钮禁用态走局部 patch，避免订单区闪烁。
@@ -686,24 +703,24 @@ export function createAppShell(container: HTMLElement): AppShell {
 
     if (!ao) {
       row.classList.add("auto-waiting");
-      setIconText(name, "business", "自动接单中…");
+      setIconText(name, "business", t("order.autoWaiting"));
       bar.style.width = "0%";
       delete bar.dataset.key;
-      setText(status, "正在补充订单槽位");
+      setText(status, t("order.fillingSlots"));
       claim?.remove();
       return;
     }
 
     row.classList.remove("auto-waiting");
-    setIconText(name, orderGameIcon(ao.orderId), ao.name);
+    setIconText(name, orderGameIcon(ao.orderId), tr(ao.name));
     bar.style.width = (ao.progress * 100).toFixed(1) + "%";
     bar.dataset.key = `${ao.orderId}:${ao.orderIndex}`;
     setText(status, automationEnabled
-      ? (ao.status === "ready" ? "自动结算中" : ao.remainingLabel)
-      : (ao.status === "ready" ? "可领取" : ao.remainingLabel));
+      ? (ao.status === "ready" ? t("order.automationSettling") : ao.remainingLabel)
+      : (ao.status === "ready" ? t("order.ready") : ao.remainingLabel));
 
     if (!automationEnabled && ao.status === "ready" && !claim) {
-      row.appendChild(btn("领取", `claim_order:${ao.orderIndex}`, true));
+      row.appendChild(btn(t("order.claim"), `claim_order:${ao.orderIndex}`, true));
     } else if ((automationEnabled || ao.status !== "ready") && claim) {
       claim.remove();
     }
@@ -729,11 +746,11 @@ export function createAppShell(container: HTMLElement): AppShell {
       orderSummaryEl.style.display = "none";
     } else if (d.mode === "flow") {
       setText(orderSummaryEl,
-        `业务流水 · 处理速度 ${d.opsPerSec} 单/秒 · 毛收入 ${d.grossPerSec}/秒 · 成本 ${d.costPerSec}/秒 · 净收入 ${d.netPerSec}/秒`);
+        `${t("order.flowSummary", { ops: d.opsPerSec, gross: d.grossPerSec, cost: d.costPerSec, net: d.netPerSec })}`);
       orderSummaryEl.style.display = "";
     } else {
       setText(orderSummaryEl,
-        `算力结算 · 处理请求 ${d.opsPerSec}/秒 · 收入 ${d.netPerSec}/秒 · 总算力 ${d.totalCompute}`);
+        `${t("order.computeSummary", { ops: d.opsPerSec, income: d.netPerSec, total: d.totalCompute })}`);
       orderSummaryEl.style.display = "";
     }
   }
@@ -745,11 +762,11 @@ export function createAppShell(container: HTMLElement): AppShell {
       const r = el("div", "order-row" + (row.recommended ? " recommended" : ""));
       const info = el("div", "order-info");
       const orderName = el("div", "order-name");
-      setIconText(orderName, orderGameIcon(row.order.id), row.order.name);
+      setIconText(orderName, orderGameIcon(row.order.id), tr(row.order.name));
       info.appendChild(orderName);
       info.appendChild(el("div", "order-meta",
-        `${row.order.durationSec}秒 · 毛 ${row.gross} · 租赁成本 ${row.rentalCost} · 净 ${row.netIncome}${row.recommended ? " · 推荐" : ""}`));
-      r.append(info, btn("接取", `accept_order:${row.order.id}`, true, row.canAccept));
+        `${t("order.meta", { sec: row.order.durationSec, gross: row.gross, rental: row.rentalCost, net: row.netIncome })}${row.recommended ? t("order.recommended") : ""}`));
+      r.append(info, btn(t("order.accept"), `accept_order:${row.order.id}`, true, row.canAccept));
       orderListEl.appendChild(r);
     }
     // 三档表现：flow/compute 模式折叠单笔列表为只读业务分布摘要
@@ -764,8 +781,8 @@ export function createAppShell(container: HTMLElement): AppShell {
     buildActiveRows(vm);
     sigActive = sigForActive(vm);
     setText(orderHintEl, vm.automationEnabled
-      ? "自动经营运行中"
-      : `完成 ${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold} 个订单解锁自动经营`);
+      ? t("order.automationRunning")
+      : t("order.hintManual", { count: `${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold}` }));
   }
   function patchOrders(vm: ViewModel): void {
     metrics.partialPatchCount += 1;
@@ -776,8 +793,8 @@ export function createAppShell(container: HTMLElement): AppShell {
     activeListEl.classList.toggle("collapsed", collapsed);
     renderOrderSummary(vm);
     setText(orderHintEl, vm.automationEnabled
-      ? "自动经营运行中"
-      : `完成 ${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold} 个订单解锁自动经营`);
+      ? t("order.automationRunning")
+      : t("order.hintManual", { count: `${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold}` }));
     const orderButtons = orderListEl.querySelectorAll("button[data-action^='accept_order:']");
     for (let i = 0; i < orderButtons.length; i++) {
       syncButtonAffordance(orderButtons[i] as HTMLButtonElement, vm.orders[i]?.canAccept ?? false);
@@ -808,7 +825,7 @@ export function createAppShell(container: HTMLElement): AppShell {
     fleetEl.dataset.phase = vm.server.phase;
     fleetEl.dataset.owned = String(vm.server.ownedCount);
     for (const s of vm.server.servers) {
-      const chip = el("div", "server-chip" + (s.owned ? " owned" : ""), `${s.name}${s.owned ? " ✓" : ""}（${s.power}×）`);
+      const chip = el("div", "server-chip" + (s.owned ? " owned" : ""), `${tr(s.name)}${s.owned ? " ✓" : ""}(${s.power}×)`);
       chip.dataset.serverIndex = String(s.index);
       chip.dataset.owned = s.owned ? "true" : "false";
       fleetEl.appendChild(chip);
@@ -816,32 +833,32 @@ export function createAppShell(container: HTMLElement): AppShell {
     // 阶段进度 + 首服里程碑
     serverProgressEl.replaceChildren();
     if (vm.server.ownedCount === 0 && !vm.workshop.firstServer.awarded) {
-      serverProgressEl.appendChild(el("div", "server-progress-title", "第一台服务器 · 创业里程碑"));
+      serverProgressEl.appendChild(el("div", "server-progress-title", t("server.firstMilestone")));
       const levelProgress = el("div", "server-progress-line",
-        `工作室等级：Lv.${vm.workshop.firstServer.levelCurrent} / Lv.${vm.workshop.firstServer.levelTarget}`);
+        `${t("server.studioLevel")}${t("common.colon")}Lv.${vm.workshop.firstServer.levelCurrent} / Lv.${vm.workshop.firstServer.levelTarget}`);
       const revenueProgress = el("div", "server-progress-line",
-        `累计营业收入：${vm.workshop.firstServer.revenueCurrent} / ${vm.workshop.firstServer.revenueTarget}`);
+        `${t("server.lifetimeRevenue")}${t("common.colon")}${vm.workshop.firstServer.revenueCurrent} / ${vm.workshop.firstServer.revenueTarget}`);
       syncProgress(levelProgress, vm.workshop.firstServer.levelProgress * 100);
       syncProgress(revenueProgress, vm.workshop.firstServer.revenueProgress * 100);
       serverProgressEl.append(levelProgress, revenueProgress);
     } else if (vm.server.ownedCount >= 1) {
       serverProgressEl.appendChild(el("div", "server-progress-title",
-        `服务器 ${vm.server.ownedCount}/${vm.server.maxCount} · ${vm.server.phaseLabel}`));
-      const next = vm.server.nextName ? `下一台：${vm.server.nextName}（${vm.server.nextCost}）` : "已满 8 台，完成集群里程碑后筹建算力中心";
+        `${t("server.fleet", { owned: vm.server.ownedCount, max: vm.server.maxCount })} · ${tr(vm.server.phaseLabel)}`));
+      const next = vm.server.nextName ? t("server.next", { name: tr(vm.server.nextName), cost: vm.server.nextCost ?? "" }) : t("server.fullCluster");
       const fleetProgress = el("div", "server-progress-line", next);
       syncProgress(fleetProgress, (vm.server.ownedCount / Math.max(1, vm.server.maxCount)) * 100);
       serverProgressEl.appendChild(fleetProgress);
     }
     serverActionsEl.replaceChildren();
     if (!vm.rental.active && vm.server.ownedCount === 0 && vm.rental.canEnable) {
-      serverActionsEl.appendChild(btn("启用租赁算力（¥100）", "enable_rental", false));
+      serverActionsEl.appendChild(btn(t("action.enableRental"), "enable_rental", false));
     }
     if (vm.server.nextName) {
-      const label = vm.server.ownedCount === 0 ? "取得第一台服务器（里程碑）" : `购买${vm.server.nextName}（${vm.server.nextCost}）`;
+      const label = vm.server.ownedCount === 0 ? t("server.getFirst") : t("action.buyServer") + ` ${tr(vm.server.nextName ?? "")}(${vm.server.nextCost})`;
       serverActionsEl.appendChild(btn(label, "buy_server", true, vm.server.canBuy));
     }
     if (vm.server.batchUnlocked && vm.server.ownedCount >= 1 && vm.server.ownedCount < vm.server.maxCount) {
-      serverActionsEl.appendChild(btn("批量购买可负担服务器", "buy_max_servers", false, vm.server.canBuyMax));
+      serverActionsEl.appendChild(btn(t("server.buyAffordable"), "buy_max_servers", false, vm.server.canBuyMax));
     }
   }
   function patchServer(vm: ViewModel): void {
@@ -849,9 +866,9 @@ export function createAppShell(container: HTMLElement): AppShell {
     if (vm.server.ownedCount === 0 && !vm.workshop.firstServer.awarded) {
       const lines = serverProgressEl.querySelectorAll(".server-progress-line");
       if (lines[0]) setText(lines[0] as HTMLElement,
-        `工作室等级：Lv.${vm.workshop.firstServer.levelCurrent} / Lv.${vm.workshop.firstServer.levelTarget}`);
+        `${t("server.studioLevel")}${t("common.colon")}Lv.${vm.workshop.firstServer.levelCurrent} / Lv.${vm.workshop.firstServer.levelTarget}`);
       if (lines[1]) setText(lines[1] as HTMLElement,
-        `累计营业收入：${vm.workshop.firstServer.revenueCurrent} / ${vm.workshop.firstServer.revenueTarget}`);
+        `${t("server.lifetimeRevenue")}${t("common.colon")}${vm.workshop.firstServer.revenueCurrent} / ${vm.workshop.firstServer.revenueTarget}`);
       if (lines[0]) syncProgress(lines[0] as HTMLElement, vm.workshop.firstServer.levelProgress * 100);
       if (lines[1]) syncProgress(lines[1] as HTMLElement, vm.workshop.firstServer.revenueProgress * 100);
     }
@@ -905,14 +922,14 @@ export function createAppShell(container: HTMLElement): AppShell {
     // 身份/进入信息
     stage4EntryEl.replaceChildren();
     const stage4Identity = el("div", "stage4-identity");
-    setIconText(stage4Identity, "moon", s4.identity);
+    setIconText(stage4Identity, "moon", tr(s4.identity));
     stage4EntryEl.appendChild(stage4Identity);
-    stage4EntryEl.appendChild(el("div", "stage4-motivation-title", s4.motivationTitle));
-    stage4EntryEl.appendChild(el("div", "stage4-motivation", s4.motivationText));
-    stage4EntryEl.appendChild(el("div", "stage4-cosmic-model", `宇宙模型：${s4.cosmicModelName ?? "—"}（沿用地球模型蓝图加成）`));
-    stage4EntryEl.appendChild(el("div", "stage4-income", `地月收入 ${s4.incomePerSec} · 节点倍率 ${s4.nodeMult}`));
+    stage4EntryEl.appendChild(el("div", "stage4-motivation-title", tr(s4.motivationTitle)));
+    stage4EntryEl.appendChild(el("div", "stage4-motivation", tr(s4.motivationText)));
+    stage4EntryEl.appendChild(el("div", "stage4-cosmic-model", t("stage4.cosmicModel", { name: tr(s4.cosmicModelName ?? "—") })));
+    stage4EntryEl.appendChild(el("div", "stage4-income", `${t("stage4.income")} ${s4.incomePerSec} · ${t("stage4.nodeMult")} ${s4.nodeMult}`));
     if (s4.batchUnlocked) {
-      stage4EntryEl.appendChild(btn("批量部署可用节点", "buy_node:verified_nodes", false, s4.canBuyMaxNodes));
+      stage4EntryEl.appendChild(btn(t("stage4.batchDeploy"), "buy_node:verified_nodes", false, s4.canBuyMaxNodes));
     }
 
     // 轨道节点阵列
@@ -923,11 +940,11 @@ export function createAppShell(container: HTMLElement): AppShell {
       const nodeName = el("div", "stage4-node-name");
       setIconText(nodeName, contentGameIcon(n.id, "satellite"), n.name);
       card.appendChild(nodeName);
-      card.appendChild(el("div", "stage4-node-cost", n.owned ? "已部署" : n.cost));
+      card.appendChild(el("div", "stage4-node-cost", n.owned ? t("stage4.deployed") : n.cost));
       if (n.canBuy) {
-        card.appendChild(btn("部署节点", `buy_node:${n.id}`, true));
+        card.appendChild(btn(t("stage4.deployNode"), `buy_node:${n.id}`, true));
       } else if (!n.owned) {
-        card.appendChild(el("div", "stage4-node-locked", n.id === "moon_base" ? "首个自费节点" : "需先部署前一节点"));
+        card.appendChild(el("div", "stage4-node-locked", n.id === "moon_base" ? t("stage4.firstPaidNode") : t("stage4.needPreviousNode")));
       }
       stage4NodesEl.appendChild(card);
     }
@@ -939,27 +956,27 @@ export function createAppShell(container: HTMLElement): AppShell {
     setIconText(projectTitle, "orbit", fp.name);
     stage4ProjectEl.appendChild(projectTitle);
     if (fp.active) {
-      const progress = el("div", "stage4-project-progress", `工程进度：${fp.progressLabel}`);
+      const progress = el("div", "stage4-project-progress", `${t("stage4.projectProgress")}${t("common.colon")}${fp.progressLabel}`);
       syncProgress(progress, Number.parseFloat(fp.progressLabel));
       stage4ProjectEl.appendChild(progress);
     } else if (fp.pendingReward) {
       const reward = el("div", "stage4-project-reward");
-      setIconText(reward, "reward", "地月一体化算力网已完成，等待手动领取");
+      setIconText(reward, "reward", t("stage4.moonNetworkDone"));
       stage4ProjectEl.appendChild(reward);
-      stage4ProjectEl.appendChild(btn("领取主线完成里程碑", "claim_stage4_reward", true));
+      stage4ProjectEl.appendChild(btn(t("stage4.claimMilestone"), "claim_stage4_reward", true));
     } else if (fp.completed) {
       const done = el("div", "stage4-project-done");
-      setIconText(done, "complete", "地月主线完成");
+      setIconText(done, "complete", t("stage4.moonStoryDone"));
       stage4ProjectEl.appendChild(done);
       if (!vm.stage5.entered) {
-        stage4ProjectEl.appendChild(btn("进入戴森算力纪元", "start_stage5", true));
+        stage4ProjectEl.appendChild(btn(t("stage4.enterDyson"), "start_stage5", true));
       }
     } else {
-      stage4ProjectEl.appendChild(el("div", "stage4-project-desc", fp.rewardText));
+      stage4ProjectEl.appendChild(el("div", "stage4-project-desc", tr(fp.rewardText)));
       if (fp.canStart) {
-        stage4ProjectEl.appendChild(btn("启动地月一体化算力网", "start_stage4_project", true));
+        stage4ProjectEl.appendChild(btn(t("stage4.startMoonNetwork"), "start_stage4_project", true));
       } else {
-        stage4ProjectEl.appendChild(el("div", "stage4-project-locked", `地月节点 ${s4.ownedNodeCount}/${s4.nodes.length} · 全部部署后可启动`));
+        stage4ProjectEl.appendChild(el("div", "stage4-project-locked", `${t("stage4.nodesLabel")} ${s4.ownedNodeCount}/${s4.nodes.length} · ${t("stage4.allNodesToStart")}`));
       }
     }
   }
@@ -969,10 +986,10 @@ export function createAppShell(container: HTMLElement): AppShell {
     const s4 = vm.stage4;
     // 高频：收入/进度文本局部更新
     const income = stage4EntryEl.querySelector(".stage4-income");
-    if (income) setText(income as HTMLElement, `地月收入 ${s4.incomePerSec} · 节点倍率 ${s4.nodeMult}`);
+    if (income) setText(income as HTMLElement, `${t("stage4.income")} ${s4.incomePerSec} · ${t("stage4.nodeMult")} ${s4.nodeMult}`);
     const prog = stage4ProjectEl.querySelector(".stage4-project-progress");
     if (prog) {
-      setText(prog as HTMLElement, `工程进度：${s4.finalProject.progressLabel}`);
+      setText(prog as HTMLElement, `${t("stage4.projectProgress")}${t("common.colon")}${s4.finalProject.progressLabel}`);
       syncProgress(prog as HTMLElement, Number.parseFloat(s4.finalProject.progressLabel));
     }
     // 节点按钮禁用态（结构性变化由签名重建处理）
@@ -1008,10 +1025,10 @@ export function createAppShell(container: HTMLElement): AppShell {
 
     stage5EntryEl.replaceChildren();
     const stage5Identity = el("div", "stage5-identity");
-    setIconText(stage5Identity, "orbit", s5.identity);
+    setIconText(stage5Identity, "orbit", tr(s5.identity));
     stage5EntryEl.appendChild(stage5Identity);
-    stage5EntryEl.appendChild(el("div", "stage5-cosmic-model", `宇宙模型：${s5.cosmicModelName ?? "—"}（沿用地球模型蓝图加成）`));
-    stage5EntryEl.appendChild(el("div", "stage5-income", `恒星收入 ${s5.incomePerSec} · 节点倍率 ${s5.nodeMult}`));
+    stage5EntryEl.appendChild(el("div", "stage5-cosmic-model", t("stage4.cosmicModel", { name: tr(s5.cosmicModelName ?? "—") })));
+    stage5EntryEl.appendChild(el("div", "stage5-income", `${t("stage5.income")} ${s5.incomePerSec} · ${t("stage5.nodeMult")} ${s5.nodeMult}`));
 
     stage5NodesEl.replaceChildren();
     for (const n of s5.nodes) {
@@ -1020,11 +1037,11 @@ export function createAppShell(container: HTMLElement): AppShell {
       const nodeName = el("div", "stage5-node-name");
       setIconText(nodeName, contentGameIcon(n.id, "sparkles"), n.name);
       card.appendChild(nodeName);
-      card.appendChild(el("div", "stage5-node-cost", n.owned ? "已部署" : n.cost));
+      card.appendChild(el("div", "stage5-node-cost", n.owned ? t("stage4.deployed") : n.cost));
       if (n.canBuy) {
-        card.appendChild(btn("部署节点", `buy_stage5_node:${n.id}`, true));
+        card.appendChild(btn(t("stage4.deployNode"), `buy_stage5_node:${n.id}`, true));
       } else if (!n.owned) {
-        card.appendChild(el("div", "stage5-node-locked", "需先部署前一节点"));
+        card.appendChild(el("div", "stage5-node-locked", t("stage4.needPreviousNode")));
       }
       stage5NodesEl.appendChild(card);
     }
@@ -1035,24 +1052,24 @@ export function createAppShell(container: HTMLElement): AppShell {
     setIconText(projectTitle, "dyson_sphere", fp.name);
     stage5ProjectEl.appendChild(projectTitle);
     if (fp.active) {
-      const progress = el("div", "stage5-project-progress", `工程进度：${fp.progressLabel}`);
+      const progress = el("div", "stage5-project-progress", `${t("stage4.projectProgress")}${t("common.colon")}${fp.progressLabel}`);
       syncProgress(progress, Number.parseFloat(fp.progressLabel));
       stage5ProjectEl.appendChild(progress);
     } else if (fp.pendingReward) {
       const reward = el("div", "stage5-project-reward");
-      setIconText(reward, "reward", "戴森算力球已完成，等待手动领取");
+      setIconText(reward, "reward", t("stage5.dysonDone"));
       stage5ProjectEl.appendChild(reward);
-      stage5ProjectEl.appendChild(btn("领取主线完成里程碑", "claim_stage5_reward", true));
+      stage5ProjectEl.appendChild(btn(t("stage4.claimMilestone"), "claim_stage5_reward", true));
     } else if (fp.completed) {
       const done = el("div", "stage5-project-done");
-      setIconText(done, "complete", "主线完成 · 永续增长模式已解锁");
+      setIconText(done, "complete", t("stage5.storyDonePerpetual"));
       stage5ProjectEl.appendChild(done);
     } else {
-      stage5ProjectEl.appendChild(el("div", "stage5-project-desc", fp.rewardText));
+      stage5ProjectEl.appendChild(el("div", "stage5-project-desc", tr(fp.rewardText)));
       if (fp.canStart) {
-        stage5ProjectEl.appendChild(btn("启动戴森算力球", "start_stage5_project", true));
+        stage5ProjectEl.appendChild(btn(t("stage5.startDyson"), "start_stage5_project", true));
       } else {
-        stage5ProjectEl.appendChild(el("div", "stage5-project-locked", "完成恒星节点与前置里程碑后可启动"));
+        stage5ProjectEl.appendChild(el("div", "stage5-project-locked", t("stage5.lockedHint")));
       }
     }
 
@@ -1060,16 +1077,16 @@ export function createAppShell(container: HTMLElement): AppShell {
     if (s5.storyCompleted) {
       const story = el("div", "stage5-story-done");
       setIconText(story, "celebration",
-        "银河终局庆典 · 主线完成。戴森算力球已把整个银河系接入算力网络，数字仍会继续增长，世界尺度不再改变。");
+        t("stage5.storyCelebration"));
       stage5StoryEl.appendChild(story);
 
       const growth = el("div", "perpetual-growth");
       const growthHeading = el("div", "perpetual-growth-heading");
-      setIconText(growthHeading, "terminal", "银河网络实时结算");
+      setIconText(growthHeading, "terminal", t("stage5.liveSettlement"));
       const growthValues = el("div", "perpetual-growth-values");
       const liveMoney = el("div", "perpetual-growth-money", vm.money);
       liveMoney.dataset.perpetualMoney = "true";
-      const liveIncome = el("div", "perpetual-growth-income", `每秒持续注入 ${s5.incomePerSec}`);
+      const liveIncome = el("div", "perpetual-growth-income", `${t("stage5.injectPerSec")} ${s5.incomePerSec}`);
       liveIncome.dataset.perpetualIncome = "true";
       growthValues.append(liveMoney, liveIncome);
       const pulse = el("div", "perpetual-growth-pulse");
@@ -1079,7 +1096,7 @@ export function createAppShell(container: HTMLElement): AppShell {
         growthHeading,
         growthValues,
         pulse,
-        el("div", "perpetual-growth-note", "所有建设已完成；银河节点仍在自动结算，财富会永久增长。"),
+        el("div", "perpetual-growth-note", t("stage5.perpetualNote")),
       );
       stage5StoryEl.appendChild(growth);
     }
@@ -1089,16 +1106,16 @@ export function createAppShell(container: HTMLElement): AppShell {
     metrics.partialPatchCount += 1;
     const s5 = vm.stage5;
     const income = stage5EntryEl.querySelector(".stage5-income");
-    if (income) setText(income as HTMLElement, `恒星收入 ${s5.incomePerSec} · 节点倍率 ${s5.nodeMult}`);
+    if (income) setText(income as HTMLElement, `${t("stage5.income")} ${s5.incomePerSec} · ${t("stage5.nodeMult")} ${s5.nodeMult}`);
     const prog = stage5ProjectEl.querySelector(".stage5-project-progress");
     if (prog) {
-      setText(prog as HTMLElement, `工程进度：${s5.finalProject.progressLabel}`);
+      setText(prog as HTMLElement, `${t("stage4.projectProgress")}${t("common.colon")}${s5.finalProject.progressLabel}`);
       syncProgress(prog as HTMLElement, Number.parseFloat(s5.finalProject.progressLabel));
     }
     const liveMoney = stage5StoryEl.querySelector("[data-perpetual-money]");
     if (liveMoney) setText(liveMoney as HTMLElement, vm.money);
     const liveIncome = stage5StoryEl.querySelector("[data-perpetual-income]");
-    if (liveIncome) setText(liveIncome as HTMLElement, `每秒持续注入 ${s5.incomePerSec}`);
+    if (liveIncome) setText(liveIncome as HTMLElement, `${t("stage5.injectPerSec")} ${s5.incomePerSec}`);
     for (const n of s5.nodes) {
       const btns = stage5Section.querySelectorAll(`button[data-action='buy_stage5_node:${n.id}']`);
       for (const b of btns) syncButtonAffordance(b as HTMLButtonElement, n.canBuy);
@@ -1128,55 +1145,55 @@ export function createAppShell(container: HTMLElement): AppShell {
       const nextMult = round === 1 ? 1.5 : 2.0;
       prestigeInfoEl.appendChild(el("div", "prestige-kicker",
         vm.singularity.spacePlanRevealed
-          ? "EARTH COMPLETE · 地球算力网络达到物理极限"
-          : `SINGULARITY CORE · 第 ${round} 轮时代工程`));
+          ? t("prestige.earthComplete")
+          : t("prestige.singularityCore", { round })));
       if (vm.singularity.spacePlanRevealed) {
-        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", "地外算力计划已揭示"));
+        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.spacePlanRevealed")));
         prestigeInfoEl.appendChild(el("div", "prestige-info-text",
-          "检测到恒星级能源协议，新的尺度已经解锁。可稍后在算力档案馆重新打开。"));
-        prestigeActionsEl.appendChild(commandBtn("查看地外算力计划", "page:honor", true));
+          t("prestige.spacePlanRevealedBody")));
+        prestigeActionsEl.appendChild(commandBtn(t("prestige.viewSpacePlan"), "page:honor", true));
       } else if (vm.singularity.coreClaimable) {
-        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", `永久收入倍率 → ×${nextMult}`));
+        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.multiplierNext", { mult: nextMult })));
         prestigeInfoEl.appendChild(el("div", "prestige-info-text",
-          `本轮奖励：第${round}枚奇点核心\n奇点核心总计：${round} / 3`));
-        vm.prestige.gainItems.forEach((t) => prestigeListEl.appendChild(el("li", "prestige-gain", "获得：" + t)));
-        prestigeActionsEl.appendChild(btn(`领取第${round}枚奇点核心`, "claim_core", true));
+          t("prestige.roundReward2", { round })));
+        vm.prestige.gainItems.forEach((item) => prestigeListEl.appendChild(el("li", "prestige-gain", t("prestige.gainPrefix") + prestigeItemText(item))));
+        prestigeActionsEl.appendChild(btn(t("prestige.claimCore", { round }), "claim_core", true));
       } else if (vm.singularity.iterationReady) {
-        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", `永久收入倍率 → ×${nextMult}`));
+        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.multiplierNext", { mult: nextMult })));
         prestigeInfoEl.appendChild(el("div", "prestige-info-text",
           round === 3
-            ? "第三次迭代将转化为地外算力计划揭示，不再清档。"
-            : "奇点核心已领取，可执行下一次技术迭代进入下一轮。"));
-        vm.prestige.resetItems.forEach((t) => prestigeListEl.appendChild(el("li", "prestige-reset", "重置：" + t)));
-        vm.prestige.gainItems.forEach((t) => prestigeListEl.appendChild(el("li", "prestige-gain", "获得：" + t)));
+            ? t("prestige.thirdIteration")
+            : t("prestige.iterationReady")));
+        vm.prestige.resetItems.forEach((item) => prestigeListEl.appendChild(el("li", "prestige-reset", t("prestige.resetPrefix") + prestigeItemText(item))));
+        vm.prestige.gainItems.forEach((item) => prestigeListEl.appendChild(el("li", "prestige-gain", t("prestige.gainPrefix") + prestigeItemText(item))));
         prestigeActionsEl.appendChild(btn(
-          round === 3 ? "揭示地外算力计划" : `执行第 ${round} 次技术迭代`,
+          round === 3 ? t("core.revealPlan") : t("prestige.execute", { round }),
           "prestige",
           true,
         ));
       } else {
-        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", `奇点核心 ${vm.singularity.label ?? "0/3"}`));
+        prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("app.singularityBadge", { label: vm.singularity.label ?? "0/3" })));
         prestigeInfoEl.appendChild(el("div", "prestige-info-text",
           round === 1
-            ? "完成本轮旗舰工程与时代工程后，可领取奇点核心 1。"
-            : `进入第 ${round} 轮：完成时代工程后可领取奇点核心 ${round}/3。`));
+            ? t("prestige.hintRound1")
+            : t("prestige.hintRound", { round })));
       }
       return;
     }
     prestigeSection.dataset.state = vm.prestige.canPrestige ? "ready" : vm.prestige.count > 0 ? "earned" : "hidden";
     if (vm.prestige.canPrestige) {
-      prestigeInfoEl.appendChild(el("div", "prestige-kicker", "TECH ITERATION · 时代协议就绪"));
-      prestigeInfoEl.appendChild(el("div", "prestige-multiplier", "永久收入 ×2"));
+      prestigeInfoEl.appendChild(el("div", "prestige-kicker", t("prestige.kickerReady")));
+      prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.permanentX2")));
       prestigeInfoEl.appendChild(el("div", "prestige-info-text",
-        "三座机房与最终旗舰工程已完成，可以进行第一次技术迭代。"));
-      vm.prestige.resetItems.forEach((t) => prestigeListEl.appendChild(el("li", "prestige-reset", "重置：" + t)));
-      vm.prestige.gainItems.forEach((t) => prestigeListEl.appendChild(el("li", "prestige-gain", "获得：" + t)));
-      prestigeActionsEl.appendChild(btn("进行技术迭代（×2 永久收入）", "prestige", true));
+        t("prestige.readyBody")));
+      vm.prestige.resetItems.forEach((item) => prestigeListEl.appendChild(el("li", "prestige-reset", t("prestige.resetPrefix") + prestigeItemText(item))));
+      vm.prestige.gainItems.forEach((item) => prestigeListEl.appendChild(el("li", "prestige-gain", t("prestige.gainPrefix") + prestigeItemText(item))));
+      prestigeActionsEl.appendChild(btn(t("prestige.startWithX2"), "prestige", true));
     } else if (vm.prestige.count > 0) {
-      prestigeInfoEl.appendChild(el("div", "prestige-kicker", "TECH ITERATION · 本版本技术迭代已完成"));
-      prestigeInfoEl.appendChild(el("div", "prestige-multiplier", "第1次迭代 · 永久收入×2"));
+      prestigeInfoEl.appendChild(el("div", "prestige-kicker", t("prestige.kickerDone")));
+      prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.firstIterationDone")));
       prestigeInfoEl.appendChild(el("div", "prestige-info-text",
-        "本轮技术路线已稳定，可继续扩张现有网络。"));
+        t("prestige.doneBody")));
     }
   }
 
@@ -1186,33 +1203,33 @@ export function createAppShell(container: HTMLElement): AppShell {
     if (vm.offline.hasPending && !existing) {
       const oc = el("div", "offline-card");
       // CARD-04 回归回执：展示 本次离线/有效结算/上限/超出未计入/资金/研发/工程
-      const lines: string[] = [`本次离线：${vm.offline.rawElapsedLabel}`];
-      lines.push(`有效结算：${vm.offline.elapsedLabel}`);
-      lines.push(`本阶段上限：${vm.offline.capLabel}`);
-      if (vm.offline.excessLabel) lines.push(`超出未计入：${vm.offline.excessLabel}`);
-      lines.push(`获得资金：${vm.offline.money}`);
+      const lines: string[] = [t("offline.rawElapsed", { value: vm.offline.rawElapsedLabel })];
+      lines.push(t("offline.elapsed", { value: vm.offline.elapsedLabel }));
+      lines.push(t("offline.cap", { value: vm.offline.capLabel }));
+      if (vm.offline.excessLabel) lines.push(t("offline.excess", { value: vm.offline.excessLabel }));
+      lines.push(t("offline.money", { value: vm.offline.money }));
       const feelPreview = vm.feel.offlinePreview;
       if (feelPreview) {
-        lines.push(`领取前资金：${feelPreview.moneyBefore}`);
-        lines.push(`领取后资金：${feelPreview.moneyAfter}`);
-        lines.push(`总算力：${feelPreview.computeLabel}`);
+        lines.push(t("offline.moneyBefore", { value: feelPreview.moneyBefore }));
+        lines.push(t("offline.moneyAfter", { value: feelPreview.moneyAfter }));
+        lines.push(t("offline.compute", { value: feelPreview.computeLabel }));
       }
-      lines.push(`获得研发进度：${vm.offline.researchProgress.toFixed(1)}%`);
+      lines.push(t("offline.researchProgress", { value: vm.offline.researchProgress.toFixed(1) }));
       lines.push(
         vm.offline.projectName && vm.offline.projectProgressDelta > 0
-          ? `推进工程：${vm.offline.projectName} +${vm.offline.projectProgressDelta.toFixed(0)}`
-          : "推进工程：—"
+          ? t("offline.projectProgress", { name: tr(vm.offline.projectName), delta: vm.offline.projectProgressDelta.toFixed(0) })
+          : t("offline.projectNone")
       );
       if (feelPreview) {
         lines.push(
           feelPreview.affordableAfterCount > 0
-            ? `回归后可投入：${feelPreview.affordableAfterCount}项 · 推荐${feelPreview.recommendedAfterLabel ?? "查看当前项目"}`
-            : "回归后可投入：0项 · 继续积累下一次升级资金",
+            ? t("offline.affordable", { count: feelPreview.affordableAfterCount, recommended: feelPreview.recommendedAfterLabel ? tr(feelPreview.recommendedAfterLabel) : t("offline.viewCurrent") })
+            : t("offline.noneAffordable"),
         );
       }
-      oc.appendChild(el("div", "offline-receipt-title", "回归结算 · 公司在成长"));
+      oc.appendChild(el("div", "offline-receipt-title", t("offline.receiptTitle")));
       lines.forEach((line) => oc.appendChild(el("div", "offline-receipt-line", line)));
-      oc.appendChild(btn("领取离线收益", "claim_offline", true));
+      oc.appendChild(btn(t("action.claimOffline"), "claim_offline", true));
       businessPage.insertBefore(oc, businessPage.firstChild);
     } else if (!vm.offline.hasPending && existing) {
       existing.remove();
@@ -1228,28 +1245,28 @@ export function createAppShell(container: HTMLElement): AppShell {
     offlineSponsorCardEl.replaceChildren();
     if (sponsor.pendingAdKind) {
       const pending = el("div", "sponsor-pending");
-      pending.appendChild(el("div", "sponsor-pending-title", "上次赞助尚未完成"));
+      pending.appendChild(el("div", "sponsor-pending-title", t("sponsor.pendingTitle")));
       pending.appendChild(el("div", "sponsor-card-copy",
         sponsor.pendingAdKind === "offline_capacity"
-          ? "离线扩容奖励仍在等待。你可以继续观看，或取消后重新选择。"
-          : "收入充能奖励仍在等待。你可以继续观看，或取消后重新选择。"));
+          ? t("sponsor.offlinePending")
+          : t("sponsor.incomePending")));
       const pendingActions = el("div", "sponsor-actions");
-      pendingActions.appendChild(btn("继续上次赞助", "resume_sponsor_ad", true));
-      pendingActions.appendChild(btn("取消", "cancel_pending_sponsor_ad"));
+      pendingActions.appendChild(btn(t("sponsor.resume"), "resume_sponsor_ad", true));
+      pendingActions.appendChild(btn(t("common.cancel"), "cancel_pending_sponsor_ad"));
       pending.appendChild(pendingActions);
       offlineSponsorCardEl.appendChild(pending);
     }
     const offlineTitle = el("div", "sponsor-card-title");
-    setIconText(offlineTitle, "moon", "离线经营扩容");
+    setIconText(offlineTitle, "moon", t("sponsor.offlineCardTitle"));
     offlineSponsorCardEl.appendChild(offlineTitle);
     offlineSponsorCardEl.appendChild(el("div", "sponsor-card-copy",
-      "默认结算最近6小时；每次赞助增加2小时。只有离线超过6小时、实际用到扩展部分时才会消耗。"));
+      t("sponsor.offlineHint")));
     const offlineProgress = el("div", "sponsor-progress",
-      `当前离线结算上限 ${sponsor.offlineCapacityLabel} · 今日赞助 ${sponsor.offlineAdsUsed}/${sponsor.offlineAdsMax}`);
+      `${t("sponsor.offlineCap")} ${sponsor.offlineCapacityLabel} · ${t("sponsor.todayAds")} ${sponsor.offlineAdsUsed}/${sponsor.offlineAdsMax}`);
     syncProgress(offlineProgress, sponsor.offlineCapacityProgress * 100);
     offlineSponsorCardEl.appendChild(offlineProgress);
     offlineSponsorCardEl.appendChild(btn(
-      sponsor.canWatchOfflineAd ? "观看赞助 · 离线上限 +2小时" : "今日离线容量已充满",
+      sponsor.canWatchOfflineAd ? t("sponsor.watchOffline") : t("sponsor.offlineFull"),
       "prepare_sponsor_ad:offline_capacity",
       true,
       sponsor.canWatchOfflineAd,
@@ -1257,23 +1274,23 @@ export function createAppShell(container: HTMLElement): AppShell {
 
     incomeSponsorCardEl.replaceChildren();
     const incomeTitle = el("div", "sponsor-card-title");
-    setIconText(incomeTitle, "sponsor", "经营收入 ×2");
+    setIconText(incomeTitle, "sponsor", t("sponsor.incomeCardTitle"));
     incomeSponsorCardEl.appendChild(incomeTitle);
     incomeSponsorCardEl.appendChild(el("div", "sponsor-card-copy",
-      "每次充能2小时，可与机房投产红利×4叠加。每天赠送3次，再可观看9次赞助视频。"));
+      t("sponsor.incomeHint")));
     const incomeProgress = el("div", "sponsor-progress",
-      `剩余 ${sponsor.incomeBoostRemainingLabel} · 免费 ${sponsor.incomeFreeUsed}/${sponsor.incomeFreeMax} · 赞助 ${sponsor.incomeAdsUsed}/${sponsor.incomeAdsMax}`);
+      `${t("sponsor.remaining")} ${sponsor.incomeBoostRemainingLabel} · ${t("sponsor.free")} ${sponsor.incomeFreeUsed}/${sponsor.incomeFreeMax} · ${t("sponsor.ads")} ${sponsor.incomeAdsUsed}/${sponsor.incomeAdsMax}`);
     syncProgress(incomeProgress, sponsor.incomeBoostProgress * 100);
     incomeSponsorCardEl.appendChild(incomeProgress);
     const actions = el("div", "sponsor-actions");
     actions.appendChild(btn(
-      sponsor.canClaimFreeIncome ? "领取今日免费充能 · +2小时" : "今日免费充能已领取",
+      sponsor.canClaimFreeIncome ? t("sponsor.claimFree") : t("sponsor.freeClaimed"),
       "claim_free_income_sponsor",
       false,
       sponsor.canClaimFreeIncome,
     ));
     actions.appendChild(btn(
-      sponsor.canWatchIncomeAd ? "观看赞助 · 收入×2 +2小时" : "今日收入充能已满",
+      sponsor.canWatchIncomeAd ? t("sponsor.watchIncome") : t("sponsor.incomeFull"),
       "prepare_sponsor_ad:income_boost",
       true,
       sponsor.canWatchIncomeAd,
@@ -1356,23 +1373,23 @@ export function createAppShell(container: HTMLElement): AppShell {
       storyCompleteOverlay.dataset.shown = "1";
       if (!storyCompleteVisualEl.src) storyCompleteVisualEl.src = storyCompleteVisualEl.dataset.src ?? "";
       storyCompleteCard.classList.add("dyson-celebration");
-      setText(storyCompleteTitleEl, "银河终局庆典 · 银河算力大亨");
+      setText(storyCompleteTitleEl, t("story.celebrationTitle"));
       const legendary = vm.legendaryArchive;
       setText(storyCompleteBodyEl,
         [
-          "戴森算力球点亮恒星，银河算力网络正式投入运行。",
+          t("story.dysonOnline"),
           "",
-          "AI创业工作室 → 服务器集群 → 三轮地球算力纪元 → 地月算力网 → 戴森算力球",
+          t("story.journey"),
           "",
-          `奇点核心：3 / 3 · 工作室 Lv.${vm.workshop.level}`,
-          `最高算力：${legendary?.maxCompute ?? vm.compute}`,
-          `最高收入：${legendary?.maxIncome ?? vm.incomePerSec}`,
-          legendary?.completedAtMs ? `完成时间：${new Date(legendary.completedAtMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}` : "",
+          `${t("story.coresAndStudio", { level: vm.workshop.level })}`,
+          `${t("story.maxCompute")}${t("common.colon")}${legendary?.maxCompute ?? vm.compute}`,
+          `${t("story.maxIncome")}${t("common.colon")}${legendary?.maxIncome ?? vm.incomePerSec}`,
+          legendary?.completedAtMs ? `${t("story.completedAt")}${t("common.colon")}${new Date(legendary.completedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}` : "",
           "",
-          "主线完成，永续增长继续。世界尺度不再改变，但你的数字仍会不断刷新纪录。",
+          t("story.perpetualContinue"),
         ].filter(Boolean).join("\n"));
       storyCompleteActionsEl.replaceChildren();
-      storyCompleteActionsEl.appendChild(commandBtn("继续经营", "close_story_complete", true));
+      storyCompleteActionsEl.appendChild(commandBtn(t("story.continueBusiness"), "close_story_complete", true));
       storyCompleteOverlay.hidden = false;
     }
 
@@ -1380,18 +1397,18 @@ export function createAppShell(container: HTMLElement): AppShell {
     if (vm.singularity.spacePlanRevealed && !vm.singularity.spacePlanStarted) {
       if (!spaceRevealOverlay.hidden) {
         // 已在展示中：保持内容同步
-        setText(spaceRevealTitleEl, "地球算力网络达到物理极限");
+        setText(spaceRevealTitleEl, t("spaceReveal.title"));
         setText(spaceRevealBodyEl,
-          "检测到恒星级能源协议。新的尺度已经解锁。\n\n地外算力计划已揭示：地球主线完成，可随时启动地月算力网。");
+          t("spaceReveal.body"));
         spaceRevealActionsEl.replaceChildren();
-        spaceRevealActionsEl.appendChild(btn("启动地外算力计划", "start_space_plan", true));
+        spaceRevealActionsEl.appendChild(btn(t("spaceReveal.start"), "start_space_plan", true));
       } else if (!spaceRevealOverlay.dataset.shown) {
         spaceRevealOverlay.dataset.shown = "1";
-        setText(spaceRevealTitleEl, "地球算力网络达到物理极限");
+        setText(spaceRevealTitleEl, t("spaceReveal.title"));
         setText(spaceRevealBodyEl,
-          "检测到恒星级能源协议。新的尺度已经解锁。\n\n地外算力计划已揭示：地球主线完成，可随时启动地月算力网。");
+          t("spaceReveal.body"));
         spaceRevealActionsEl.replaceChildren();
-        spaceRevealActionsEl.appendChild(btn("启动地外算力计划", "start_space_plan", true));
+        spaceRevealActionsEl.appendChild(btn(t("spaceReveal.start"), "start_space_plan", true));
         spaceRevealOverlay.hidden = false;
       }
     }
@@ -1407,7 +1424,7 @@ export function createAppShell(container: HTMLElement): AppShell {
       centerSection.classList.add("hidden");
       prestigeSection.classList.add("hidden");
       const mt = modelSection.querySelector(".section-title");
-      if (mt) mt.textContent = "① 宇宙模型";
+      if (mt) mt.textContent = t("section.stage4Model");
       modelSection.classList.remove("hidden");
     }
     if (isStage4) {
@@ -1418,7 +1435,7 @@ export function createAppShell(container: HTMLElement): AppShell {
       prestigeSection.classList.add("hidden");
       // 模型区转为“宇宙模型包装”：只读展示（沿用地球图鉴收藏加成，不新增抽取/配置）
       const mt = modelSection.querySelector(".section-title");
-      if (mt) mt.textContent = "① 宇宙模型";
+      if (mt) mt.textContent = t("section.stage4Model");
       modelSection.classList.remove("hidden");
     }
 
@@ -1431,9 +1448,9 @@ export function createAppShell(container: HTMLElement): AppShell {
       centerSection.classList.add("hidden");
     }
     if (isStage3) {
-      modelSection.querySelector(".section-title")!.textContent = "① 模型与研发";
+      modelSection.querySelector(".section-title")!.textContent = t("section.stage3Model");
     } else {
-      modelSection.querySelector(".section-title")!.textContent = "① 模型与订单";
+      modelSection.querySelector(".section-title")!.textContent = t("section.model");
     }
 
     // 自动经营解锁后，把服务器增长放到聚合订单之前；只在顺序真正变化时移动既有节点。
@@ -1444,12 +1461,12 @@ export function createAppShell(container: HTMLElement): AppShell {
       businessPage.insertBefore(orderSection, serverSection);
     }
     if (stage2Automated) {
-      modelSection.querySelector(".section-title")!.textContent = "① 模型与研发";
-      serverSection.querySelector(".section-title")!.textContent = "② 服务器扩张";
-      orderSection.querySelector(".section-title")!.textContent = "③ 自动经营";
+      modelSection.querySelector(".section-title")!.textContent = t("section.stage3Model");
+      serverSection.querySelector(".section-title")!.textContent = t("section.serverAutomated");
+      orderSection.querySelector(".section-title")!.textContent = t("section.ordersAutomated");
     } else {
-      serverSection.querySelector(".section-title")!.textContent = "③ 租赁与服务器";
-      orderSection.querySelector(".section-title")!.textContent = "② 订单";
+      serverSection.querySelector(".section-title")!.textContent = t("section.server");
+      orderSection.querySelector(".section-title")!.textContent = t("section.orders");
     }
 
     // 算力档案馆：打开时只在档案数据或标签变化后重建，普通 tick 不替换节点。
@@ -1499,17 +1516,37 @@ export function createAppShell(container: HTMLElement): AppShell {
     return button;
   }
 
+  /** 通关用时：按当前语言输出「X小时Y分钟」/「Xh Ym」。 */
+  function formatDuration(totalMinutes: number): string {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (getLocale() === "en-US") {
+      const parts: string[] = [];
+      if (hours > 0) parts.push(`${hours}h`);
+      if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+      return parts.join(" ");
+    }
+    const partsZh: string[] = [];
+    if (hours > 0) partsZh.push(`${hours}小时`);
+    if (minutes > 0 || partsZh.length === 0) partsZh.push(`${minutes}分钟`);
+    return partsZh.join("");
+  }
+
   function maybeShowStage2Settlement(vm: ViewModel): void {
     if (vm.stage2Settlement.shown || vm.stage3Gateway === false || vm.server.ownedCount < 8) return;
     const res = handler("complete_stage2_settlement");
     if (res?.ok) {
       confirmDialog({
-        title: "服务器集群里程碑完成",
+        title: t("stage2.title"),
         body:
-          `服务器 ${vm.server.ownedCount}/8 · 模型 ${vm.stage2Settlement.modelCount} 个 · ` +
-          `总算力 ${vm.stage2Settlement.totalCompute} · 收入/秒 ${vm.stage2Settlement.incomePerSec} · ` +
-          `本阶段累计收入 ${vm.stage2Settlement.stageIncome}。\n\n算力中心筹建已解锁（下一阶段：电力设施 / 算力卡 / 光模块 / 存储阵列 / 机房）。`,
-        confirmText: "继续经营",
+          t("stage2.body", {
+            servers: vm.server.ownedCount,
+            models: vm.stage2Settlement.modelCount,
+            compute: vm.stage2Settlement.totalCompute,
+            income: vm.stage2Settlement.incomePerSec,
+            stageIncome: vm.stage2Settlement.stageIncome,
+          }),
+        confirmText: t("stage2.continue"),
         onConfirm: () => {},
       });
     }
@@ -1528,20 +1565,22 @@ export function createAppShell(container: HTMLElement): AppShell {
 
   function showResearchReceipt(receipt: ResearchReceipt): void {
     researchReceiptEl.textContent = [
-      `研发成果：${receipt.resultModelName}`,
-      `模型蓝图：${receipt.resultModelName} 蓝图 Lv.${receipt.archiveLevelBefore} → Lv.${receipt.archiveLevelAfter}（+${receipt.archiveLevelDelta}）`,
-      `模型算力：${receipt.computeBefore} → ${receipt.computeAfter}（+${receipt.computeDelta}）`,
-      `每秒收入：${receipt.incomeBefore} → ${receipt.incomeAfter}（+${receipt.incomeDelta}）`,
-      `主力：${receipt.switched ? `已切换（${receipt.oldModelName} → ${receipt.resultModelName}）` : `保持 ${receipt.oldModelName}`}`,
-      `原因：${receipt.switchReason}`,
+      t("receipt.researchResult", { name: tr(receipt.resultModelName) }),
+      t("receipt.blueprint", { name: tr(receipt.resultModelName), before: receipt.archiveLevelBefore, after: receipt.archiveLevelAfter, delta: receipt.archiveLevelDelta }),
+      t("receipt.compute", { before: receipt.computeBefore, after: receipt.computeAfter, delta: receipt.computeDelta }),
+      t("receipt.income", { before: receipt.incomeBefore, after: receipt.incomeAfter, delta: receipt.incomeDelta }),
+      receipt.switched
+        ? t("receipt.switched", { oldName: tr(receipt.oldModelName), newName: tr(receipt.resultModelName) })
+        : t("receipt.kept", { name: tr(receipt.oldModelName) }),
+      t("receipt.reason", { reason: tr(receipt.switchReason) }),
     ].join("\n");
     researchReceiptEl.hidden = false;
   }
 
   function showArchitectureReceipt(receipt: ArchitectureReceipt): void {
     showToast(
-      `架构蓝图 ${receipt.beforeCount}/3 → ${receipt.afterCount}/3 · ` +
-      `全局倍率 ×${receipt.beforeMultiplier} → ×${receipt.afterMultiplier}`,
+      t("receipt.architecture", { before: receipt.beforeCount, after: receipt.afterCount }) + " · " +
+      t("receipt.architectureMult", { before: receipt.beforeMultiplier, after: receipt.afterMultiplier }),
     );
   }
 
@@ -1553,7 +1592,7 @@ export function createAppShell(container: HTMLElement): AppShell {
           stage4Section.scrollIntoView?.({ behavior: "smooth", block: "start" });
         });
       } else {
-        showToast(result.error === "already_started" ? "地外算力计划已经启动" : `启动失败：${result.error ?? "未知原因"}`);
+        showToast(result.error === "already_started" ? t("spacePlan.alreadyStarted") : t("spacePlan.startFailed", { reason: result.error ?? t("error.unknown") }));
       }
     }
     if (command === "claim_core" && result.ok) {
@@ -1561,22 +1600,22 @@ export function createAppShell(container: HTMLElement): AppShell {
       const nextMult = round === 1 ? "×1.5" : "×2.0";
       const isFinalEarthRound = round === 3;
       confirmDialog({
-        title: `第${round}枚奇点核心已入库`,
+        title: t("core.claimTitle", { round }),
         body: isFinalEarthRound
-          ? `地球三轮主线已经完成。永久收入提升至 ${nextMult}，下一步将揭示地外算力计划；本轮不会执行普通清档。`
-          : `本轮完成，永久收入将提升至 ${nextMult}。进入下一轮后，资金、服务器、机房与本轮训练会重置，模型蓝图与长期档案保留。`,
-        confirmText: isFinalEarthRound ? "揭示地外算力计划" : "立即进入下一轮",
-        cancelText: "先留在本轮",
+          ? t("core.claimBodyFinal", { mult: nextMult })
+          : t("core.claimBody", { mult: nextMult }),
+        confirmText: isFinalEarthRound ? t("core.revealPlan") : t("core.nextRound"),
+        cancelText: t("core.stayRound"),
         onConfirm: () => {
           if (isFinalEarthRound) {
             handler("prestige");
             return;
           }
           confirmDialog({
-            title: `确认进入第${round + 1}轮`,
-            body: "资金、服务器、机房、基础设施与本轮模型训练将重置；模型蓝图、档案与永久倍率保留。",
-            confirmText: "确认重置并进入下一轮",
-            cancelText: "返回查看",
+            title: t("core.confirmRound", { round: round + 1 }),
+            body: t("core.resetBody"),
+            confirmText: t("core.confirmReset"),
+            cancelText: t("common.cancel"),
             onConfirm: () => { handler("prestige"); },
           });
         },
@@ -1590,7 +1629,7 @@ export function createAppShell(container: HTMLElement): AppShell {
     dialog.appendChild(el("div", "dialog-title", options.title));
     dialog.appendChild(el("div", "dialog-body", options.body));
     const row = el("div", "dialog-actions");
-    row.appendChild(btn(options.cancelText ?? "取消", "dialog_cancel"));
+    row.appendChild(btn(options.cancelText ?? t("common.cancel"), "dialog_cancel"));
     row.appendChild(btn(options.confirmText, "dialog_confirm", true));
     dialog.appendChild(row);
     overlay.appendChild(dialog);
@@ -1640,9 +1679,9 @@ export function createAppShell(container: HTMLElement): AppShell {
     // 进入入口（Stage 3 条件满足但未进入）
     stage3EntryEl.replaceChildren();
     if (!st.entered && st.entryMet) {
-      stage3EntryEl.appendChild(el("div", "stage3-entry-title", "地球纪元 · 算力中心"));
-      stage3EntryEl.appendChild(el("div", "stage3-entry-text", "8 台服务器集群完成，集群核心机房就绪。进入算力中心阶段。"));
-      stage3EntryEl.appendChild(btn("进入算力中心（不扣资金）", "enter_stage3", true));
+      stage3EntryEl.appendChild(el("div", "stage3-entry-title", t("stage3.entryTitle")));
+      stage3EntryEl.appendChild(el("div", "stage3-entry-text", t("stage3.entryText")));
+      stage3EntryEl.appendChild(btn(t("stage3.enterCenter"), "enter_stage3", true));
       stage3Section.classList.remove("hidden");
       return;
     } else if (!st.entered) {
@@ -1654,7 +1693,7 @@ export function createAppShell(container: HTMLElement): AppShell {
     setText(commissionBonusEl, "");
     commissionBonusEl.style.display = "none";
     if (st.commissionBonusActive) {
-      setIconText(commissionBonusEl, "celebration", `投产红利：${st.commissionBonusRemaining}内收入 ×4`);
+      setIconText(commissionBonusEl, "celebration", t("stage3.commissionBonus", { remaining: st.commissionBonusRemaining }));
       commissionBonusEl.style.display = "";
     }
 
@@ -1662,14 +1701,14 @@ export function createAppShell(container: HTMLElement): AppShell {
     bottleneckEl.replaceChildren();
     if (st.bottleneck.id) {
       bottleneckEl.appendChild(el("div", "bottleneck-title",
-        `当前瓶颈：${st.bottleneck.name}`));
+        t("stage3.bottleneckLabel", { name: tr(st.bottleneck.name) })));
       bottleneckEl.appendChild(el("div", "bottleneck-line",
-        `有效效率：${(st.bottleneck.efficiency * 100).toFixed(0)}% · 升级后预计：${(st.bottleneck.upgradeEfficiency * 100).toFixed(0)}% · 预计增加收入：${st.bottleneck.projectedIncomeGain}`));
+        `${t("stage3.effectiveEfficiency")}${t("common.colon")}${(st.bottleneck.efficiency * 100).toFixed(0)}% · ${t("stage3.upgradeEfficiency")}${t("common.colon")}${(st.bottleneck.upgradeEfficiency * 100).toFixed(0)}% · ${t("stage3.projectedIncome")}${t("common.colon")}${st.bottleneck.projectedIncomeGain}`));
       syncProgress(bottleneckEl.lastElementChild as HTMLElement, st.bottleneck.efficiency * 100);
-      bottleneckEl.appendChild(btn("升级当前瓶颈", `upgrade_infra:${st.bottleneck.id}`, true,
+      bottleneckEl.appendChild(btn(t("stage3.upgradeBottleneck"), `upgrade_infra:${st.bottleneck.id}`, true,
         st.infrastructure.find((i) => i.id === st.bottleneck.id)?.canUpgrade ?? false));
     } else {
-      bottleneckEl.appendChild(el("div", "bottleneck-title", "无瓶颈：各项基础设施充足"));
+      bottleneckEl.appendChild(el("div", "bottleneck-title", t("stage3.noBottleneck")));
     }
 
     // 基础设施
@@ -1678,11 +1717,11 @@ export function createAppShell(container: HTMLElement): AppShell {
       const card = el("div", "infra-card");
       card.dataset.infrastructure = inf.id;
       const infraName = el("div", "infra-name");
-      setIconText(infraName, contentGameIcon(inf.id, "server"), `${inf.name} Lv.${inf.level}/${inf.maxLevel}`);
+      setIconText(infraName, contentGameIcon(inf.id, "server"), `${tr(inf.name)} Lv.${inf.level}/${inf.maxLevel}`);
       card.appendChild(infraName);
-      card.appendChild(el("div", "infra-desc", inf.desc));
+      card.appendChild(el("div", "infra-desc", tr(inf.desc)));
       if (inf.detail) card.appendChild(el("div", "infra-detail", inf.detail));
-      card.appendChild(btn(`升级（${inf.upgradeCost}）`, `upgrade_infra:${inf.id}`, false, inf.canUpgrade));
+      card.appendChild(btn(`${t("action.upgrade")}(${inf.upgradeCost})`, `upgrade_infra:${inf.id}`, false, inf.canUpgrade));
       infraGridEl.appendChild(card);
     }
 
@@ -1693,22 +1732,22 @@ export function createAppShell(container: HTMLElement): AppShell {
       card.dataset.roomIndex = String(r.index);
       card.dataset.commissioned = r.commissioned ? "true" : "false";
       const roomName = el("div", "room-name");
-      setIconText(roomName, r.commissioned ? "complete" : "server", r.name);
+      setIconText(roomName, r.commissioned ? "complete" : "server", tr(r.name));
       card.appendChild(roomName);
       if (r.commissioned) {
-        card.appendChild(el("div", "room-scale", r.scaleName));
+        card.appendChild(el("div", "room-scale", tr(r.scaleName)));
       } else if (r.index === 2 || r.index === 3) {
         card.appendChild(el("div", "room-require",
-          `电力 Lv${r.requirements.power} · 算力卡 Lv${r.requirements.computeCards} · 光模块 Lv${r.requirements.optical} · 存储 Lv${r.requirements.storage}`));
+          `${t("infra.power.name")} Lv${r.requirements.power} · ${t("infra.computeCards.name")} Lv${r.requirements.computeCards} · ${t("infra.optical.name")} Lv${r.requirements.optical} · ${t("infra.storage.name")} Lv${r.requirements.storage}`));
         const prerequisiteDone = r.index === 2
           ? st.flagship.some((f) => f.id === "project_1" && f.completed)
           : st.flagship.some((f) => f.id === "project_2" && f.completed);
         if (r.index === 2 && !prerequisiteDone) {
-          card.appendChild(el("div", "room-gate", "需先完成旗舰工程「大模型集中训练」"));
+          card.appendChild(el("div", "room-gate", `${t("stage3.needPrereq")}${t("common.colon")}${t("flagship.1.name")}`));
         } else if (r.index === 3 && !prerequisiteDone) {
-          card.appendChild(el("div", "room-gate", "需先完成旗舰工程「全国推理服务网络」"));
+          card.appendChild(el("div", "room-gate", `${t("stage3.needPrereq")}${t("common.colon")}${t("flagship.2.name")}`));
         } else if (r.requirementsMet) {
-          card.appendChild(btn(`建设并投产${r.name}`, `commission_room:${r.index}`, true));
+          card.appendChild(btn(t("stage3.commissionRoom", { name: tr(r.name) }), `commission_room:${r.index}`, true));
         }
       }
       roomListEl.appendChild(card);
@@ -1719,9 +1758,9 @@ export function createAppShell(container: HTMLElement): AppShell {
     const active = st.flagship.find((f) => f.activeId);
     if (active) {
       const activeName = el("div", "flagship-active-name");
-      setIconText(activeName, contentGameIcon(active.id, "project_1"), active.name);
+      setIconText(activeName, contentGameIcon(active.id, "project_1"), tr(active.name));
       flagshipActiveEl.appendChild(activeName);
-      const progress = el("div", "flagship-active-progress", `处理进度：${active.progressLabel} · 当前贡献算力：${active.totalCompute}`);
+      const progress = el("div", "flagship-active-progress", `${t("stage3.progressLabel")}${t("common.colon")}${active.progressLabel} · ${t("stage3.contributeCompute")}${t("common.colon")}${active.totalCompute}`);
       syncProgress(progress, Number.parseFloat(active.progressLabel));
       flagshipActiveEl.appendChild(progress);
     } else {
@@ -1730,9 +1769,9 @@ export function createAppShell(container: HTMLElement): AppShell {
     const pending = st.flagship.find((f) => f.pendingRewardId);
     if (pending) {
       const pendingReward = el("div", "flagship-reward-ready");
-      setIconText(pendingReward, "reward", `${pending.pendingRewardName} 已完成，等待领取`);
+      setIconText(pendingReward, "reward", `${tr(pending.pendingRewardName)} · ${t("common.pendingClaim")}`);
       flagshipActiveEl.appendChild(pendingReward);
-      flagshipActiveEl.appendChild(btn("领取旗舰工程奖励", "claim_flagship_reward", true));
+      flagshipActiveEl.appendChild(btn(t("stage3.claimFlagshipReward"), "claim_flagship_reward", true));
       flagshipActiveEl.style.display = "";
     } else if (!active) {
       flagshipActiveEl.style.display = "none";
@@ -1747,19 +1786,19 @@ export function createAppShell(container: HTMLElement): AppShell {
       const card = el("div", "flagship-card" + stateClass);
       card.dataset.projectId = f.id;
       const flagshipName = el("div", "flagship-name");
-      setIconText(flagshipName, contentGameIcon(f.id, "project_1"), f.name);
+      setIconText(flagshipName, contentGameIcon(f.id, "project_1"), tr(f.name));
       card.appendChild(flagshipName);
-      card.appendChild(el("div", "flagship-reward", f.rewardText));
+      card.appendChild(el("div", "flagship-reward", tr(f.rewardText)));
       if (f.canStart) {
-        card.appendChild(btn("启动工程", `start_flagship:${f.id}`, true));
+        card.appendChild(btn(t("stage3.startProject"), `start_flagship:${f.id}`, true));
       } else if (f.completed) {
         const completed = el("div", "flagship-completed");
-        setIconText(completed, "complete", "已完成");
+        setIconText(completed, "complete", t("common.done"));
         card.appendChild(completed);
       } else if (!f.unlocked) {
         card.appendChild(el("div", "flagship-locked", f.requirementsText));
       } else {
-        card.appendChild(el("div", "flagship-locked", "已启动"));
+        card.appendChild(el("div", "flagship-locked", t("stage3.started")));
       }
       flagshipListEl.appendChild(card);
     }
@@ -1771,7 +1810,7 @@ export function createAppShell(container: HTMLElement): AppShell {
     const st = vm.stage3;
     // 投产红利（高频文本）
     if (st.commissionBonusActive) {
-      setIconText(commissionBonusEl, "celebration", `投产红利：${st.commissionBonusRemaining}内收入 ×4`);
+      setIconText(commissionBonusEl, "celebration", t("stage3.commissionBonus", { remaining: st.commissionBonusRemaining }));
       commissionBonusEl.style.display = "";
     } else {
       setText(commissionBonusEl, "");
@@ -1783,7 +1822,7 @@ export function createAppShell(container: HTMLElement): AppShell {
       flagshipActiveEl.style.display = "";
       const prog = flagshipActiveEl.querySelector(".flagship-active-progress");
       if (prog) {
-        setText(prog as HTMLElement, `处理进度：${active.progressLabel} · 当前贡献算力：${active.totalCompute}`);
+        setText(prog as HTMLElement, `${t("stage3.progressLabel")}${t("common.colon")}${active.progressLabel} · ${t("stage3.contributeCompute")}${t("common.colon")}${active.totalCompute}`);
         syncProgress(prog as HTMLElement, Number.parseFloat(active.progressLabel));
       }
     } else if (!st.flagship.some((f) => f.pendingRewardId)) {
@@ -1828,34 +1867,34 @@ export function createAppShell(container: HTMLElement): AppShell {
     archiveTabsEl.replaceChildren();
     archivePanelEl.replaceChildren();
     const tabs = [
-      { id: "catalog", label: "档案", icon: "archive" as GameIconName },
-      { id: "achievements", label: "里程碑", icon: "achieved" as GameIconName },
-      { id: "hall", label: "名人堂", icon: "honor" as GameIconName },
+      { id: "catalog", label: "archive.tab.catalog", icon: "archive" as GameIconName },
+      { id: "achievements", label: "archive.tab.achievements", icon: "achieved" as GameIconName },
+      { id: "hall", label: "archive.tab.hall", icon: "honor" as GameIconName },
     ];
     const activeTab = tabs.some((t) => t.id === archiveTab) ? archiveTab : "catalog";
 
     for (const t of tabs) {
-      const b = btn(t.label, `archive_tab:${t.id}`, activeTab === t.id);
-      setIconText(b, t.icon, t.label);
+      const b = btn(tr(t.label), `archive_tab:${t.id}`, activeTab === t.id);
+      setIconText(b, t.icon, tr(t.label));
       archiveTabsEl.appendChild(b);
     }
 
     if (activeTab === "catalog") {
       const categories = [
-        { id: "models", label: "模型蓝图", icon: "models" as GameIconName },
-        { id: "blueprints", label: "集群架构", icon: "blueprints" as GameIconName },
-        { id: "tech", label: "科技档案", icon: "tech" as GameIconName },
-        { id: "eras", label: "算力纪元", icon: "eras" as GameIconName },
-        ...(vm.singularity.active ? [{ id: "singularity", label: "奇点核心", icon: "singularity" as GameIconName }] : []),
-        ...(vm.growthHistory.enabled ? [{ id: "growth", label: "成长历史", icon: "growth" as GameIconName }] : []),
-        ...(vm.growthHistory.enabled ? [{ id: "legendary", label: "传奇档案", icon: "legendary" as GameIconName }] : []),
+        { id: "models", label: "archive.category.models", icon: "models" as GameIconName },
+        { id: "blueprints", label: "archive.category.blueprints", icon: "blueprints" as GameIconName },
+        { id: "tech", label: "archive.category.tech", icon: "tech" as GameIconName },
+        { id: "eras", label: "archive.category.eras", icon: "eras" as GameIconName },
+        ...(vm.singularity.active ? [{ id: "singularity", label: "archive.category.singularity", icon: "singularity" as GameIconName }] : []),
+        ...(vm.growthHistory.enabled ? [{ id: "growth", label: "archive.category.growth", icon: "growth" as GameIconName }] : []),
+        ...(vm.growthHistory.enabled ? [{ id: "legendary", label: "archive.category.legendary", icon: "legendary" as GameIconName }] : []),
       ];
       const categoryBar = el("div", "archive-categories");
       const activeCategory = categories.some((item) => item.id === archiveCategory) ? archiveCategory : "models";
       archiveCategory = activeCategory;
       for (const category of categories) {
         const categoryButton = btn(category.label, `archive_category:${category.id}`, activeCategory === category.id);
-        setIconText(categoryButton, category.icon, category.label);
+        setIconText(categoryButton, category.icon, tr(category.label));
         categoryBar.appendChild(categoryButton);
       }
       archivePanelEl.appendChild(categoryBar);
@@ -1869,12 +1908,12 @@ export function createAppShell(container: HTMLElement): AppShell {
         const card = el("div", "archive-card" + (model.owned ? "" : " locked") + (model.current ? " current" : ""));
         const title = el("div", "archive-card-title");
         setIconText(title, modelGameIcon(model.id),
-          `${model.owned ? model.name : "未获得模型"}${model.current ? "（当前主力）" : ""}`);
+          `${model.owned ? tr(model.name) : t("archive.notOwned")}${model.current ? t("archive.currentActive") : ""}`);
         card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", `${model.roleLabel} · ${model.effectText}`));
+        card.appendChild(el("div", "archive-card-line", `${tr(model.roleLabel)} · ${tr(model.effectText)}`));
         const details = el("div", "archive-card-line", model.owned
-          ? `蓝图 Lv.${model.archiveLevel} · 研发 ${model.researchCount} 次 · 历史训练 ${model.lifetimeTrainingCount} 次 · 累计贡献 ${model.lifetimeContribution}`
-          : "继续免费研发以解锁");
+          ? `${t("archive.blueprintLevel")} Lv.${model.archiveLevel} · ${t("archive.researchCount")} ${model.researchCount} · ${t("archive.lifetimeTraining")} ${model.lifetimeTrainingCount} · ${t("archive.lifetimeContribution")} ${model.lifetimeContribution}`
+          : t("archive.continueResearch"));
         details.dataset.modelId = model.id;
         card.appendChild(details);
         list.appendChild(card);
@@ -1885,9 +1924,9 @@ export function createAppShell(container: HTMLElement): AppShell {
       for (const bp of vm.stage3.blueprints) {
         const card = el("div", "archive-card" + (bp.active ? " active" : ""));
         const title = el("div", "archive-card-title");
-        setIconText(title, contentGameIcon(bp.id, "blueprints"), `${bp.name}${bp.owned ? "（已解锁）" : "（未解锁）"}`);
+        setIconText(title, contentGameIcon(bp.id, "blueprints"), `${tr(bp.name)}${bp.owned ? t("archive.unlocked") : t("archive.locked")}`);
         card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", bp.desc));
+        card.appendChild(el("div", "archive-card-line", tr(bp.desc)));
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
@@ -1896,9 +1935,9 @@ export function createAppShell(container: HTMLElement): AppShell {
       for (const t of vm.stage3.techArchive) {
         const card = el("div", "archive-card" + (t.unlocked ? "" : " locked"));
         const title = el("div", "archive-card-title");
-        setIconText(title, t.unlocked ? "unlocked" : "locked", t.name);
+        setIconText(title, t.unlocked ? "unlocked" : "locked", tr(t.name));
         card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", t.desc));
+        card.appendChild(el("div", "archive-card-line", tr(t.desc)));
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
@@ -1907,7 +1946,7 @@ export function createAppShell(container: HTMLElement): AppShell {
       for (const e of vm.stage3.eraArchive) {
         const card = el("div", "archive-card" + (e.reached ? "" : " locked"));
         const title = el("div", "archive-card-title");
-        setIconText(title, e.reached ? "achieved" : "locked", e.name);
+        setIconText(title, e.reached ? "achieved" : "locked", tr(e.name));
         card.appendChild(title);
         list.appendChild(card);
       }
@@ -1916,55 +1955,55 @@ export function createAppShell(container: HTMLElement): AppShell {
       const list = el("div", "archive-singularity");
       const claimed = vm.singularity.label ?? "0/3";
       list.appendChild(el("div", "archive-card",
-        `奇点核心 ${claimed}${vm.singularity.coreClaimable ? "（可领取）" : ""}`));
+        `${t("app.singularityBadge", { label: `${claimed}/3` })}${vm.singularity.coreClaimable ? t("archive.claimable") : ""}`));
       if (vm.singularity.spacePlanRevealed) {
         list.appendChild(el("div", "archive-card",
-          "地外算力计划已揭示：地球算力网络达到物理极限，检测到恒星级能源协议，新的尺度已经解锁。"));
+          t("archive.spacePlanRevealed")));
         if (vm.singularity.spacePlanStarted) {
           list.appendChild(el("div", "archive-card",
             vm.stage5.entered
-              ? "地外算力计划已启动：当前为银河算力大亨（戴森算力纪元）。"
-              : "地外算力计划已启动：当前为地月算力运营商。"));
+              ? t("archive.spacePlanStartedGalaxy")
+              : t("archive.spacePlanStartedLunar")));
         } else {
-          list.appendChild(btn("启动地外算力计划", "start_space_plan", true));
+          list.appendChild(btn(t("archive.startSpacePlan"), "start_space_plan", true));
         }
       } else if (vm.singularity.round != null) {
         list.appendChild(el("div", "archive-card",
-          `当前第 ${vm.singularity.round} 轮：完成本轮时代工程后手动领取奇点核心。`));
+          t("archive.roundHint", { round: vm.singularity.round })));
       }
       archivePanelEl.appendChild(list);
     } else if (contentTab === "growth") {
       const list = el("div", "archive-growth");
       const history = vm.growthHistory;
-      list.appendChild(el("div", "archive-subtitle", "模型历史"));
-      list.appendChild(el("div", "archive-card-line", `已记录模型：${history.modelHistory.filter((m) => m.owned).length}/${history.modelHistory.length}`));
-      list.appendChild(el("div", "archive-subtitle", "技术迭代历史"));
-      if (history.iterationHistory.length === 0) list.appendChild(el("div", "archive-card-line", "尚未完成技术迭代"));
+      list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.models")));
+      list.appendChild(el("div", "archive-card-line", `${t("archive.recordedModels")}${t("common.colon")}${history.modelHistory.filter((m) => m.owned).length}/${history.modelHistory.length}`));
+      list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.iterations")));
+      if (history.iterationHistory.length === 0) list.appendChild(el("div", "archive-card-line", t("archive.noIterations")));
       for (const iteration of history.iterationHistory) {
-        list.appendChild(el("div", "archive-card", `${iteration.label} · 永久收入 ${iteration.multiplier}`));
+        list.appendChild(el("div", "archive-card", `${tr(iteration.label)} · ${t("archive.permanentIncome")} ${iteration.multiplier}`));
       }
-      list.appendChild(el("div", "archive-subtitle", "奇点核心"));
+      list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.cores")));
       for (const core of history.singularityCores) {
         const coreCard = el("div", "archive-card" + (core.claimed ? "" : " locked"));
-        setIconText(coreCard, core.claimed ? "singularity" : "locked", core.label);
+        setIconText(coreCard, core.claimed ? "singularity" : "locked", tr(core.label));
         list.appendChild(coreCard);
       }
-      list.appendChild(el("div", "archive-subtitle", "文明阶段"));
+      list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.civilization")));
       for (const stage of history.civilizationStages) {
         const card = el("div", "archive-card" + (stage.reached ? "" : " locked"));
         const title = el("div", "archive-card-title");
-        setIconText(title, stage.reached ? "achieved" : "locked", stage.name);
+        setIconText(title, stage.reached ? "achieved" : "locked", tr(stage.name));
         card.appendChild(title);
         if (stage.reached && stage.reachedAtMs > 0) {
-          card.appendChild(el("div", "archive-card-line", `抵达时间：${new Date(stage.reachedAtMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`));
+          card.appendChild(el("div", "archive-card-line", `${t("archive.reachedAt")}${t("common.colon")}${new Date(stage.reachedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}`));
         }
         list.appendChild(card);
       }
-      list.appendChild(el("div", "archive-subtitle", "银河纪元记录"));
-      if (history.galacticEras.length === 0) list.appendChild(el("div", "archive-card-line", "完成终局阶段后，这里会记录已抵达的银河纪元"));
+      list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.galacticEras")));
+      if (history.galacticEras.length === 0) list.appendChild(el("div", "archive-card-line", t("archive.noGalacticEras")));
       for (const era of history.galacticEras) {
         const eraCard = el("div", "archive-card");
-        setIconText(eraCard, "eras", era.name);
+        setIconText(eraCard, "eras", tr(era.name));
         list.appendChild(eraCard);
       }
       archivePanelEl.appendChild(list);
@@ -1973,28 +2012,28 @@ export function createAppShell(container: HTMLElement): AppShell {
       if (vm.legendaryArchive) {
         const archive = vm.legendaryArchive;
         const title = el("div", "archive-card-title");
-        setIconText(title, "legendary", "戴森算力球 · 终局传奇");
+        setIconText(title, "legendary", t("archive.legendaryTitle"));
         list.appendChild(title);
-        list.appendChild(el("div", "archive-card-line", `完成时间：${new Date(archive.completedAtMs).toLocaleString()}`));
-        list.appendChild(el("div", "archive-card-line", `最大算力：${archive.maxCompute}`));
-        list.appendChild(el("div", "archive-card-line", `最大收入：${archive.maxIncome}/秒`));
-        list.appendChild(el("div", "archive-card-line", `达成纪元：${archive.reachedEra}`));
+        list.appendChild(el("div", "archive-card-line", `${t("archive.completedAt")}${t("common.colon")}${new Date(archive.completedAtMs).toLocaleString(getLocale())}`));
+        list.appendChild(el("div", "archive-card-line", `${t("archive.maxCompute")}${t("common.colon")}${archive.maxCompute}`));
+        list.appendChild(el("div", "archive-card-line", `${t("archive.maxIncome")}${t("common.colon")}${archive.maxIncome}/s`));
+        list.appendChild(el("div", "archive-card-line", `${t("archive.reachedEra")}${t("common.colon")}${tr(archive.reachedEra)}`));
       } else {
-        list.appendChild(el("div", "archive-card locked", "戴森算力球完成后，这里会留下你的终局传奇档案"));
+        list.appendChild(el("div", "archive-card locked", t("archive.legendaryLocked")));
       }
       archivePanelEl.appendChild(list);
     } else if (contentTab === "achievements") {
       const list = el("div", "archive-achievements");
       const achieved = vm.achievements.filter((item) => item.achieved).length;
-      list.appendChild(el("div", "archive-subtitle", `成长里程碑 ${achieved}/${vm.achievements.length}`));
+      list.appendChild(el("div", "archive-subtitle", `${t("archive.milestones")} ${achieved}/${vm.achievements.length}`));
       for (const item of vm.achievements) {
         const card = el("div", "archive-card" + (item.achieved ? "" : " locked"));
         const title = el("div", "archive-card-title");
-        setIconText(title, item.achieved ? "achieved" : "locked", item.name);
+        setIconText(title, item.achieved ? "achieved" : "locked", tr(item.name));
         card.appendChild(title);
         card.appendChild(el("div", "archive-card-line", item.description));
         if (item.achievedAtMs > 0) {
-          card.appendChild(el("div", "archive-card-line", `达成时间：${new Date(item.achievedAtMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`));
+          card.appendChild(el("div", "archive-card-line", `${t("archive.achievedAt")}${t("common.colon")}${new Date(item.achievedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}`));
         }
         list.appendChild(card);
       }
@@ -2002,26 +2041,26 @@ export function createAppShell(container: HTMLElement): AppShell {
     } else if (contentTab === "hall") {
       const list = el("div", "archive-hall");
       const hallTitle = el("div", "archive-card-title");
-      setIconText(hallTitle, "honor", "银河名人堂");
+      setIconText(hallTitle, "honor", t("hall.title"));
       list.appendChild(hallTitle);
       const personal = el("div", "archive-card hall-personal-record");
-      personal.appendChild(el("div", "archive-card-title", "我的经营纪录"));
-      personal.appendChild(el("div", "archive-card-line", `当前财富：${vm.money} · 工作室 Lv.${vm.workshop.level}`));
+      personal.appendChild(el("div", "archive-card-title", t("archive.myRecords")));
+      personal.appendChild(el("div", "archive-card-line", `${t("archive.currentWealth")}${t("common.colon")}${vm.money} · ${t("app.workshop", { level: vm.workshop.level, exp: "", next: "" })}`));
       if (vm.legendaryArchive) {
         const elapsedMs = Math.max(0, vm.legendaryArchive.completedAtMs - vm.createdAtMs);
         const totalMinutes = Math.floor(elapsedMs / 60_000);
-        const duration = `${Math.floor(totalMinutes / 60)}小时${totalMinutes % 60}分钟`;
-        personal.appendChild(el("div", "archive-card-line", `戴森算力球完成：${new Date(vm.legendaryArchive.completedAtMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`));
-        personal.appendChild(el("div", "archive-card-line", `本档通关用时：${duration} · 最高算力：${vm.legendaryArchive.maxCompute}`));
+        const duration = formatDuration(totalMinutes);
+        personal.appendChild(el("div", "archive-card-line", `${t("archive.dysonCompletedAt")}${t("common.colon")}${new Date(vm.legendaryArchive.completedAtMs).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`));
+        personal.appendChild(el("div", "archive-card-line", `${t("archive.clearTime")}${t("common.colon")}${duration} · ${t("archive.maxCompute")}${t("common.colon")}${vm.legendaryArchive.maxCompute}`));
       } else {
-        personal.appendChild(el("div", "archive-card-line", "完成戴森算力球后，本档通关时间会在这里永久留档。"));
+        personal.appendChild(el("div", "archive-card-line", t("archive.clearTimeHint")));
       }
       list.appendChild(personal);
       list.appendChild(el("div", "archive-card hall-board-contract",
-        "最短通关榜按用时从短到长排列；财富榜按大数保序指数从高到低排列，游戏内仍展示你的真实资金。"));
-      list.appendChild(el("div", "archive-card-line", `服务状态：${platformStatus.leaderboard}`));
-      list.appendChild(btn("查看最短通关榜", "open_leaderboard:fastest", true));
-      list.appendChild(btn("查看当前财富榜", "open_leaderboard:wealth", true));
+        t("hall.rules")));
+      list.appendChild(el("div", "archive-card-line", `${t("hall.serviceStatus")}${t("common.colon")}${tr(platformStatus.leaderboard)}`));
+      list.appendChild(btn(t("hall.viewFastest"), "open_leaderboard:fastest", true));
+      list.appendChild(btn(t("hall.viewWealth"), "open_leaderboard:wealth", true));
       archivePanelEl.appendChild(list);
     }
   }
@@ -2032,8 +2071,8 @@ export function createAppShell(container: HTMLElement): AppShell {
       const details = archivePanelEl.querySelector(`[data-model-id="${model.id}"]`) as HTMLElement | null;
       if (!details) continue;
       setText(details, model.owned
-        ? `蓝图 Lv.${model.archiveLevel} · 研发 ${model.researchCount} 次 · 历史训练 ${model.lifetimeTrainingCount} 次 · 累计贡献 ${model.lifetimeContribution}`
-        : "继续免费研发以解锁");
+        ? `${t("archive.blueprintLevel")} Lv.${model.archiveLevel} · ${t("archive.researchCount")} ${model.researchCount} · ${t("archive.lifetimeTraining")} ${model.lifetimeTrainingCount} · ${t("archive.lifetimeContribution")} ${model.lifetimeContribution}`
+        : t("archive.continueResearch"));
     }
   }
 

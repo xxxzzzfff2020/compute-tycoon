@@ -65,7 +65,7 @@ export function buildDevSave(stateId: string, nowMs: number): SaveData {
         ...s.stage3,
         entered: true,
         enteredAtMs: nowMs,
-        machineRooms: [{ index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs }],
+        machineRooms: [{ index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs }],
         infrastructure: { power: 1, computeCards: 1, optical: 1, storage: 1 },
         eraArchive: [
           { id: "era_full_cluster", reachedAtMs: nowMs },
@@ -83,7 +83,7 @@ export function buildDevSave(stateId: string, nowMs: number): SaveData {
         ...s.stage3,
         entered: true,
         enteredAtMs: nowMs,
-        machineRooms: [{ index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs }],
+        machineRooms: [{ index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs }],
         infrastructure: { power: 4, computeCards: 5, optical: 3, storage: 3 },
         flagship: {
           activeId: null,
@@ -109,8 +109,8 @@ export function buildDevSave(stateId: string, nowMs: number): SaveData {
         entered: true,
         enteredAtMs: nowMs,
         machineRooms: [
-          { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs },
-          { index: 2, id: "room_2", name: "企业级算力机房", commissionedAtMs: nowMs },
+          { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs },
+          { index: 2, id: "room_2", name: "era.room2.name", commissionedAtMs: nowMs },
         ],
         infrastructure: { power: 6, computeCards: 7, optical: 5, storage: 5 },
         flagship: {
@@ -138,9 +138,9 @@ export function buildDevSave(stateId: string, nowMs: number): SaveData {
         entered: true,
         enteredAtMs: nowMs,
         machineRooms: [
-          { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs },
-          { index: 2, id: "room_2", name: "企业级算力机房", commissionedAtMs: nowMs },
-          { index: 3, id: "room_3", name: "区域算力中心", commissionedAtMs: nowMs },
+          { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs },
+          { index: 2, id: "room_2", name: "era.room2.name", commissionedAtMs: nowMs },
+          { index: 3, id: "room_3", name: "era.room3.name", commissionedAtMs: nowMs },
         ],
         infrastructure: { power: 6, computeCards: 7, optical: 5, storage: 8 },
         flagship: {
@@ -171,9 +171,9 @@ export function buildDevSave(stateId: string, nowMs: number): SaveData {
         entered: true,
         enteredAtMs: nowMs,
         machineRooms: [
-          { index: 1, id: "room_1", name: "集群核心机房", commissionedAtMs: nowMs },
-          { index: 2, id: "room_2", name: "企业级算力机房", commissionedAtMs: nowMs },
-          { index: 3, id: "room_3", name: "区域算力中心", commissionedAtMs: nowMs },
+          { index: 1, id: "room_1", name: "era.room1.name", commissionedAtMs: nowMs },
+          { index: 2, id: "room_2", name: "era.room2.name", commissionedAtMs: nowMs },
+          { index: 3, id: "room_3", name: "era.room3.name", commissionedAtMs: nowMs },
         ],
         infrastructure: { power: 6, computeCards: 7, optical: 5, storage: 8 },
         flagship: {

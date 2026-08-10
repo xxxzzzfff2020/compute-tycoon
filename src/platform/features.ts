@@ -14,11 +14,11 @@ export const PLATFORM_FEATURES = Object.freeze({
 });
 
 export const PLATFORM_FEATURE_REASONS = Object.freeze({
-  rewardedAds: "TapTap H5应用广告已启用；正式竖屏激励广告位 1054324",
+  rewardedAds: "platform.reason.ads",
   cloudSave: PLATFORM_REVIEW_MODE
-    ? "云备份已开启（真机测试存档）"
-    : "暂未开放",
+    ? "platform.reason.cloudReview"
+    : "platform.reason.unavailable",
   leaderboard: PLATFORM_REVIEW_MODE
-    ? "名人堂已开启（真机测试榜）"
-    : "暂未开放",
+    ? "platform.reason.leaderboardReview"
+    : "platform.reason.unavailable",
 });

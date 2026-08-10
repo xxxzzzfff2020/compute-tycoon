@@ -18,11 +18,11 @@ DeepSeek 的 Stage 1–3、第一次技术迭代和二周目主链是真实实�
 ## 基线真值
 
 ```yaml
-source_repository: /Users/xxxzzzfff2002/code/TaptapMaker/TaptapMaker/H5算力大亨H5
+source_repository: <LOCAL_REPO_PATH>/H5算力大亨H5
 source_branch: main
 deepseek_final_commit: f6bd80d8b7d982598f29d901ad7e8fff55b8674c
 source_workspace_modified_by_codex: false
-audit_worktree: /Users/xxxzzzfff2002/code/TaptapMaker/STUDIO_CONTROL/04_LOCAL_OPERATIONS/PM_RUNTIME/compute_tycoon/h5_intake_20260801/worktree
+audit_worktree: <LOCAL_REPO_PATH>/code/TaptapMaker/STUDIO_CONTROL/04_LOCAL_OPERATIONS/PM_RUNTIME/compute_tycoon/h5_intake_20260801/worktree
 audit_branch: codex/h5-intake-audit-20260801
 origin_main: NOT_CONFIGURED
 node: 25.8.0

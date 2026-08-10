@@ -85,9 +85,9 @@ export function modelRoleEffectText(model: ModelDef): string {
   const activePercent = Math.round(model.activeBonus * 100);
   const passivePercent = Math.round(model.archiveBonusPerLevel * 100);
   if (model.role === "high_value_business") {
-    return `主力：高价值业务权重 +${activePercent}% · 蓝图每级 +${passivePercent}%`;
+    return `model.effect.highValue`;
   }
-  return `主力：${model.roleLabel} +${activePercent}% · 蓝图每级 +${passivePercent}%`;
+  return `model.effect.role`;
 }
 
 export function distinctModelRoles(): ModelRole[] {

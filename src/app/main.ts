@@ -8,6 +8,7 @@ import { buildDevSave, DEV_SAVE_NAMESPACE, devStateId } from "./devverify";
 import { ENDGAME_SAVE_NAMESPACE, newSaveId } from "../save/types";
 import { ensureEndgameSingularity } from "../economy/singularity";
 import { createGrowthFeedback } from "../economy/feel";
+import { getLocale, initLocale, setLocale, t } from "../i18n";
 import { GameSession } from "./session";
 import { freshSaveData, LocalStorageSaveStorage } from "../save/storage";
 import { SaveRepository } from "../save/repository";
@@ -173,6 +174,7 @@ export function boot(): void {
     }
   }
   const repository = new SaveRepository({ storage: effectiveStorage, nowMs: () => clock.now() });
+  initLocale();
   const shell = createAppShell(container);
   const audio = new GameAudio();
   audio.install();
@@ -186,9 +188,9 @@ export function boot(): void {
   const leaderboards = formalPlatformMode && PLATFORM_FEATURES.leaderboard ? new TapLeaderboardController() : null;
   activeCloudSaveController = cloudSave;
   const leaderboardStatus = leaderboards?.supported()
-    ? "已连接"
+    ? "platform.connected"
     : PLATFORM_FEATURES.leaderboard
-      ? "当前设备暂未连接"
+      ? "platform.notConnected"
       : PLATFORM_FEATURE_REASONS.leaderboard;
   shell.setPlatformStatus({
     cloud: cloudSave?.getSnapshot().message ?? PLATFORM_FEATURE_REASONS.cloudSave,
@@ -200,7 +202,7 @@ export function boot(): void {
     removeCloudSaveSubscription = cloudSave.subscribe((snapshot) => {
       shell.setPlatformStatus({
         cloud: snapshot.lastSuccessAtMs > 0
-          ? `${snapshot.message} · 最近成功 ${new Date(snapshot.lastSuccessAtMs).toLocaleString("zh-CN")}`
+          ? `${snapshot.message} · platform.lastSuccess ${new Date(snapshot.lastSuccessAtMs).toLocaleString(getLocale())}`
           : snapshot.message,
         leaderboard: leaderboardStatus,
         platformReview: PLATFORM_REVIEW_MODE,
@@ -233,17 +235,17 @@ export function boot(): void {
     const started = rewardedAd.show((completed) => {
       if (!completed) {
         session.cancelPendingSponsorAd(offer.eventId);
-        shell.showToast("广告未完整观看，本次未充能");
+        shell.showToast(t("toast.adIncomplete"));
         return;
       }
       const granted = session.grantRewardedAd(offer.eventId);
       shell.showToast(granted.ok
-        ? (isOffline ? "离线结算上限已增加2小时" : "经营收入×2已增加2小时")
-        : "奖励已领取或当前不可领取");
+        ? (isOffline ? t("toast.offlineCapacityBoost") : t("toast.incomeBoost"))
+        : t("toast.rewardUnavailable"));
     });
     if (!started) {
       session.cancelPendingSponsorAd(offer.eventId);
-      shell.showToast("广告尚未就绪，请稍后再试");
+      shell.showToast(t("toast.adNotReady"));
     }
   };
   if (rewardedAd) {
@@ -312,7 +314,7 @@ export function boot(): void {
         const offer = session.pendingRewardedAdOffer();
         if (!offer) return { ok: false, error: "ad_offer_missing" };
         if (!rewardedAd || rewardedAd.getSnapshot().state !== "ready") {
-          shell.showToast(rewardedAd ? "广告正在加载，请稍后再试" : "广告需在 TapTap 小游戏中体验");
+          shell.showToast(rewardedAd ? t("toast.adLoading") : t("toast.adTapTapOnly"));
           return { ok: false, error: "ad_not_ready" };
         }
         queueMicrotask(() => playRewardedOffer(offer));
@@ -324,48 +326,48 @@ export function boot(): void {
       }
       case "cloud_upload": {
         if (!cloudSave?.supported()) {
-          shell.showToast("云存档需在 TapTap 小游戏中使用");
+          shell.showToast(t("toast.cloudUnsupported"));
           return { ok: false, error: "cloud_unsupported" };
         }
         void cloudSave.upload(session.exportJson(), true).then((result) => {
           if (result.ok) {
-            shell.showToast("云备份完成");
+            shell.showToast(t("toast.cloudBackupDone"));
             return;
           }
           if (result.conflict) {
             shell.confirmDialog({
-              title: "发现云端进度冲突",
-              body: `${result.error ?? "云端已有不同进度。"}\n\n建议先从云端恢复。只有确认本机进度才是要保留的版本时，才强制覆盖云端。`,
-              confirmText: "确认以本机覆盖云端",
+              title: t("cloud.conflictTitle"),
+              body: `${t(result.error ?? "cloud.conflictBody")}\n\n${t("cloud.conflictAdvice")}`,
+              confirmText: t("cloud.confirmOverride"),
               onConfirm: () => {
                 void cloudSave.upload(session.exportJson(), true, true).then((forced) => {
-                  shell.showToast(forced.ok ? "已按确认覆盖云端" : forced.error ?? "强制备份失败");
+                  shell.showToast(forced.ok ? t("toast.cloudOverridden") : t(forced.error ?? "toast.cloudOverrideFailed"));
                 });
               },
             });
             return;
           }
-          shell.showToast(result.error ?? "云备份失败");
+          shell.showToast(t(result.error ?? "toast.cloudBackupFailed"));
         });
         return { ok: true };
       }
       case "cloud_restore": {
         if (!cloudSave?.supported()) {
-          shell.showToast("云存档需在 TapTap 小游戏中使用");
+          shell.showToast(t("toast.cloudUnsupported"));
           return { ok: false, error: "cloud_unsupported" };
         }
         shell.confirmDialog({
-          title: "从云端恢复",
-          body: "仅在云端文件通过完整存档校验后替换本地进度；空存档或损坏存档不会覆盖本地。确定继续吗？",
-          confirmText: "校验并恢复",
+          title: t("cloud.restoreTitle"),
+          body: t("cloud.restoreBody"),
+          confirmText: t("cloud.restoreConfirm"),
           onConfirm: () => {
             void cloudSave.download().then((downloaded) => {
               if (!downloaded.ok || !downloaded.saveJson) {
-                shell.showToast(downloaded.error ?? "云端恢复失败，本地档未改变");
+                shell.showToast(t(downloaded.error ?? "toast.cloudRestoreFailed"));
                 return;
               }
               const imported = session.importJson(downloaded.saveJson);
-              shell.showToast(imported.ok ? "云端存档已恢复" : "云端存档校验失败，本地档未改变");
+              shell.showToast(imported.ok ? t("toast.cloudRestored") : t("toast.cloudRestoreInvalid"));
             });
           },
         });
@@ -381,6 +383,15 @@ export function boot(): void {
       }
       case "save":
         return session.save("manual");
+      case "set_locale": {
+        const locale = command.slice("set_locale:".length);
+        if (locale !== "zh-CN" && locale !== "en-US") return { ok: false, error: "invalid_locale" };
+        if (getLocale() === locale) return { ok: true };
+        setLocale(locale);
+        // 语言是低频偏好：重载以全量一致地重渲染（存档 schema 不受影响）。
+        window.location.reload();
+        return { ok: true };
+      }
       case "export_json": {
         const json = session.exportJson();
         const blob = new Blob([json], { type: "application/json" });
@@ -394,13 +405,13 @@ export function boot(): void {
       }
       case "import_json": {
         const res = session.importJson(String((payload as { text?: string } | undefined)?.text ?? ""));
-        if (!res.ok) shell.showToast(res.error ?? "导入失败");
+        if (!res.ok) shell.showToast(t(res.error ?? "toast.importFailed"));
         return res;
       }
       case "reset":
         {
           const result = session.reset();
-          if (result.ok) shell.showToast("已重置为新存档");
+          if (result.ok) shell.showToast(t("toast.resetDone"));
           return result;
         }
       default:
@@ -430,7 +441,7 @@ export function boot(): void {
         }
         if (command.startsWith("prepare_sponsor_ad:")) {
           if (!rewardedAd || rewardedAd.getSnapshot().state !== "ready") {
-            shell.showToast(rewardedAd ? "广告正在加载，请稍后再试" : "广告需在 TapTap 小游戏中体验");
+            shell.showToast(rewardedAd ? t("toast.adLoading") : t("toast.adTapTapOnly"));
             return { ok: false, error: "ad_not_ready" };
           }
           const kind = command.slice("prepare_sponsor_ad:".length);
@@ -441,12 +452,12 @@ export function boot(): void {
           const kind = command.slice("open_leaderboard:".length);
           if (kind !== "fastest" && kind !== "wealth") return { ok: false, error: "invalid_leaderboard" };
           if (!leaderboards?.supported()) {
-            shell.showToast("名人堂需在 TapTap 小游戏中查看");
+            shell.showToast(t("toast.leaderboardTapTapOnly"));
             return { ok: false, error: "leaderboard_unsupported" };
           }
           void leaderboards.submitEligible(session.getState()).finally(() => {
             void leaderboards.open(kind).then((result) => {
-              if (!result.ok) shell.showToast(result.error ?? "排行榜打开失败");
+              if (!result.ok) shell.showToast(t(result.error ?? "leaderboard.err.openFailed"));
             });
           });
           return { ok: true };

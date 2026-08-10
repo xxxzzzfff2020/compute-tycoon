@@ -10,9 +10,9 @@ import { stage3IncomePerSecond, stage3TotalCompute } from "./stage3";
 import { stage4Entered } from "./stage4";
 
 // ---------- 常数（来自 CARD-00 冻结表） ----------
-export const STAGE5_IDENTITY = "银河算力大亨";
+export const STAGE5_IDENTITY = "stage5.identity";
 export const STAGE5_FINAL_PROJECT_ID = "dyson_sphere";
-export const STAGE5_ERA_NAME = "银河纪元";
+export const STAGE5_ERA_NAME = "stage5.eraName";
 /** 进入时里程碑授予第一个恒星计算节点（不扣资金）。 */
 export const STAGE5_NODES: ReadonlyArray<{
   id: string;
@@ -22,10 +22,10 @@ export const STAGE5_NODES: ReadonlyArray<{
   cost: number;
   incomeMult: number;
 }> = [
-  { id: "solar_array", name: "太阳能采集阵列", icon: "☀️", cost: 0, incomeMult: 1 },
-  { id: "stellar_node", name: "恒星计算节点", icon: "⭐", cost: 7.2e11, incomeMult: 1.8 },
-  { id: "dyson_cloud", name: "戴森计算云", icon: "🌫️", cost: 7.2e12, incomeMult: 3 },
-  { id: "stellar_model", name: "恒星级模型阵列", icon: "🌠", cost: 7.2e13, incomeMult: 5 },
+  { id: "solar_array", name: "stage5.node.solarArray.name", icon: "☀️", cost: 0, incomeMult: 1 },
+  { id: "stellar_node", name: "stage5.node.stellarNode.name", icon: "⭐", cost: 7.2e11, incomeMult: 1.8 },
+  { id: "dyson_cloud", name: "stage5.node.dysonCloud.name", icon: "🌫️", cost: 7.2e12, incomeMult: 3 },
+  { id: "stellar_model", name: "stage5.node.stellarModel.name", icon: "🌠", cost: 7.2e13, incomeMult: 5 },
 ];
 
 /** 宇宙模型包装：仅展示名称/图标（不增加独立抽取、配置或复杂槽位）。 */
@@ -35,7 +35,7 @@ export const STAGE5_COSMIC_MODELS: ReadonlyArray<{
   icon: string;
   desc: string;
 }> = [
-  { id: "stellar_ai", name: "恒星级模型", icon: "🌠", desc: "为戴森算力纪元定制恒星级推理模型" },
+  { id: "stellar_ai", name: "stage5.cosmic.name", icon: "🌠", desc: "stage5.cosmic.desc" },
 ];
 
 // ---------- 门禁 ----------
@@ -139,9 +139,9 @@ export function stage5IncomePerSecond(state: SaveData, nowMs = Date.now()): Deci
 /** 唯一最终巨构：戴森算力球（最终RC：约8小时在线等效，cap=30/秒）。 */
 export const STAGE5_FINAL_PROJECT = {
   id: STAGE5_FINAL_PROJECT_ID,
-  name: "戴森算力球",
+  name: "stage5.dysonSphere",
   icon: "🔮",
-  desc: "全游戏最昂贵最明确的最终目标：以戴森结构包裹恒星，汲取全部能源运行银河级算力",
+  desc: "stage5.dysonSphereDesc",
   progressRequired: 864000,
   progressCapPerSec: 30,
 };

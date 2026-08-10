@@ -7,14 +7,14 @@ release_status: NOT_RELEASE_CANDIDATE
 
 lua_reference:
   status: READ_ONLY_ENGINEERING_REFERENCE
-  repository: /Users/xxxzzzfff2002/code/TaptapMaker/TaptapMaker/ComputeTycoon
+  repository: <LOCAL_REPO_PATH>/ComputeTycoon
   head: f9351dcad464c5fa4928f4dae72f0a9bdf0c8f9f
   tag: archive/compute-tycoon-lua-frozen-20260801
   touched_by_this_task: false
 
 h5:
-  canonical_repository: /Users/xxxzzzfff2002/code/TaptapMaker/TaptapMaker/H5算力大亨H5
-  audit_worktree: /Users/xxxzzzfff2002/code/TaptapMaker/STUDIO_CONTROL/04_LOCAL_OPERATIONS/PM_RUNTIME/compute_tycoon/h5_intake_20260801/worktree
+  canonical_repository: <LOCAL_REPO_PATH>/H5算力大亨H5
+  audit_worktree: <LOCAL_REPO_PATH>/code/TaptapMaker/STUDIO_CONTROL/04_LOCAL_OPERATIONS/PM_RUNTIME/compute_tycoon/h5_intake_20260801/worktree
   deepseek_baseline: f6bd80d8b7d982598f29d901ad7e8fff55b8674c
   prior_repair: 60144ca5bfb1d8e2440b8b4d28c0778858481a3a
   prior_report: bc3c3ad2a36e40c9207db7369d73c2d0969a672d
@@ -102,7 +102,7 @@ task_id: H5_PRODUCT_CONTRACT_AND_CURVE_RECONCILIATION_01
 result: READY_FOR_CONCENTRATED_HUMAN_REVIEW
 
 baseline:
-  canonical_repository: /Users/xxxzzzfff2002/code/TaptapMaker/TaptapMaker/H5算力大亨H5
+  canonical_repository: <LOCAL_REPO_PATH>/H5算力大亨H5
   audit_start_commit: bc3c3ad2a36e40c9207db7369d73c2d0969a672d
   reconciliation_commit: TAG_TARGET
   main_commit: TAG_TARGET

@@ -93,7 +93,7 @@ describe("CARD-04: receipt snapshot fields", () => {
     expect(reward.elapsedSec).toBe(6 * 60 * 60);
     expect(reward.rawElapsedSec).toBe(10 * 60 * 60);
     expect(reward.capSec).toBe(6 * 60 * 60);
-    expect(reward.projectName).toBe("戴森算力球");
+    expect(reward.projectName).toBe("stage5.dysonSphere");
     expect(reward.projectProgressDelta).toBeGreaterThan(0);
     expect(reward.money).toBeGreaterThan(0);
   });
@@ -237,7 +237,7 @@ describe("CARD-04: receipt drives same-cap side effects", () => {
     s.lastTickAtMs = now() - 2 * 60 * 60 * 1000;
     const { session } = makeSession({ initial: { ...s } as Partial<SaveData> });
     const state = session.getState();
-    expect(state.pendingOfflineReward?.projectName).toBe("戴森算力球");
+    expect(state.pendingOfflineReward?.projectName).toBe("stage5.dysonSphere");
     expect(state.pendingOfflineReward?.projectProgressDelta).toBeGreaterThan(0);
     expect(state.singularity?.stage5?.projectProgress).toBeGreaterThan(before);
     expect(hasPendingFinalRewardLike(state)).toBe(false);

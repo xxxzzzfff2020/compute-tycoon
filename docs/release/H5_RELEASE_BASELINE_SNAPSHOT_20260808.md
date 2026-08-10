@@ -3,7 +3,7 @@
 ```yaml
 task_id: COMPUTE_TYCOON_H5_FINAL_RELEASE_CONVERGENCE_01
 captured_at: 2026-08-08
-canonical_repository: /Users/xxxzzzfff2002/code/TaptapMaker/TaptapMaker/H5算力大亨H5
+canonical_repository: <LOCAL_REPO_PATH>/H5算力大亨H5
 branch_before: main
 branch_working: codex/final-release-convergence-01
 head: f765129a96f57bf395041bb507e7571024aa9291
@@ -47,7 +47,7 @@ formal_cloud_sync_at_baseline: false
 sites_project_id: appgprj_6a6daad5757c8191912434c015631a1b
 version: 14
 deployed_commit: f765129a96f57bf395041bb507e7571024aa9291
-url: https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site
+url: <PRIVATE_REVIEW_URL>
 access: custom_owner_only
 external_visitors: 0
 groups: 0

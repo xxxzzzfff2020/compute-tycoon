@@ -8,8 +8,8 @@ describe("release platform feature gates", () => {
       cloudSave: false,
       leaderboard: false,
     });
-    expect(PLATFORM_FEATURE_REASONS.rewardedAds).toContain("1054324");
-    expect(PLATFORM_FEATURE_REASONS.cloudSave).toBe("暂未开放");
-    expect(PLATFORM_FEATURE_REASONS.leaderboard).toBe("暂未开放");
+    expect(PLATFORM_FEATURE_REASONS.rewardedAds).toBe("platform.reason.ads");
+    expect(PLATFORM_FEATURE_REASONS.cloudSave).toBe("platform.reason.unavailable");
+    expect(PLATFORM_FEATURE_REASONS.leaderboard).toBe("platform.reason.unavailable");
   });
 });

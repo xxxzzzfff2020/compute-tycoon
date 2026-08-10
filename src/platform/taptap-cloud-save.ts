@@ -92,9 +92,9 @@ function tapCloudApi(): TapCloudApi | null {
 function errorText(error: unknown): string {
   if (typeof error === "object" && error !== null) {
     const value = error as { errMsg?: string; message?: string; code?: number };
-    return value.errMsg ?? value.message ?? (value.code == null ? "云存档操作失败" : `云存档错误 ${value.code}`);
+    return value.errMsg ?? value.message ?? (value.code == null ? "cloud.err.generic" : `cloud.err.code:${value.code}`);
   }
-  return String(error || "云存档操作失败");
+  return String(error || "cloud.err.generic");
 }
 
 function saveIdentity(payload: unknown): CloudSaveIdentity | null {
@@ -156,7 +156,7 @@ export class TapCloudSaveController {
     this.browserStorage = options.browserStorage ?? window.localStorage;
     this.snapshot = {
       state: this.api ? "idle" : "unsupported",
-      message: this.api ? "云存档待同步" : "请在 TapTap 小游戏中使用云存档",
+      message: this.api ? "cloud.state.pending" : "cloud.err.tapOnly",
       lastSuccessAtMs: this.storedNumber(LAST_SUCCESS_KEY),
     };
   }
@@ -181,7 +181,7 @@ export class TapCloudSaveController {
     if (this.timer !== null || this.inFlight) return;
     const elapsed = Date.now() - this.lastUploadAtMs();
     const delay = Math.max(1_500, MIN_UPLOAD_INTERVAL_MS - elapsed);
-    this.setSnapshot("scheduled", "本地已保存，云备份排队中");
+    this.setSnapshot("scheduled", "cloud.state.queued");
     this.timer = window.setTimeout(() => {
       this.timer = null;
       const next = this.pendingProvider;
@@ -191,20 +191,20 @@ export class TapCloudSaveController {
   }
 
   async upload(saveJson: string, force = false, overwriteConflict = false): Promise<CloudOperationResult> {
-    if (!this.api) return this.fail("请在 TapTap 小游戏中使用云存档", "unsupported");
-    if (this.inFlight) return { ok: false, error: "云存档正在同步" };
+    if (!this.api) return this.fail("cloud.err.tapOnly", "unsupported");
+    if (this.inFlight) return { ok: false, error: "cloud.err.syncing" };
     const elapsed = Date.now() - this.lastUploadAtMs();
     if (!force && elapsed < MIN_UPLOAD_INTERVAL_MS) {
-      return { ok: false, error: `云存档限频，请 ${Math.ceil((MIN_UPLOAD_INTERVAL_MS - elapsed) / 1000)} 秒后再试` };
+      return { ok: false, error: `cloud.err.throttled:${Math.ceil((MIN_UPLOAD_INTERVAL_MS - elapsed) / 1000)}` };
     }
     let payload: unknown;
     try {
       payload = JSON.parse(saveJson);
     } catch {
-      return this.fail("本地存档无效，未上传");
+      return this.fail("cloud.err.invalidLocal");
     }
     const localMeta = saveIdentity(payload);
-    if (!localMeta) return this.fail("本地存档缺少有效身份，未上传");
+    if (!localMeta) return this.fail("cloud.err.noIdentity");
     const localFingerprint = cloudFingerprint(localMeta);
     const wrapped = JSON.stringify({
       format: "compute-tycoon-h5-cloud-v2",
@@ -213,10 +213,10 @@ export class TapCloudSaveController {
       meta: localMeta,
       payload,
     } satisfies CloudEnvelopeV2);
-    if (new TextEncoder().encode(wrapped).byteLength > MAX_ARCHIVE_BYTES) return this.fail("存档超过10MB，未上传");
+    if (new TextEncoder().encode(wrapped).byteLength > MAX_ARCHIVE_BYTES) return this.fail("cloud.err.tooLarge");
 
     this.inFlight = true;
-    this.setSnapshot("syncing", "正在核对云端版本");
+    this.setSnapshot("syncing", "cloud.state.checking");
     try {
       const fs = this.api.getFileSystemManager();
       const cloud = this.api.getCloudSaveManager();
@@ -228,7 +228,7 @@ export class TapCloudSaveController {
           remote = await this.readArchive(cloud, fs, existing);
         } catch (error) {
           if (!overwriteConflict) {
-            const message = `云端存档无法安全核对：${errorText(error)}。已停止覆盖`;
+            const message = `cloud.err.verifyFailed:${errorText(error)}`;
             this.setSnapshot("conflict", message);
             return { ok: false, conflict: true, error: message, localMeta };
           }
@@ -238,7 +238,7 @@ export class TapCloudSaveController {
             const now = Date.now();
             this.browserStorage.setItem(this.key(LAST_UPLOAD_KEY), String(now));
             this.rememberRemote(localFingerprint);
-            this.setSnapshot("synced", "云端与本地已一致", now);
+            this.setSnapshot("synced", "cloud.state.consistent", now);
             return { ok: true, localMeta, remoteMeta: remote.meta };
           }
           const knownRemote = this.browserStorage.getItem(this.key(KNOWN_REMOTE_KEY));
@@ -247,8 +247,8 @@ export class TapCloudSaveController {
           const localNotOlder = localMeta.revision >= remote.meta.revision && localMeta.updatedAtMs >= remote.meta.updatedAtMs;
           if (!overwriteConflict && !(isKnownLineage && sameSave && localNotOlder)) {
             const message = sameSave
-              ? "云端已有另一设备更新的进度，已停止自动覆盖。请先恢复云端或确认强制备份"
-              : "云端属于另一份存档，已停止自动覆盖。请先恢复云端或确认强制备份";
+              ? "cloud.conflict.otherDevice"
+              : "cloud.conflict.otherSave";
             this.setSnapshot("conflict", message);
             return { ok: false, conflict: true, error: message, localMeta, remoteMeta: remote.meta };
           }
@@ -258,7 +258,7 @@ export class TapCloudSaveController {
       const filePath = `${this.api.env.USER_DATA_PATH}/${this.fileName}`;
       await new Promise<void>((resolve, reject) => fs.writeFile({ filePath, data: wrapped, encoding: "utf8", success: resolve, fail: reject }));
       const common: CloudWriteOptions = {
-        archiveMetaData: { name: this.slotName, summary: `算力大亨自动存档 · ${new Date().toLocaleString("zh-CN")}`, playtime: 0 },
+        archiveMetaData: { name: this.slotName, summary: `compute-tycoon-cloud-save`, playtime: 0 },
         archiveFilePath: filePath,
         success: () => undefined,
         fail: () => undefined,
@@ -272,7 +272,7 @@ export class TapCloudSaveController {
       const now = Date.now();
       this.browserStorage.setItem(this.key(LAST_UPLOAD_KEY), String(now));
       this.rememberRemote(localFingerprint);
-      this.setSnapshot("synced", "云备份已完成", now);
+      this.setSnapshot("synced", "cloud.state.done", now);
       return { ok: true, localMeta };
     } catch (error) {
       return this.fail(errorText(error));
@@ -283,23 +283,23 @@ export class TapCloudSaveController {
   }
 
   async download(): Promise<CloudOperationResult> {
-    if (!this.api) return this.fail("请在 TapTap 小游戏中使用云存档", "unsupported");
-    if (this.inFlight) return { ok: false, error: "云存档正在同步" };
+    if (!this.api) return this.fail("cloud.err.tapOnly", "unsupported");
+    if (this.inFlight) return { ok: false, error: "cloud.err.syncing" };
     this.inFlight = true;
-    this.setSnapshot("syncing", "正在读取并校验云端存档");
+    this.setSnapshot("syncing", "cloud.state.reading");
     try {
       const fs = this.api.getFileSystemManager();
       const cloud = this.api.getCloudSaveManager();
       const saves = await this.archiveList(cloud);
       const archive = saves.find((item) => item.name === this.slotName);
-      if (!archive) return this.fail("云端还没有可恢复的存档");
+      if (!archive) return this.fail("cloud.err.noArchive");
       const decoded = await this.readArchive(cloud, fs, archive);
       const now = Date.now();
       this.rememberRemote(decoded.fingerprint);
-      this.setSnapshot("synced", "云端存档已校验，可安全恢复", now);
+      this.setSnapshot("synced", "cloud.state.verified", now);
       return { ok: true, saveJson: JSON.stringify(decoded.payload), remoteMeta: decoded.meta };
     } catch (error) {
-      return this.fail(`云端存档格式无效，本地档未改变：${errorText(error)}`);
+      return this.fail(`cloud.err.invalidFormat:${errorText(error)}`);
     } finally {
       this.inFlight = false;
       this.resumePendingUpload();
@@ -356,7 +356,7 @@ export class TapCloudSaveController {
   ): Promise<DecodedCloudEnvelope> {
     const uuid = archive.uuid ?? archive.archiveUUID;
     const fileId = archive.fileId ?? archive.archiveFileId;
-    if (!uuid || !fileId) throw new Error("云端档案缺少文件身份");
+    if (!uuid || !fileId) throw new Error("cloud.err.noFileIdentity");
     const safeSlot = this.slotName.replace(/[^a-zA-Z0-9_-]/g, "_");
     const targetFilePath = `${this.api!.env.USER_DATA_PATH}/${safeSlot}-preflight.json`;
     const downloaded = await new Promise<{ filePath: string }>((resolve, reject) => cloud.getArchiveData({
@@ -373,7 +373,7 @@ export class TapCloudSaveController {
       fail: reject,
     }));
     const decoded = decodeCloudEnvelope(raw);
-    if (!decoded) throw new Error("云端存档校验失败");
+    if (!decoded) throw new Error("cloud.err.verifyFailed2");
     return decoded;
   }
 

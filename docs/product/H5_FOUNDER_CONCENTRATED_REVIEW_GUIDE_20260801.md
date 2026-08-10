@@ -2,7 +2,7 @@
 
 ```yaml
 status: READY_FOR_FOUNDER_CONCENTRATED_REVIEW
-review_url: https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site
+review_url: <PRIVATE_REVIEW_URL>
 default_speed: 1x
 checkpoint_count: 10
 storage_namespace: compute_tycoon_h5_review_v2:<checkpoint_id>

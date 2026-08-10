@@ -81,7 +81,7 @@ describe("TapTap rewarded video adapter", () => {
     controller.init();
     expect(controller.getSnapshot()).toEqual({
       state: "unsupported",
-      message: "当前不是 TapTap 小游戏环境",
+      message: "ads.err.tapOnly",
     });
     expect(controller.show(() => { throw new Error("must not run"); })).toBe(false);
   });
@@ -102,7 +102,7 @@ describe("TapTap rewarded video adapter", () => {
     expect(button.disabled).toBe(false);
     button.click();
     ad.emitClose(true);
-    expect(document.querySelector(".ad-test-result")?.textContent).toContain("未修改存档");
+    expect(document.querySelector(".ad-test-result")?.textContent).toBe("ads.debug.success");
     cleanup();
     expect(document.querySelector(".ad-test-panel")).toBeNull();
   });

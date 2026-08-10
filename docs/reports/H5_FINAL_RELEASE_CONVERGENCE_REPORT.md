@@ -8,7 +8,7 @@ baseline: f765129a96f57bf395041bb507e7571024aa9291
 candidate_commit: 42c26ef5b35caf735b0f0415bb523404765645c0
 candidate_tag: compute-tycoon-h5-release-candidate-20260808
 private_rc_version: 15
-private_rc_url: https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site
+private_rc_url: <PRIVATE_REVIEW_URL>
 private_rc_access: OWNER_ONLY_CUSTOM
 public_release: NOT_AUTHORIZED
 ```
@@ -35,7 +35,7 @@ public_release: NOT_AUTHORIZED
 
 ## 平台与商业化
 
-- TapTap H5 身份：Developer `415945` / App `902727` / Miniapp `tapmcix1sdc8m7ybwj`。
+- TapTap H5 身份：Developer `<DEVELOPER_ID>` / App `<APP_ID>` / Miniapp `<MINIAPP_ID>`。
 - 激励广告 VERIFIED；竖屏广告位 `1054324`。只实现离线同额追加和候选蓝图额外+1。
 - 广告基础奖励先到账，取消/失败不扣；Schema v5 保存事件账本，重复回调和刷新 exactly-once。
 - 云存档关闭：API 可用但 H5 真容器身份、服务端时间和双设备冲突未闭合。

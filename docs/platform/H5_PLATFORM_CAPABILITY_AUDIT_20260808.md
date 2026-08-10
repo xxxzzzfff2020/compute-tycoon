@@ -4,9 +4,9 @@
 
 | 项目 | 当前事实 |
 |---|---|
-| Developer ID | `415945` |
-| App ID | `902727` |
-| Miniapp ID | `tapmcix1sdc8m7ybwj` |
+| Developer ID | `<DEVELOPER_ID>` |
+| App ID | `<APP_ID>` |
+| Miniapp ID | `<MINIAPP_ID>` |
 | 应用名 | 算力大亨 |
 | 类型 | 模拟经营 |
 | 当前公开状态 | 未发布 |

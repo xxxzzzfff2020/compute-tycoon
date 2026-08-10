@@ -1,72 +1,134 @@
-# 算力大亨 · H5 MVP
+# Compute Tycoon (算力大亨)
 
-《算力大亨》首个 H5 文字挂机经营游戏 MVP。基于 Lua 黄金产品合同（`4a661c8`，2026-07-19）重新实现，非 Lua 代码迁移。
+> An open-source incremental AI infrastructure tycoon game — and a reproducible case study of AI-agent-driven game development with human product governance.
 
-- 技术栈：TypeScript + Vite + Vitest + decimal.js（DOM 优先，无 Canvas 主 UI，无大型框架）
-- 玩法：AI 创业工作室 → 免费研发 6 个职责模型 → 1–8 台服务器 → 三座机房与旗舰工程 → 第一次技术迭代 → 第二轮加速
-- 标准首轮完整时长：约 81 分钟（8 策略 ×1000 局校准，见 `docs/ECONOMY_SIMULATION.md`）；地球主线三次迭代上限（核心 1/2/3，永久倍率 ×1.5/×2.0/×2.0）
+**Compute Tycoon** is a fully playable H5 incremental/idle tycoon game about building a personal AI studio into a planetary-scale compute empire. It is also a reference implementation: the entire pipeline — product contract, agent roles, code, automated tests, economic simulation, device QA, ads/cloud adapters, release process — is open, documented, and reproducible from a clean clone.
 
-## 快速开始
+**Play it live:** https://xxxzzzfff2020.github.io/compute-tycoon/
+
+---
+
+## The Game
+
+You start with one AI studio, research models, and accept compute orders. Grow from a single server to server clusters, then to a compute center with machine rooms and flagship projects. Through technology iterations (prestige) you keep permanent progress, discover Singularity Cores, and unlock the endgame:
+
+`AI Studio → Model R&D → Orders → First Server → Server Cluster → Compute Center → Technology Iterations → Off-world Compute Plan → Earth-Moon Compute Network → Dyson Compute Sphere`
+
+- **Locales:** zh-CN (default) and en-US, switchable in-game, preference stored outside the save schema
+- **Offline progression:** exactly-once offline receipts, stage-based offline caps
+- **Save safety:** schema-versioned localStorage saves, export/import, exactly-once claims
+- **No framework lock-in:** TypeScript + Vite + Vitest + decimal.js, DOM-first rendering
+
+## Features
+
+- 6 model archetypes with roles, training, and permanent archive bonuses
+- Manual order flow → automation unlock → high-throughput server clusters
+- 8 servers → Stage 2 settlement → Compute Center (power / compute cards / optical / storage)
+- 3 machine rooms + 3 flagship projects, era/tech archives, blueprint milestones
+- Technology iterations (×1.5 / ×2.0 / ×2.0 permanent multipliers)
+- Singularity Cores (3), Off-world Compute Plan reveal, Stage 4 lunar network, Stage 5 Dyson sphere
+- Honor Hall / Archive: models, blueprints, tech, eras, cores, growth history, leaderboards
+- Platform adapters for rewarded ads, cloud save, leaderboards — runtime-injected, safe fallbacks
+- Fully documented i18n layer (`src/i18n/`), 760+ keys per locale
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Language | TypeScript |
+| Build | Vite |
+| Tests | Vitest (unit) + jsdom/Puppeteer (E2E) |
+| Numbers | decimal.js |
+| Icons | lucide |
+| State/Save | localStorage, versioned schema + validation |
+| Platform | TapTap adapters via runtime `tap` object (ads / cloud save / leaderboards) |
+
+## Quick Start
 
 ```bash
-npm install        # 安装依赖
-npm run dev        # 本地开发（默认 http://localhost:5173）
-npm run build      # 生产构建（tsc + vite build，输出 dist/）
-npm run build:sites # 生产构建 + Sites Worker 适配
-npm run build:review # 集中评审构建（输出 dist-review/）
-npm run build:sites:review # 集中评审构建 + Sites Worker 适配
-npm run preview    # 预览生产构建
-npm run preview:review # 本地预览集中评审构建
-npm run test       # 单元测试（Vitest）
-npm run e2e        # 浏览器 E2E（jsdom，全流程：新档→迭代）
-npm run typecheck  # TypeScript 检查
-npm run simulate   # 经济模拟（8 种策略 × 1000 局）
+npm install
+npm run dev          # local dev server
+npm test             # unit tests (Vitest)
+npm run e2e          # browser E2E (full loop: new save → iteration)
+npm run typecheck    # TypeScript check
+npm run build        # production build → dist/
+npm run simulate     # economy simulation (8 strategies × 1000 runs)
 ```
 
-> 目录名为中文（`H5算力大亨H5`），npm 脚本内部无依赖路径拼接，可正常工作。
+Requires Node.js 20+ and npm. No platform accounts are needed to build or run the core game; TapTap features are optional at runtime.
 
-## 核心命令/入口
+## Architecture
 
-| 命令 | 说明 |
-|------|------|
-| `获取第一款模型` | Stage1 起点 |
-| `接取`（订单） | 手动接单（完成 6 单解锁自动经营；迭代后 3 单） |
-| `训练/研发模型` | 提升模型等级与处理能力 |
-| `开启自动经营` | 自动接推荐订单 + 自动领取 |
-| `购买服务器` | 第一台由里程碑授予，第 2–8 台资金购买 |
-| `进入算力中心` | 仅在 8 服和 Stage 2 结算后进入 Stage 3 |
-| `升级基础设施 / 投产机房` | 电力、算力卡、光模块、存储四项全局成长；无旧中心升级 |
-| `进行技术迭代` | 地球主线最多三次（R1/R2/R3）；永久倍率 ×1.5/×2.0/×2.0；第三次迭代转为「地外算力计划」揭示不清档 |
+- `src/app/` — boot, session, command routing, review/dev entrypoints
+- `src/core/` — time, big-number utilities
+- `src/data/` — product contract content (models, orders, servers, stage 3+)
+- `src/economy/` — game rules engine, viewmodel, offline settlement, singularity/stage 4/5
+- `src/save/` — storage, schema validation, migration, repository
+- `src/ui/` — DOM renderer (no Canvas main UI), final-feel layer
+- `src/i18n/` — locale dictionaries and runtime (zh-CN / en-US)
+- `src/platform/` — TapTap adapters (ads, cloud save, leaderboards)
+- `src/audio/` — BGM controller
+- `src/review/` — isolated founder-concentrated review runtime (separate build)
+- `scripts/` — simulations, browser verification, release tooling
+- `tests/` — unit + E2E suites (379+ unit tests)
 
-## 存档
+## AI Development Workflow
 
-- localStorage 命名空间：`compute_tycoon_h5_mvp_v1`
-- 自动保存（15 秒/隐藏页面时）、手动保存、导出/导入 JSON、重置二次确认
-- Stage 2 离线最多 60 分钟；Stage 3 随存储从 60 分钟升至 180 分钟，资金与研发共用上限；待领取报价 exactly-once
-- 详见 `docs/SAVE_CONTRACT.md`
+This project is a **case study in AI-agent-driven game development**. The workflow is documented in `docs/ai-development/`:
 
-## 开发加速（正式 UI 不可见）
+- `01_OVERVIEW.md` — how AI agents and humans collaborated
+- `02_PRODUCT_GOVERNANCE.md` — product contract as source of truth
+- `03_AGENT_ROLES.md` — PM / coding / testing / review roles
+- `04_DEVELOPMENT_WORKFLOW.md` — one task, one owner, one acceptance standard
+- `05_EVIDENCE_DRIVEN_QA.md` — why "tests pass" ≠ "player experience passes"
+- `07_CODEX_WORKFLOW.md` — how Codex was used (audit, repair, tests, docs)
+- `AI_GAME_STUDIO_PRINCIPLES.md` — reusable principles for AI-assisted studios
 
-URL 参数 `?dev=1&state=<合法检查点>&speed=N`。只有合法隔离检查点才能启用倍速；正式 UI 不显示入口，正式档不受影响。
+**Division of labor:** AI agents implement code, write tests, run economic simulations, do deterministic QA, and prepare releases. Humans own product direction, gameplay judgment, and the final experience gate. No claims of "fully autonomous AI" are made — this is a real, evidence-driven collaboration.
 
-## 创始人集中评审（独立构建）
+## Testing
 
-- 私密入口：`https://compute-tycoon-h5-review.xxxzzzfff2026.chatgpt.site`
-- Review Build 提供“从新档完整开始”和 A–J 十个真实状态机检查点。
-- 每个检查点使用独立命名空间 `compute_tycoon_h5_review_v2:<checkpoint_id>`，不读取或覆盖正式档。
-- Review 运行时只由专用构建显式安装；给正式入口追加 Review 查询参数不会启用评审模式。
-- Review 会话栏提供 1/2/4/8/16/32× 调试倍率，切换后继续当前隔离存档；默认体验始终为 1×，正式 Production 不显示该控件。
-- 自动化 QA 仍可在 Review Build 使用隐藏的 `qa=1&speed=N` 路径，不进入面向体验的倍率选择器。
-- 详见 `docs/product/H5_FOUNDER_CONCENTRATED_REVIEW_GUIDE_20260801.md`。
+- **Unit (379 tests):** economy rules, save/migration, offline exactly-once, stage 3–5, platform adapters, i18n acceptance
+- **E2E:** full game loop from new save through first technology iteration (jsdom/Puppeteer)
+- **Economic simulation:** `npm run simulate` — 8 strategies × 1000 runs, budget/balance checks
+- **Review checkpoints:** isolated state-machine checkpoints for human experience reviews
+- **Evidence-driven QA:** browser matrices, runtime soaks, save/load round-trips — see `docs/reports/`
 
-## 文档
+## Internationalization
 
-- `docs/PRODUCT_CONTRACT.md` — 产品合同与数值来源
-- `docs/ECONOMY_SIMULATION.md` — 经济模拟方法与结果
-- `docs/SAVE_CONTRACT.md` — 存档/离线/幂等契约
-- `docs/CODEX_HANDOFF.md` — 交接说明（范围/技术债/下一步）
-- `docs/product/H5_CONTRACT_RECONCILIATION_01.md` — 6 模型、旧中心、存储和曲线正式协调结论
-- `docs/product/H5_FOUNDER_CONCENTRATED_REVIEW_GUIDE_20260801.md` — Review Candidate V2 集中体验顺序与判断问题
-- `docs/product/H5_ITERATION2_ITERATION3_ENDLESS_DESIGN_PREP_01.md` — 迭代与无尽纪元历史设计准备（已被正式整合卡取代）
-- `docs/reports/H5_ENDGAME_CONVERGENCE_P2_REPORT_20260807.md` — 终局收敛实施报告（倍率 ×1.5/×2.0/×2.0）
-- `docs/reports/H5_REVIEW_HARDENING_05_20260801.md` — 本轮确定性硬化与证据收口
+- Dictionaries: `src/i18n/zh-CN.ts`, `src/i18n/en-US.ts` (identical key sets, enforced by tests)
+- Runtime: `src/i18n/index.ts` — locale detection, persistence, interpolation, Intl number/percent formatting
+- Terminology is frozen in `docs/i18n/TERMINOLOGY.md` (e.g. 算力 = Compute Power, 技术迭代 = Technology Iteration)
+- Player-visible strings must never be hardcoded outside `src/i18n/` (see `AGENTS.md`)
+- English is natural game English, not a literal translation
+
+## Documentation
+
+- `docs/PRODUCT_CONTRACT.md` — product contract and numeric sources
+- `docs/ECONOMY_SIMULATION.md` — simulation methodology and results
+- `docs/SAVE_CONTRACT.md` — save / offline / idempotency contract
+- `docs/ai-development/` — the AI-agent development case study
+- `docs/oss/` — open-source scope, security audit, license audit, release plan
+- `docs/platform/` — platform capability audit
+- `docs/release/` — release notes and checklists
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and PRs are welcome. Please keep player-facing strings in the i18n dictionaries and respect the product contract (`docs/PRODUCT_CONTRACT.md`) — gameplay/economy changes need design discussion first.
+
+## Security
+
+See [SECURITY.md](SECURITY.md). The repository is released through a sanitized OSS mirror: `store-materials/` (platform store assets) and internal review URLs are excluded. No credentials are committed.
+
+## License
+
+Code: [MIT](LICENSE). Media assets in `public/assets/` (key art, BGM) are project-owned but **not** covered by the code license — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md` for details.
+
+## Roadmap
+
+- [ ] Japanese / Korean / Traditional Chinese locales
+- [ ] Community-contributed content hooks
+- [ ] Webhook-driven issue/PR triage automation
+- [ ] Release automation via GitHub Actions
+
+*Roadmap reflects current intent; items are not commitments.*

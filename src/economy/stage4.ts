@@ -10,10 +10,10 @@ import { stage3IncomePerSecond } from "./stage3";
 import { batchPurchaseUnlocked } from "./singularity";
 
 // ---------- 常数（来自 CARD-00 冻结表） ----------
-export const STAGE4_IDENTITY = "地月算力运营商";
+export const STAGE4_IDENTITY = "stage4.identity";
 export const STAGE4_FINAL_PROJECT_ID = "moon_network";
-export const STAGE4_MOTIVATION_TITLE = "地球算力饱和 → 太空冷却";
-export const STAGE4_MOTIVATION_TEXT = "地球算力网络已接近物理上限。把算力送入太空，用冷却与新尺度换取下一段增长。";
+export const STAGE4_MOTIVATION_TITLE = "stage4.motivationTitle";
+export const STAGE4_MOTIVATION_TEXT = "stage4.motivationText";
 /** 进入时里程碑授予第一个节点（不扣资金），首个自费节点 = 月球背面算力基地。 */
 export const STAGE4_NODES: ReadonlyArray<{
   id: string;
@@ -23,10 +23,10 @@ export const STAGE4_NODES: ReadonlyArray<{
   cost: number;
   incomeMult: number;
 }> = [
-  { id: "leo_node", name: "近地轨道节点", icon: "🛰️", cost: 0, incomeMult: 1 },
-  { id: "moon_base", name: "月球背面算力基地", icon: "🌕", cost: 1.8e10, incomeMult: 1.6 },
-  { id: "lunar_link", name: "地月激光链路", icon: "🔗", cost: 1.8e11, incomeMult: 2.4 },
-  { id: "deep_relay", name: "深空算力中继", icon: "🌌", cost: 1.8e12, incomeMult: 3.5 },
+  { id: "leo_node", name: "stage4.node.leo.name", icon: "🛰️", cost: 0, incomeMult: 1 },
+  { id: "moon_base", name: "stage4.node.moonBase.name", icon: "🌕", cost: 1.8e10, incomeMult: 1.6 },
+  { id: "lunar_link", name: "stage4.node.lunarLink.name", icon: "🔗", cost: 1.8e11, incomeMult: 2.4 },
+  { id: "deep_relay", name: "stage4.node.deepRelay.name", icon: "🌌", cost: 1.8e12, incomeMult: 3.5 },
 ];
 /** 首个自费节点门 8–15 分钟由 CARD-00 冻结；此处只保留价格常量，不做硬编码时间门。 */
 export const STAGE4_FIRST_PAID_NODE_ID = "moon_base";
@@ -38,7 +38,7 @@ export const STAGE4_COSMIC_MODELS: ReadonlyArray<{
   icon: string;
   desc: string;
 }> = [
-  { id: "lunar_ai", name: "地外AI模型", icon: "🌕", desc: "为地月算力网定制的地外推理模型" },
+  { id: "lunar_ai", name: "stage4.cosmic.name", icon: "🌕", desc: "stage4.cosmic.desc" },
 ];
 
 // ---------- 门禁 ----------
@@ -156,9 +156,9 @@ export function stage4IncomePerSecond(state: SaveData, nowMs = Date.now()): Deci
 /** 唯一最终工程：地月一体化算力网（最终RC：约4小时在线等效，cap=25/秒）。 */
 export const STAGE4_FINAL_PROJECT = {
   id: STAGE4_FINAL_PROJECT_ID,
-  name: "地月一体化算力网",
+  name: "stage4.moonNetwork",
   icon: "🌐",
-  desc: "将地球与月球算力统一为一张地月网络，完成即达成地月算力运营商主线目标",
+  desc: "stage4.moonNetworkDesc",
   progressRequired: 360000,
   progressCapPerSec: 25,
 };

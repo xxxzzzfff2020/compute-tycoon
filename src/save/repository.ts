@@ -12,6 +12,7 @@ import {
   type SaveData,
 } from "./types";
 import { validateSave } from "./validate";
+import { t } from "../i18n";
 
 export interface SaveRepositoryOptions {
   storage: SaveStorage;
@@ -44,7 +45,7 @@ export class SaveRepository {
     if (raw == null) {
       const fresh = freshSaveData(this.nowMs());
       this.latest = fresh;
-      return { kind: "fresh", data: fresh, message: "已创建新存档" };
+      return { kind: "fresh", data: fresh, message: "save.msg.created" };
     }
     const result = validateSave(raw);
     if (!result.ok) {
@@ -56,19 +57,19 @@ export class SaveRepository {
         return {
           kind: "fresh",
           data: fresh,
-          message: `存档版本 ${(raw as unknown as Record<string, unknown>).schemaVersion} 高于当前支持版本 ${MAX_SUPPORTED_SCHEMA_VERSION}，已安全新建存档（未覆盖原档）`,
+          message: t("save.msg.futureVersion", { version: String((raw as unknown as Record<string, unknown>).schemaVersion), max: String(MAX_SUPPORTED_SCHEMA_VERSION) }),
         };
       }
       const fresh = freshSaveData(this.nowMs());
       this.latest = fresh;
-      return { kind: "corrupt_recreated", data: fresh, message: "检测到损坏存档，已安全新建" };
+      return { kind: "corrupt_recreated", data: fresh, message: "save.msg.corruptRecreated" };
     }
     if (result.repaired) {
       this.latest = result.data;
-      return { kind: "repaired", data: result.data, message: "存档存在缺失字段，已自动修复" };
+      return { kind: "repaired", data: result.data, message: "save.msg.repaired" };
     }
     this.latest = result.data;
-    return { kind: "loaded", data: result.data, message: "已恢复存档" };
+    return { kind: "loaded", data: result.data, message: "save.msg.loaded" };
   }
 
   /** 原子保存：校验通过才写盘，并递增 revision */

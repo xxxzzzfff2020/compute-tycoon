@@ -94,7 +94,7 @@ describe("model research non-regression contract", () => {
         archiveLevelAfter: 20,
         archiveLevelDelta: 1,
         switched: false,
-        switchReason: "当前主力蓝图升级，模型算力与每秒收入都已提高",
+        switchReason: "receipt.reason.upgraded",
       },
     });
     expect(session.getState().modelProgress?.modelId).toBe("voice");
@@ -204,10 +204,10 @@ describe("model research non-regression contract", () => {
     const first = session.researchModel();
     expect(first.ok).toBe(true);
     expect(first.researchReceipt).toMatchObject({
-      oldModelName: "语音合成模型",
-      resultModelName: "知识蒸馏模型",
+      oldModelName: "model.voice.name",
+      resultModelName: "model.distill.name",
       levelBefore: 12,
-      conclusion: "已收录，当前主力更强，保持不变",
+      conclusion: "receipt.conclusion.kept",
     });
     expect(first.researchReceipt?.computeBefore).toBe("3.8178");
     expect(first.researchReceipt?.incomeBefore).toBe("309.2832");

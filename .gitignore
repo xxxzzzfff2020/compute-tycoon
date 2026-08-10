@@ -4,3 +4,6 @@ dist-review/
 dist-platform-review/
 *.local
 .DS_Store
+store-materials/
+.openai/
+.vite/

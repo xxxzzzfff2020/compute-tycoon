@@ -18,9 +18,9 @@ export const SINGULARITY_CORE_IDS: ReadonlyArray<string> = ["core_1", "core_2", 
 
 /** 时代工程（每轮唯一最昂贵目标） */
 export const ERA_PROJECTS: ReadonlyArray<{ id: string; name: string; round: 1 | 2 | 3 }> = [
-  { id: "project_r1", name: "区域算力协作网", round: 1 },
-  { id: "project_r2", name: "全球算力骨干环", round: 2 },
-  { id: "project_r3", name: "行星算力统一场", round: 3 },
+  { id: "project_r1", name: "flagship.r1.name", round: 1 },
+  { id: "project_r2", name: "flagship.r2.name", round: 2 },
+  { id: "project_r3", name: "flagship.r3.name", round: 3 },
 ];
 
 export const ERA_PROJECT_IDS = ERA_PROJECTS.map((p) => p.id);
