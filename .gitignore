@@ -7,3 +7,4 @@ dist-platform-review/
 store-materials/
 .openai/
 .vite/
+.planning/
