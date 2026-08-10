@@ -20,7 +20,7 @@
 
 1. `rg --files`（排除 node_modules/.git/dist*）枚举工作树。
 2. 正则批量检索密钥类：`sk-`/`pk-` 前缀、`api_key`、`openai`、`bearer`、`client_secret`、`access_token`、`oauth_secret`、`secret_key`、`Authorization`、Slack/GitHub token 特征。
-3. 检索敏感标识：本机路径 `/Users/xxxzzzfff2002/`、`chatgpt.site`、`compute-tycoon-h5-review`、`taptap.cn`、`maker.taptap.cn`、`app_id 902727`、`developer_id 415945`、`miniapp tapmcix1sdc8m7ybwj`、邮箱。
+3. 检索敏感标识：本机路径、私密评审域名、平台账号标识、邮箱及外部平台 URL。
 4. 复核 `src/platform/` 平台适配源码、`package.json`、`.gitignore`、`.openai/hosting.json`、vite 配置与 git 提交历史。
 
 ## 3. 发现项清单
@@ -30,9 +30,9 @@
 | 文件 | 类型 | 处理建议 |
 |---|---|---|
 | `store-materials/` 整体（249 个文件、约 47 MB） | TapTap 商店发布物料：`manifest.json`、宣传图、截图、录屏、Logo、库背景、封面、Review Pack、capture-harness | **整体排除出公开镜像** |
-| `store-materials/taptap-app-<APP_ID>/manifest.json` | 平台账号标识：`app_id 902727`、`miniapp_id tapmcix1sdc8m7ybwj`、基线 commit `d5084130…` | 排除（随目录） |
-| `store-materials/taptap-app-<APP_ID>/requirements/MAT_00_REQUIREMENTS.md` | 平台账号标识：`developer_id 415945` / `app_id 902727` / `miniapp_id tapmcix1sdc8m7ybwj` | 排除（随目录） |
-| `store-materials/taptap-app-<APP_ID>/brand-assets/MAT_03_BRAND_ASSETS.md` | 平台账号标识：`app 902727` / `miniapp tapmcix1sdc8m7ybwj` | 排除（随目录） |
+| `store-materials/taptap-app-<APP_ID>/manifest.json` | 平台账号标识、基线 commit | 排除（随目录） |
+| `store-materials/taptap-app-<APP_ID>/requirements/MAT_00_REQUIREMENTS.md` | 平台账号标识 | 排除（随目录） |
+| `store-materials/taptap-app-<APP_ID>/brand-assets/MAT_03_BRAND_ASSETS.md` | 平台账号标识 | 排除（随目录） |
 | `store-materials/taptap-app-<APP_ID>/TASK_RESULT.md` | 发布任务结果、平台状态与提交基线 | 排除（随目录） |
 | `store-materials/taptap-app-<APP_ID>/copy/MAT_01_COPY.md`、`real-game-media/MAT_02_REAL_GAME_MEDIA.md`、`review-pack/REVIEW_PACK.md`、`capture-harness/RESPONSIVE_QA.md` | 发布物料说明与 QA 记录 | 排除（随目录） |
 
@@ -58,7 +58,7 @@
 | `docs/reports/H5_FINAL_RELEASE_CONVERGENCE_REPORT.md` | L11 | 同上 |
 | `docs/release/H5_RELEASE_BASELINE_SNAPSHOT_20260808.md` | L50 | 同上 |
 
-说明：该域名属个人私有 Sites 部署（`.xxxzzzfff2026.chatgpt.site`），泄露会暴露内部评审入口，应整体移除或替换为 `<PRIVATE_REVIEW_URL>` 占位符。
+说明：该域名属个人私有 Sites 部署，泄露会暴露内部评审入口，应整体移除或替换为 `<PRIVATE_REVIEW_URL>` 占位符。
 
 ### 3.4 建议脱敏：平台账号标识（散落于 docs/）
 
@@ -106,7 +106,7 @@
 - 公开前用以下命令自查（排除 node_modules/.git/dist*）：
 
 ```bash
-rg -n '/Users/|chatgpt\.site|compute-tycoon-h5-review|902727|415945|tapmcix1sdc8m7ybwj|sk-[A-Za-z0-9]|api[_-]?key|token|secret' .
+rg -n '/Users/|PRIVATE_REVIEW_URL|PLATFORM_ID|sk-[A-Za-z0-9]|api[_-]?key|token|secret' .
 ```
 
 - 若仓库已含历史提交，注意即使当前工作树脱敏，旧 commit 中仍可能残留；必要时重写历史或使用新仓库发布。
