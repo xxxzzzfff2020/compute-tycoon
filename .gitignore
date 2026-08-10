@@ -8,3 +8,6 @@ store-materials/
 .openai/
 .vite/
 .planning/
+/task_plan.md
+/findings.md
+/progress.md
