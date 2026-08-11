@@ -8,7 +8,7 @@ import { buildDevSave, DEV_SAVE_NAMESPACE, devStateId } from "./devverify";
 import { ENDGAME_SAVE_NAMESPACE, newSaveId } from "../save/types";
 import { ensureEndgameSingularity } from "../economy/singularity";
 import { createGrowthFeedback } from "../economy/feel";
-import { getLocale, initLocale, setLocale, t } from "../i18n";
+import { getLocale, initLocale, localeFromCommand, setLocale, t } from "../i18n";
 import { GameSession } from "./session";
 import { freshSaveData, LocalStorageSaveStorage } from "../save/storage";
 import { SaveRepository } from "../save/repository";
@@ -255,6 +255,15 @@ export function boot(): void {
   }
 
   const executeCommand: CommandHandler = (command, payload) => {
+    if (command.startsWith("set_locale:")) {
+      const locale = localeFromCommand(command);
+      if (!locale) return { ok: false, error: "invalid_locale" };
+      if (getLocale() === locale) return { ok: true };
+      setLocale(locale);
+      // 语言是低频偏好：重载以全量一致地重渲染（存档 schema 不受影响）。
+      window.location.reload();
+      return { ok: true };
+    }
     switch (command) {
       case "acquire_model":
         return session.acquireModel();
@@ -383,15 +392,6 @@ export function boot(): void {
       }
       case "save":
         return session.save("manual");
-      case "set_locale": {
-        const locale = command.slice("set_locale:".length);
-        if (locale !== "zh-CN" && locale !== "en-US") return { ok: false, error: "invalid_locale" };
-        if (getLocale() === locale) return { ok: true };
-        setLocale(locale);
-        // 语言是低频偏好：重载以全量一致地重渲染（存档 schema 不受影响）。
-        window.location.reload();
-        return { ok: true };
-      }
       case "export_json": {
         const json = session.exportJson();
         const blob = new Blob([json], { type: "application/json" });

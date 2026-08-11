@@ -12,6 +12,7 @@ import { freshSaveData } from "../../src/save/storage";
 import {
   getLocale,
   initLocale,
+  localeFromCommand,
   setLocale,
   t,
   formatNumber,
@@ -115,6 +116,32 @@ describe("en-US rendering", () => {
 });
 
 describe("locale switching persistence", () => {
+  it("sends the complete en-US command from the settings button", () => {
+    setupDom("zh-CN");
+    initLocale();
+    const container = document.getElementById("app")!;
+    const shell = createAppShell(container);
+    const commands: string[] = [];
+    shell.setCommandHandler((command) => {
+      commands.push(command);
+      return { ok: true };
+    });
+    shell.render(buildViewModel(freshSaveData(Date.now())));
+
+    const englishButton = container.querySelector<HTMLButtonElement>("button[data-command='set_locale:en-US']");
+    expect(englishButton).not.toBeNull();
+    englishButton!.click();
+    expect(commands).toContain("set_locale:en-US");
+    shell.destroy();
+  });
+
+  it("parses the complete language button command", () => {
+    expect(localeFromCommand("set_locale:zh-CN")).toBe("zh-CN");
+    expect(localeFromCommand("set_locale:en-US")).toBe("en-US");
+    expect(localeFromCommand("set_locale:ja-JP")).toBeNull();
+    expect(localeFromCommand("set_locale")).toBeNull();
+  });
+
   it("persists the preference in an independent storage key, not the save schema", () => {
     setupDom("zh-CN");
     initLocale();

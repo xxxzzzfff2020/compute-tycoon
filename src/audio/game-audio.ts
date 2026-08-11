@@ -33,9 +33,11 @@ export function saveAudioPreferences(preferences: AudioPreferences): void {
 
 export const GAME_BGM_PATH = `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stellar-tide-v1.mp3`;
 const BGM_SEGMENTS = {
-  earth: { start: 0, end: 76 },
-  lunar: { start: 76, end: 152 },
-  dyson: { start: 152, end: 227.5 },
+  stage1: { start: 0, end: 19 },
+  stage2: { start: 19, end: 38 },
+  stage3: { start: 38, end: 76 },
+  stage4: { start: 76, end: 152 },
+  stage5: { start: 152, end: 227.5 },
 } as const;
 
 export interface BgmPhaseProfile {
@@ -45,16 +47,15 @@ export interface BgmPhaseProfile {
   playbackRate: number;
 }
 
-export function bgmPhaseProfile(stage: number, iteration: number): BgmPhaseProfile {
-  const key: keyof typeof BGM_SEGMENTS = stage >= 5 ? "dyson" : stage === 4 ? "lunar" : "earth";
+export function bgmPhaseProfile(stage: number, _iteration: number): BgmPhaseProfile {
+  const normalizedStage = Math.min(5, Math.max(1, Math.trunc(stage)));
+  const key = `stage${normalizedStage}` as keyof typeof BGM_SEGMENTS;
   const segment = BGM_SEGMENTS[key];
   return {
     key,
-    start: key === "earth"
-      ? Math.min(segment.end - 1, segment.start + Math.min(3, Math.max(0, iteration)) * 19)
-      : segment.start,
+    start: segment.start,
     end: segment.end,
-    playbackRate: stage >= 5 ? 1.02 : stage === 4 ? 1 : 0.97 + Math.min(3, Math.max(0, iteration)) * 0.01,
+    playbackRate: 1,
   };
 }
 

@@ -4,11 +4,17 @@ import { resolve } from "node:path";
 import { bgmPhaseProfile, GAME_BGM_PATH } from "../../src/audio/game-audio";
 
 describe("original presentation assets", () => {
-  it("maps earth iterations, lunar and dyson eras onto separate BGM sections", () => {
-    expect(bgmPhaseProfile(1, 0)).toEqual({ key: "earth", start: 0, end: 76, playbackRate: 0.97 });
-    expect(bgmPhaseProfile(3, 3)).toEqual({ key: "earth", start: 57, end: 76, playbackRate: 1 });
-    expect(bgmPhaseProfile(4, 3)).toEqual({ key: "lunar", start: 76, end: 152, playbackRate: 1 });
-    expect(bgmPhaseProfile(5, 3)).toEqual({ key: "dyson", start: 152, end: 227.5, playbackRate: 1.02 });
+  it("maps every gameplay stage onto its own original-speed BGM section", () => {
+    expect(bgmPhaseProfile(1, 0)).toEqual({ key: "stage1", start: 0, end: 19, playbackRate: 1 });
+    expect(bgmPhaseProfile(2, 0)).toEqual({ key: "stage2", start: 19, end: 38, playbackRate: 1 });
+    expect(bgmPhaseProfile(3, 3)).toEqual({ key: "stage3", start: 38, end: 76, playbackRate: 1 });
+    expect(bgmPhaseProfile(4, 3)).toEqual({ key: "stage4", start: 76, end: 152, playbackRate: 1 });
+    expect(bgmPhaseProfile(5, 3)).toEqual({ key: "stage5", start: 152, end: 227.5, playbackRate: 1 });
+  });
+
+  it("does not alter music speed or section when technology iterations change", () => {
+    expect(bgmPhaseProfile(1, 0)).toEqual(bgmPhaseProfile(1, 3));
+    expect(bgmPhaseProfile(3, 0)).toEqual(bgmPhaseProfile(3, 3));
   });
 
   it("ships bounded local audio and final-key-art files", () => {

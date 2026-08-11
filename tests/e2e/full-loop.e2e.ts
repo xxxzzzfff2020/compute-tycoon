@@ -11,6 +11,7 @@ import { SaveRepository } from "../../src/save/repository";
 import { createAppShell } from "../../src/ui/render";
 import { ORDERS, SERVERS, PRESTIGE_TARGET_INCOME } from "../../src/data/content";
 import { FIRST_SERVER_WORKSHOP_LEVEL } from "../../src/economy/workshop";
+import { t } from "../../src/i18n";
 
 function setupDom() {
   const dom = new JSDOM("<!doctype html><html><body><div id=\"app\"></div></body></html>", {
@@ -134,7 +135,7 @@ describe("E2E full loop", () => {
     // Stage 3 筹建入口：8 台解锁但不提前标记 Stage 3
     expect(session.viewModel().stage3Gateway).toBe(true);
     expect(session.viewModel().stage).toBe(2);
-    expect(session.viewModel().stageLabel).toContain("算力中心筹建已解锁");
+    expect(t(session.viewModel().stageLabel)).toContain("算力中心筹建已解锁");
     // Stage 2 结算 exactly-once
     expect(session.completeStage2Settlement().ok).toBe(true);
     expect(session.completeStage2Settlement().ok).toBe(false);
@@ -151,7 +152,7 @@ describe("E2E full loop", () => {
     expect(session.getState().stage3?.entered).toBe(true);
     expect(session.getState().stage3?.machineRooms?.some((r) => r.index === 1)).toBe(true);
     expect(session.viewModel().stage).toBe(3);
-    expect(session.viewModel().stageLabel).toContain("算力中心");
+    expect(t(session.viewModel().stageLabel)).toContain("算力中心");
     // Stage 3 纪元：完整集群 + 核心机房已记录
     const eras = session.getState().stage3!.eraArchive.map((e) => e.id);
     expect(eras).toContain("era_full_cluster");

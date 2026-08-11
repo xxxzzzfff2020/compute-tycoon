@@ -33,6 +33,12 @@ export function getLocale(): Locale {
   return currentLocale;
 }
 
+export function localeFromCommand(command: string): Locale | null {
+  if (!command.startsWith("set_locale:")) return null;
+  const locale = command.slice("set_locale:".length);
+  return locale === "zh-CN" || locale === "en-US" ? locale : null;
+}
+
 export function setLocale(locale: Locale): void {
   if (locale !== "zh-CN" && locale !== "en-US") return;
   if (locale === currentLocale) return;
