@@ -21,7 +21,13 @@
 ## Media assets
 
 - `public/assets/visuals/dyson-compute-sphere-keyart-v1.jpg` — AI-generated key art, owned by the project. Not covered by the MIT code license; redistribution outside this repository requires separate permission.
-- `public/assets/audio/compute-tycoon-stellar-tide-v1.mp3` — AI-generated BGM (instrumental), owned by the project. Not covered by the MIT code license; redistribution outside this repository requires separate permission.
+- `public/assets/audio/compute-tycoon-stage1-solo-spark-v1.mp3` — AI-generated Stage 1 BGM (instrumental), owned by the project.
+- `public/assets/audio/compute-tycoon-stage2-cluster-pulse-v1.mp3` — AI-generated Stage 2 BGM (instrumental), owned by the project.
+- `public/assets/audio/compute-tycoon-stage3-compute-citadel-v1.mp3` — AI-generated Stage 3 BGM (instrumental), owned by the project.
+- `public/assets/audio/compute-tycoon-stage4-earth-moon-relay-v1.mp3` — AI-generated Stage 4 BGM (instrumental), owned by the project.
+- `public/assets/audio/compute-tycoon-stage5-dyson-ascension-v1.mp3` — AI-generated Stage 5 BGM (instrumental), owned by the project.
+
+The five BGM files are not covered by the MIT code license; redistribution outside this repository requires separate permission. See `docs/oss/BGM_GENERATION_RECORD.md` for provenance.
 
 See `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md` for the full asset provenance audit.
 

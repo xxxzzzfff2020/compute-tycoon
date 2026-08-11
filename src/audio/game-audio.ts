@@ -31,31 +31,25 @@ export function saveAudioPreferences(preferences: AudioPreferences): void {
   window.dispatchEvent(new CustomEvent("ct-audio-preferences", { detail: preferences }));
 }
 
-export const GAME_BGM_PATH = `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stellar-tide-v1.mp3`;
-const BGM_SEGMENTS = {
-  stage1: { start: 0, end: 19 },
-  stage2: { start: 19, end: 38 },
-  stage3: { start: 38, end: 76 },
-  stage4: { start: 76, end: 152 },
-  stage5: { start: 152, end: 227.5 },
+export const GAME_BGM_PATHS = {
+  stage1: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage1-solo-spark-v1.mp3`,
+  stage2: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage2-cluster-pulse-v1.mp3`,
+  stage3: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage3-compute-citadel-v1.mp3`,
+  stage4: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage4-earth-moon-relay-v1.mp3`,
+  stage5: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage5-dyson-ascension-v1.mp3`,
 } as const;
 
 export interface BgmPhaseProfile {
-  key: keyof typeof BGM_SEGMENTS;
-  start: number;
-  end: number;
-  playbackRate: number;
+  key: keyof typeof GAME_BGM_PATHS;
+  path: string;
 }
 
 export function bgmPhaseProfile(stage: number, _iteration: number): BgmPhaseProfile {
   const normalizedStage = Math.min(5, Math.max(1, Math.trunc(stage)));
-  const key = `stage${normalizedStage}` as keyof typeof BGM_SEGMENTS;
-  const segment = BGM_SEGMENTS[key];
+  const key = `stage${normalizedStage}` as keyof typeof GAME_BGM_PATHS;
   return {
     key,
-    start: segment.start,
-    end: segment.end,
-    playbackRate: 1,
+    path: GAME_BGM_PATHS[key],
   };
 }
 
@@ -81,14 +75,6 @@ export class GameAudio {
     if (this.context && this.prefs.sfxEnabled) void this.context.resume();
     if (this.prefs.bgmEnabled) void this.playBgm();
   };
-  private readonly onBgmTimeUpdate = () => {
-    if (!this.bgm) return;
-    const segment = this.currentSegment();
-    if (this.bgm.currentTime >= segment.end || this.bgm.currentTime < segment.start) {
-      this.bgm.currentTime = segment.start;
-    }
-  };
-
   install(): void {
     const unlock = () => {
       this.ensureBgm();
@@ -111,8 +97,14 @@ export class GameAudio {
     this.iteration = iteration;
     if (this.bgm) {
       const nextKey = this.phaseProfile().key;
-      if (nextKey !== previousKey) this.bgm.currentTime = this.phaseStart();
-      this.bgm.playbackRate = this.phaseProfile().playbackRate;
+      if (nextKey !== previousKey) {
+        const shouldResume = this.prefs.bgmEnabled && document.visibilityState !== "hidden";
+        this.bgm.pause();
+        this.bgm.src = this.phaseProfile().path;
+        this.bgm.currentTime = 0;
+        this.bgm.load();
+        if (shouldResume) void this.playBgm();
+      }
     }
   }
 
@@ -145,7 +137,6 @@ export class GameAudio {
     document.removeEventListener("visibilitychange", this.onVisibility);
     if (this.bgm) {
       this.bgm.pause();
-      this.bgm.removeEventListener("timeupdate", this.onBgmTimeUpdate);
       this.bgm.removeAttribute("src");
       this.bgm.load();
       this.bgm = null;
@@ -179,13 +170,10 @@ export class GameAudio {
 
   private ensureBgm(): HTMLAudioElement {
     if (this.bgm) return this.bgm;
-    const bgm = new Audio(GAME_BGM_PATH);
-    bgm.preload = "auto";
+    const bgm = new Audio(this.phaseProfile().path);
+    bgm.preload = "metadata";
     bgm.setAttribute("playsinline", "true");
-    bgm.addEventListener("timeupdate", this.onBgmTimeUpdate);
-    bgm.addEventListener("ended", this.onBgmTimeUpdate);
-    bgm.currentTime = this.phaseStart();
-    bgm.playbackRate = this.phaseProfile().playbackRate;
+    bgm.loop = true;
     bgm.volume = Math.max(0, Math.min(1, this.prefs.volume * 0.58));
     this.bgm = bgm;
     return bgm;
@@ -203,14 +191,5 @@ export class GameAudio {
 
   private phaseProfile(): BgmPhaseProfile {
     return bgmPhaseProfile(this.stage, this.iteration);
-  }
-
-  private currentSegment(): { start: number; end: number } {
-    const profile = this.phaseProfile();
-    return { start: profile.start, end: profile.end };
-  }
-
-  private phaseStart(): number {
-    return this.phaseProfile().start;
   }
 }

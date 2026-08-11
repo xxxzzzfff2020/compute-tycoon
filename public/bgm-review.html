@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Compute Tycoon · BGM Review</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #18284b 0, #090d18 48%, #05070d 100%); color: #edf4ff; }
+      main { width: min(760px, 100%); margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 18px max(32px, env(safe-area-inset-bottom)); }
+      h1 { margin: 0 0 8px; font-size: clamp(1.65rem, 6vw, 2.4rem); }
+      .intro { margin: 0 0 22px; color: #aebbd2; line-height: 1.65; }
+      .now { padding: 18px; border: 1px solid #35568d; border-radius: 16px; background: rgba(16, 29, 55, .86); box-shadow: 0 16px 50px rgba(0, 0, 0, .28); }
+      .now small { color: #7f9dcc; text-transform: uppercase; letter-spacing: .12em; }
+      .now h2 { margin: 6px 0 14px; font-size: 1.25rem; }
+      audio { width: 100%; }
+      .tracks { display: grid; gap: 12px; margin-top: 16px; }
+      button { width: 100%; border: 1px solid #273c61; border-radius: 14px; padding: 15px 16px; background: rgba(10, 18, 34, .82); color: inherit; text-align: left; cursor: pointer; }
+      button strong, button span { display: block; }
+      button span { margin-top: 5px; color: #92a2bc; line-height: 1.45; }
+      button.active { border-color: #68a7ff; background: linear-gradient(135deg, rgba(31, 75, 137, .9), rgba(45, 32, 103, .88)); box-shadow: 0 0 0 1px rgba(104, 167, 255, .24) inset; }
+      .note { margin: 18px 2px 0; color: #7688a5; font-size: .9rem; line-height: 1.55; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Compute Tycoon · 五阶段 BGM</h1>
+      <p class="intro">五首均为全新、独立生成的完整纯音乐。点击任意阶段即可切换试听；此页面仅用于音乐验收，不进入正式游戏菜单。</p>
+      <section class="now">
+        <small>Now Playing</small>
+        <h2 id="now-title">Stage 1 · Solo Spark</h2>
+        <audio id="player" controls preload="metadata" loop src="./assets/audio/compute-tycoon-stage1-solo-spark-v1.mp3"></audio>
+      </section>
+      <section class="tracks" aria-label="BGM tracks">
+        <button class="active" data-title="Stage 1 · Solo Spark" data-src="./assets/audio/compute-tycoon-stage1-solo-spark-v1.mp3"><strong>Stage 1 · Solo Spark</strong><span>个人 AI 工作室：克制、专注、带有创业火花。</span></button>
+        <button data-title="Stage 2 · Cluster Pulse" data-src="./assets/audio/compute-tycoon-stage2-cluster-pulse-v1.mp3"><strong>Stage 2 · Cluster Pulse</strong><span>服务器集群：机器脉冲、规模扩张与稳定推进。</span></button>
+        <button data-title="Stage 3 · Compute Citadel" data-src="./assets/audio/compute-tycoon-stage3-compute-citadel-v1.mp3"><strong>Stage 3 · Compute Citadel</strong><span>算力中心：大型设施、工程秩序与基础设施力量。</span></button>
+        <button data-title="Stage 4 · Earth Moon Relay" data-src="./assets/audio/compute-tycoon-stage4-earth-moon-relay-v1.mp3"><strong>Stage 4 · Earth Moon Relay</strong><span>地月算力网：轨道空间、远距信号与探索感。</span></button>
+        <button data-title="Stage 5 · Dyson Ascension" data-src="./assets/audio/compute-tycoon-stage5-dyson-ascension-v1.mp3"><strong>Stage 5 · Dyson Ascension</strong><span>戴森终局：文明尺度、宇宙光辉与完成感。</span></button>
+      </section>
+      <p class="note">网页版本采用 44.1kHz / 80kbps MP3，以保留完整曲目并控制 H5 下载体积。</p>
+    </main>
+    <script>
+      const player = document.querySelector("#player");
+      const title = document.querySelector("#now-title");
+      const buttons = [...document.querySelectorAll("button[data-src]")];
+      for (const button of buttons) {
+        button.addEventListener("click", async () => {
+          for (const candidate of buttons) candidate.classList.toggle("active", candidate === button);
+          title.textContent = button.dataset.title;
+          if (player.getAttribute("src") !== button.dataset.src) {
+            player.src = button.dataset.src;
+            player.load();
+          }
+          try { await player.play(); } catch {}
+        });
+      }
+    </script>
+  </body>
+</html>

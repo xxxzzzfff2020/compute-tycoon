@@ -45,7 +45,7 @@
 | 第三方 npm 依赖（开发时） | `@types/decimal.js` / `@types/jsdom` / `@types/node` | 0.0.32 / 28.0.3 / 26.1.2 | MIT / MIT / MIT | ✅ 同上 |
 | 字体 | 无字体文件；CSS 系统字体栈（`src/styles/main.css` 第 25 行） | — | 不适用（无第三方字体） | ✅ 无字体许可负担 |
 | 图标 | lucide（经 `src/ui/icons.ts` 按名导入） | 1.30.0 | ISC + Feather MIT | ✅ 随依赖分发，许可文本已保存 |
-| BGM | `public/assets/audio/compute-tycoon-stellar-tide-v1.mp3`（《算力星潮》） | ≈227.96s，约 2.2MB | TapTap Maker `text_to_music` 生成，纯音乐、无外部参考音频 | ⚠️ 项目自有（生成物）；建议与代码许可分离声明，并保留生成记录 |
+| BGM | `public/assets/audio/compute-tycoon-stage{1..5}-*.mp3`（五首独立阶段曲目） | ≈220–362s/首，总计约 13.9MB | TapTap Maker `text_to_music` V4.5 分别生成，纯音乐、无外部参考音频；详见 `BGM_GENERATION_RECORD.md` | ⚠️ 项目自有（生成物）；与代码许可分离声明并保留生成记录 |
 | SFX | WebAudio 低密度里程碑短音效（程序化合成，`src/audio/game-audio.ts`） | — | 项目自有代码 | ✅ 随自有代码许可 |
 | 图片 | `public/assets/visuals/dyson-compute-sphere-keyart-v1.jpg` | 1152×768 JPEG ≈263KB | Codex `image_gen` 全新生成，无外部参考图 | ⚠️ 项目自有（生成物）；建议与代码许可分离声明 |
 | 平台 SDK（TapTap） | 云存档 / 排行榜 / 激励视频（`src/platform/`） | — | 运行时宿主注入 `globalThis.tap`，仓库无 SDK 二进制/许可文本 | ✅ 可公开适配代码；需自行确认 TapTap 开发者协议允许公开此类适配层 |
@@ -92,11 +92,11 @@
 | 资产 | 路径 | 生成方式 | 外部参考 | 项目内接线 |
 |---|---|---|---|---|
 | 戴森算力球主视觉 | `public/assets/visuals/dyson-compute-sphere-keyart-v1.jpg` | Codex `image_gen` 全新生成（原始 PNG → 缩放/压缩为 1152×768 JPEG） | 无 | `src/ui/render.ts` 中 `story-complete-visual` 弹窗图片（`data-src` + `loading="lazy"`） |
-| BGM《算力星潮》 | `public/assets/audio/compute-tycoon-stellar-tide-v1.mp3` | TapTap Maker `text_to_music`（V4.5 自定义模式，纯音乐，生成任务 `temp_f90aa34d-...`） | 无 | `src/audio/game-audio.ts` 分段 BGM（地球/地月/戴森三段） |
+| Stage 1–5 五首独立 BGM | `public/assets/audio/compute-tycoon-stage{1..5}-*.mp3` | TapTap Maker `text_to_music`（V4.5 自定义模式，五次独立纯音乐生成）；完整 ID 见 `docs/oss/BGM_GENERATION_RECORD.md` | 无 | `src/audio/game-audio.ts` 按 Stage 切换独立文件并循环 |
 
 - 二者均为"无外部参考的全新生成物"，可作为项目自有资产处理。
 - 来源报告注明状态为 `OWNER_REVIEW_CANDIDATE`，即"生成成功/接线成功 ≠ 最终采用与发布许可"：公开前应确权（Codex/TapTap 生成物归创作方所有、可商用/再发布，见 §7 建议），并把生成记录随仓库保留（本报告已引用）。
-- `public/` 下无其他媒体文件；项目无 `@font-face`、无外部字体/CDN 引用。
+- `public/` 下无其他未记录媒体文件；项目无 `@font-face`、无外部字体/CDN 引用。
 
 ---
 

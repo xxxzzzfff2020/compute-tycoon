@@ -37,7 +37,7 @@
 ### 2.3 `public/` 中的可公开资产
 
 - 程序化/自有代码产物：lucide 许可文本（`public/third-party/lucide-LICENSE.txt`）、程序化合成音效。
-- AI 原创生成且记录在案的媒体：BGM《算力星潮》、戴森终局主视觉。
+- AI 原创生成且记录在案的媒体：Stage 1–5 五首独立 BGM、戴森终局主视觉。
 - 媒体授权边界见 `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md`；正式开源前需权利方/法务复核媒体与平台条款。
 
 ## 3. 排除清单（不进入公开镜像）
