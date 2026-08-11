@@ -1,5 +1,7 @@
 # 《算力大亨》H5 真人体验前本地收口 02
 
+> **Historical audit:** 本文记录 2026-08-09 私有候选状态；当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_PRE_RELEASE_LOCAL_CONVERGENCE_02
 result: LOCAL_REVIEW_CANDIDATE

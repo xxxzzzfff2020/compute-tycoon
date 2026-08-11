@@ -2,7 +2,9 @@
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue for security problems. Instead, contact the maintainers privately through the GitHub security advisory flow (or the email listed on the repo profile). You will receive an acknowledgement and a fix timeline.
+Please do **not** open a public issue for security problems. Use this repository's **Security → Report a vulnerability** flow to send the maintainers a private report. If that entry is unavailable, contact the primary maintainer through the GitHub profile listed in [MAINTAINERS.md](MAINTAINERS.md) and ask for a private reporting channel without including exploit details publicly.
+
+Include the affected version, impact, reproduction steps, and any proposed mitigation. The maintainer will acknowledge the report and coordinate a disclosure timeline through the private thread.
 
 We take the following seriously:
 
@@ -17,6 +19,7 @@ We take the following seriously:
 - No API keys, tokens, or platform secrets are committed. Platform adapters call the TapTap runtime `tap` object only.
 - Saves live in localStorage; validate all input on load (`src/save/validate.ts`).
 - Run `npm audit` before release; dependencies are pinned via `package-lock.json`.
+- Dependabot monitors npm and GitHub Actions dependencies through `.github/dependabot.yml`.
 
 ## Safe development practices
 

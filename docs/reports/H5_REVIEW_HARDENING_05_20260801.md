@@ -1,5 +1,7 @@
 # H5 Review Candidate V2 硬化收口报告｜2026-08-01
 
+> **Historical audit:** 本文是 2026-08-01 的私有评审快照，不是当前公开发布状态。
+
 ```yaml
 task_id: COMPUTE-TYCOON-H5-REVIEW-HARDENING-AND-NEXT-STAGE-PREP-05
 

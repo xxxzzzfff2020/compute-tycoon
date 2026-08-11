@@ -70,7 +70,7 @@ Requires Node.js 20+ and npm. No platform accounts are needed to build or run th
 - `src/audio/` — BGM controller
 - `src/review/` — isolated founder-concentrated review runtime (separate build)
 - `scripts/` — simulations, browser verification, release tooling
-- `tests/` — unit + E2E suites (379+ unit tests)
+- `tests/` — unit + E2E suites (383 unit tests at the RC baseline)
 
 ## AI Development Workflow
 
@@ -88,7 +88,7 @@ This project is a **case study in AI-agent-driven game development**. The workfl
 
 ## Testing
 
-- **Unit (379 tests):** economy rules, save/migration, offline exactly-once, stage 3–5, platform adapters, i18n acceptance
+- **Unit (383 tests):** economy rules, save/migration, offline exactly-once, stage 3–5, platform adapters, i18n acceptance
 - **E2E:** full game loop from new save through first technology iteration (jsdom/Puppeteer)
 - **Economic simulation:** `npm run simulate` — 8 strategies × 1000 runs, budget/balance checks
 - **Review checkpoints:** isolated state-machine checkpoints for human experience reviews

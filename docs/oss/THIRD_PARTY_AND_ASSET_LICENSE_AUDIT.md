@@ -1,7 +1,7 @@
 # 《算力大亨 Compute Tycoon》H5 · 第三方与资产来源许可证审计报告
 
 - 审计日期：2026-08-10
-- 审计对象：`compute-tycoon-i18n`（H5 游戏，准备公开到 GitHub）
+- 审计对象：`compute-tycoon`（H5 游戏公开镜像）
 - 审计方式：只读检查（package.json / package-lock.json / node_modules / public / src / store-materials / docs 来源报告），未修改任何源码
 - 结论性质：本报告为法律信息整理与合规建议，不构成法律意见；正式开源前建议由权利方/法务复核媒体授权与平台条款
 
@@ -14,7 +14,7 @@
 - 两张媒体资产（戴森主视觉 JPG、BGM MP3）为 AI 全新生成、无外部参考：可作为项目自有资产随公开仓库发布。它们与"纯代码 MIT 许可"是不同授权对象，建议在 `LICENSE` 与 README 中单独说明，避免第三方误以为可自由再分发/商用。
 - `store-materials/`（47MB，249 个文件，含平台商店物料、截图、评审证据）建议从公开仓库排除（git rm --cached + .gitignore），仅保留在内部/发布工作区；README 注明正式发行版物料另行许可。
 - 无字体文件（CSS 为系统字体栈，无 `@font-face`），无外部 CDN 引用；TapTap 平台能力（云存档/排行榜/激励视频）通过运行时宿主注入的 `globalThis.tap` 调用，仓库内无平台 SDK 二进制。
-- 根目录目前没有 `LICENSE`、`NOTICE`、`THIRD_PARTY_NOTICES.md`：需要补建。
+- 根目录已提供 `LICENSE`（MIT）与 `THIRD_PARTY_NOTICES.md`；代码和媒体资产采用分离授权边界。MIT 不要求单独 `NOTICE` 文件。
 
 ---
 

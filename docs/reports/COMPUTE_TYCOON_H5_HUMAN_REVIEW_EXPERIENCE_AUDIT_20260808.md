@@ -1,5 +1,7 @@
 # 《算力大亨》H5 集中真人体验审计与优化分批建议
 
+> **Historical audit:** 本文是 2026-08-08 的体验审计快照；其返修项已进入后续收口，当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_HUMAN_REVIEW_EXPERIENCE_AUDIT_20260808
 date: 2026-08-08

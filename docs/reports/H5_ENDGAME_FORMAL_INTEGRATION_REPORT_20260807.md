@@ -1,5 +1,7 @@
 # H5 终局正式整合 · 实施报告
 
+> **Historical audit:** 本文记录 2026-08-07 终局整合时的私有门禁；当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_ENDGAME_FORMAL_INTEGRATION_01
 date: 2026-08-07

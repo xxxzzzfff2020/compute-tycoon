@@ -1,5 +1,7 @@
 # 《算力大亨》H5 真人/真机试玩前最终收口报告
 
+> **Historical audit:** 本文记录 2026-08-08 真机验收前状态，不是当前公开发布状态。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_PRE_DEVICE_FINAL_AUDIT_20260808
 date: 2026-08-08

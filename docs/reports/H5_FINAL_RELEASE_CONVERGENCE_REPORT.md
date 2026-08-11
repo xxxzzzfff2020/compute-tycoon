@@ -1,5 +1,7 @@
 # 《算力大亨》H5 最终发布收口报告
 
+> **Historical audit:** `public_release: NOT_AUTHORIZED` 是 2026-08-08 私有 RC 的点时门禁，已被后续公开仓库授权取代，不代表当前 GitHub Release 状态。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_FINAL_RELEASE_CONVERGENCE_01
 result: READY_FOR_FINAL_DEVICE_AND_RELEASE_APPROVAL

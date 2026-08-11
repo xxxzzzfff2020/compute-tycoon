@@ -1,5 +1,7 @@
 # H5 Codex 正式接收报告｜2026-08-01
 
+> **Historical audit:** 本文记录 2026-08-01 的私有接收状态，不是当前公开发布状态。
+
 ```yaml
 task_id: H5_PRODUCT_CONTRACT_AND_CURVE_RECONCILIATION_01
 overall_result: READY_FOR_CONCENTRATED_HUMAN_REVIEW

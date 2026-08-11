@@ -1,5 +1,7 @@
 # 《算力大亨》最终表现优化实施计划
 
+> **Historical audit:** 本实施计划中的授权字段记录 2026-08-09 私有阶段门禁；不代表当前公开仓库或 GitHub Release 状态。
+
 ```yaml
 plan_id: COMPUTE_TYCOON_H5_FINAL_FEEL_IMPLEMENTATION_PLAN_20260809
 source_audit: docs/product/COMPUTE_TYCOON_FINAL_FEEL_AND_INTERACTION_AUDIT_20260809.md

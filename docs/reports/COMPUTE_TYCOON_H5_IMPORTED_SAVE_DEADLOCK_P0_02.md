@@ -1,5 +1,7 @@
 # 《算力大亨》H5 导入存档仍被阻断 P0 收口报告
 
+> **Historical audit:** 本文记录修复发生时的私有发布门禁；缺陷已收口，当前公开版本状态以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ```yaml
 task_id: COMPUTE_TYCOON_H5_IMPORTED_SAVE_DEADLOCK_P0_02
 result: READY_FOR_OWNER_IMPORT_RETEST

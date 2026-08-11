@@ -1,5 +1,7 @@
 # H5 产品合同状态｜2026-08-01
 
+> **Historical audit:** 本文是 2026-08-01 的点时状态，不是当前发布状态。当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ## 当前状态
 
 ```yaml

@@ -1,6 +1,8 @@
 # Codex 交接｜算力大亨 H5 Stage 1–3 接收审计
 
 > 历史交接快照：其 `ONE_REWORK_REQUIRED` 结论已被 `docs/product/H5_CONTRACT_RECONCILIATION_01.md` 取代；不得据此恢复旧返修任务。
+>
+> **Historical audit:** 下方发布状态仅记录 2026-08-01 的私有开发门禁，不代表当前公开仓库。当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
 
 ## 当前结论
 

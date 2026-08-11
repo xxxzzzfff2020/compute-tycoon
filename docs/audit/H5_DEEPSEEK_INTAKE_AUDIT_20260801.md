@@ -1,6 +1,8 @@
 # H5 DeepSeek 接收审计｜2026-08-01
 
 > 历史审计快照：其开放产品问题已由 `docs/product/H5_CONTRACT_RECONCILIATION_01.md` 正式协调；本文件只保留当时证据，不是当前任务入口。
+>
+> **Historical audit:** 下方发布状态仅适用于 2026-08-01 私有接收审计。当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
 
 ## 结论
 

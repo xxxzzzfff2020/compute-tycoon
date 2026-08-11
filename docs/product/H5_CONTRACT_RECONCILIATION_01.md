@@ -1,5 +1,7 @@
 # H5 产品合同与曲线协调 01｜正式结论
 
+> **Historical audit:** 本文记录 2026-08-01 的私有开发检查点；其中 `NOT_RELEASE_CANDIDATE` 不代表当前公开仓库。当前公开版本以 `CHANGELOG.md` 和 GitHub Releases 为准。
+
 ```yaml
 task_id: H5_PRODUCT_CONTRACT_AND_CURVE_RECONCILIATION_01
 date: 2026-08-01

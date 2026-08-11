@@ -294,7 +294,7 @@ describe("founder review build contract", () => {
 
   it("keeps the full current-money header inside the 320–430px portrait shell", () => {
     const css = readFileSync(`${root}src/styles/main.css`, "utf8");
-    expect(css).toContain("#app {\n  max-width: 430px;");
+    expect(css).toMatch(/#app\s*\{\s*max-width:\s*430px;/);
     expect(css).toContain("max-width: 100%;");
     expect(css).toContain("overflow-wrap: anywhere;");
     expect(css).toContain("@media (max-width: 350px)");
