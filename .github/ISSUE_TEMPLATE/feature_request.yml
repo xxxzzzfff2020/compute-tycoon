@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a feature or gameplay change
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to see?
+      description: Describe the feature and why it matters.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - Gameplay / balance
+        - UI / UX
+        - Localization
+        - Tooling / CI
+        - Documentation
+    validations:
+      required: true
