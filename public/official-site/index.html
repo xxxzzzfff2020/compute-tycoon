@@ -26,6 +26,34 @@
   <body>
     <a class="skip-link" href="#main-content">跳至主要内容</a>
 
+    <!-- 项目内 Lucide 图标：与 src/ui/icons.ts 的语义映射保持一致。 -->
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-brain-circuit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+        <path d="M9 13a4.5 4.5 0 0 0 3-4M6.003 5.125A3 3 0 0 0 6.401 6.5M3.477 10.896a4 4 0 0 1 .585-.396M6 18a4 4 0 0 1-1.967-.516M12 13h4M12 18h6a2 2 0 0 1 2 2v1M12 8h8M16 8V5a2 2 0 0 1 2-2" />
+        <circle cx="16" cy="13" r=".5" /><circle cx="18" cy="3" r=".5" /><circle cx="20" cy="21" r=".5" /><circle cx="20" cy="8" r=".5" />
+      </symbol>
+      <symbol id="icon-briefcase-business" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <path d="M12 12h.01M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M22 13a18.15 18.15 0 0 1-20 0" />
+        <rect width="20" height="14" x="2" y="6" rx="2" />
+      </symbol>
+      <symbol id="icon-network" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <rect x="16" y="16" width="6" height="6" rx="1" /><rect x="2" y="16" width="6" height="6" rx="1" /><rect x="9" y="2" width="6" height="6" rx="1" />
+        <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M12 12V8" />
+      </symbol>
+      <symbol id="icon-orbit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <path d="M20.341 6.484A10 10 0 0 1 10.266 21.85M3.659 17.516A10 10 0 0 1 13.74 2.152" />
+        <circle cx="12" cy="12" r="3" /><circle cx="19" cy="5" r="2" /><circle cx="5" cy="19" r="2" />
+      </symbol>
+      <symbol id="icon-server-cog" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <path d="m10.852 14.772-.383.923M13.148 14.772a3 3 0 1 0-2.296-5.544l-.383-.923M13.148 9.228l.383-.923M13.53 15.696l-.382-.924a3 3 0 1 1-2.296-5.544M14.772 10.852l.923-.383M14.772 13.148l.923.383M4.5 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-.5M4.5 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-.5M6 18h.01M6 6h.01M9.228 10.852l-.923-.383M9.228 13.148l-.923.383" />
+      </symbol>
+      <symbol id="icon-sun-medium" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 3v1M12 20v1M3 12h1M20 12h1m-2.636-6.364-.707.707M6.343 17.657l-.707.707m0-12.728.707.707m11.314 11.314.707.707" />
+      </symbol>
+    </svg>
+
     <header class="site-header" data-header>
       <a class="brand" href="#top" aria-label="算力大亨首页">
         <span class="brand-mark" aria-hidden="true">
@@ -50,7 +78,7 @@
 
       <nav id="primary-navigation" class="primary-nav" aria-label="主导航" data-nav>
         <a href="#journey">成长版图</a>
-        <a href="#play">核心循环</a>
+        <a href="#operations">算力节点</a>
         <a href="#gallery">视觉档案</a>
         <a class="nav-play" href="../">在线试玩 <span aria-hidden="true">↗</span></a>
       </nav>
@@ -90,6 +118,12 @@
             <a class="button button-primary" href="../">立即试玩 <span aria-hidden="true">↗</span></a>
             <a class="button button-ghost" href="#journey">探索成长路线 <span aria-hidden="true">↓</span></a>
           </div>
+          <ul class="hero-route" aria-label="核心发展路径">
+            <li><span class="hero-route-icon"><svg aria-hidden="true"><use href="#icon-brain-circuit"></use></svg></span><span>研发模型</span></li>
+            <li><span class="hero-route-icon"><svg aria-hidden="true"><use href="#icon-briefcase-business"></use></svg></span><span>接入订单</span></li>
+            <li><span class="hero-route-icon"><svg aria-hidden="true"><use href="#icon-network"></use></svg></span><span>扩张网络</span></li>
+            <li><span class="hero-route-icon hero-route-icon-gold"><svg aria-hidden="true"><use href="#icon-orbit"></use></svg></span><span>地月算力网</span></li>
+          </ul>
         </div>
 
         <div class="hero-controls page-width">
@@ -121,38 +155,38 @@
         </div>
 
         <ol class="journey-track">
-          <li data-reveal>
+          <li class="journey-step-model" data-reveal>
             <span class="journey-index">01</span>
-            <div class="journey-node"><i></i></div>
-            <p class="journey-label">起步</p>
+            <div class="journey-node"><svg class="journey-icon" aria-hidden="true"><use href="#icon-brain-circuit"></use></svg></div>
+            <p class="journey-label">研发 · 起步</p>
             <h3>AI 工作室</h3>
             <p>研究模型，打开第一份订单。</p>
           </li>
-          <li data-reveal>
+          <li class="journey-step-server" data-reveal>
             <span class="journey-index">02</span>
-            <div class="journey-node"><i></i></div>
-            <p class="journey-label">扩张</p>
+            <div class="journey-node"><svg class="journey-icon" aria-hidden="true"><use href="#icon-server-cog"></use></svg></div>
+            <p class="journey-label">部署 · 扩张</p>
             <h3>服务器集群</h3>
             <p>部署节点，让算力开始自我增长。</p>
           </li>
-          <li data-reveal>
+          <li class="journey-step-orbit" data-reveal>
             <span class="journey-index">03</span>
-            <div class="journey-node"><i></i></div>
-            <p class="journey-label">接管</p>
+            <div class="journey-node"><svg class="journey-icon" aria-hidden="true"><use href="#icon-orbit"></use></svg></div>
+            <p class="journey-label">接入 · 接管</p>
             <h3>地月算力网</h3>
             <p>突破行星边界，接入地月级网络。</p>
           </li>
-          <li data-reveal>
+          <li class="journey-step-dyson" data-reveal>
             <span class="journey-index">04</span>
-            <div class="journey-node"><i></i></div>
-            <p class="journey-label">跃迁</p>
+            <div class="journey-node"><svg class="journey-icon" aria-hidden="true"><use href="#icon-sun-medium"></use></svg></div>
+            <p class="journey-label">恒星 · 跃迁</p>
             <h3>戴森算力球</h3>
             <p>汇聚恒星能量，解锁终极算力版图。</p>
           </li>
         </ol>
       </section>
 
-      <section id="play" class="core-loop" aria-labelledby="loop-title">
+      <section id="operations" class="core-loop" aria-labelledby="loop-title">
         <div class="core-loop-glow" aria-hidden="true"></div>
         <div class="page-width core-loop-layout">
           <div class="core-visual" data-reveal>
@@ -178,27 +212,30 @@
             <p class="core-intro">
               把眼前的资源投入最有价值的方向：研究、接单、部署、扩张。增长从不止步，新的节点也不会停下。
             </p>
-            <div class="loop-list">
-              <article>
-                <span>01</span>
-                <div>
-                  <h3>研发模型</h3>
-                  <p>让工作室拥有更高效的起步能力。</p>
-                </div>
+            <div class="operation-grid" aria-label="算力经营核心节点">
+              <article class="operation-card" data-tone="cyan">
+                <div class="operation-card-top"><span class="operation-icon"><svg aria-hidden="true"><use href="#icon-brain-circuit"></use></svg></span><span class="operation-index">01 / 04</span></div>
+                <h3>研发模型</h3>
+                <p>让工作室获得更高效的起步能力。</p>
+                <span class="operation-signal">MODEL RESEARCH</span>
               </article>
-              <article>
-                <span>02</span>
-                <div>
-                  <h3>接入订单</h3>
-                  <p>持续汇聚资源，推进下一轮建设。</p>
-                </div>
+              <article class="operation-card" data-tone="blue">
+                <div class="operation-card-top"><span class="operation-icon"><svg aria-hidden="true"><use href="#icon-briefcase-business"></use></svg></span><span class="operation-index">02 / 04</span></div>
+                <h3>接入订单</h3>
+                <p>持续汇聚资源，推进下一轮建设。</p>
+                <span class="operation-signal">ORDER INTAKE</span>
               </article>
-              <article>
-                <span>03</span>
-                <div>
-                  <h3>扩张网络</h3>
-                  <p>从服务器到行星级网络，解锁更大的版图。</p>
-                </div>
+              <article class="operation-card" data-tone="teal">
+                <div class="operation-card-top"><span class="operation-icon"><svg aria-hidden="true"><use href="#icon-network"></use></svg></span><span class="operation-index">03 / 04</span></div>
+                <h3>扩张网络</h3>
+                <p>从服务器到行星级网络，解锁更大的版图。</p>
+                <span class="operation-signal">NETWORK SCALE</span>
+              </article>
+              <article class="operation-card" data-tone="gold">
+                <div class="operation-card-top"><span class="operation-icon"><svg aria-hidden="true"><use href="#icon-orbit"></use></svg></span><span class="operation-index">04 / 04</span></div>
+                <h3>地月算力网</h3>
+                <p>突破行星边界，接入地月级网络。</p>
+                <span class="operation-signal">EARTH–MOON LINK</span>
               </article>
             </div>
           </div>
