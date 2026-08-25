@@ -6,6 +6,8 @@
 
 **在线试玩：** https://xxxzzzfff2020.github.io/compute-tycoon/
 
+**游戏官网：** https://xxxzzzfff2020.github.io/compute-tycoon/official-site/
+
 ---
 
 ## 游戏内容
@@ -122,7 +124,7 @@ npm run simulate     # 经济模拟（8 策略 × 1000 局）
 
 ## 许可
 
-代码：MIT（见 [LICENSE](LICENSE)）。`public/assets/` 中的媒体资产（主视觉、BGM）为项目自有，但**不**随代码许可授权——详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与 `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md`。
+代码：MIT（见 [LICENSE](LICENSE)）。`public/assets/` 与 `public/official-site/assets/` 中的媒体资产（主视觉、BGM、官网宣传图和视频）为项目自有，但**不**随代码许可授权——详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与 `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md`。
 
 ## 路线图
 

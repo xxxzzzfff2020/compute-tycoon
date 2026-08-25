@@ -6,6 +6,8 @@
 
 **Play it live:** https://xxxzzzfff2020.github.io/compute-tycoon/
 
+**Official site:** https://xxxzzzfff2020.github.io/compute-tycoon/official-site/
+
 ---
 
 ## The Game
@@ -122,7 +124,7 @@ See [SECURITY.md](SECURITY.md). The repository is released through a sanitized O
 
 ## License
 
-Code: [MIT](LICENSE). Media assets in `public/assets/` (key art, BGM) are project-owned but **not** covered by the code license — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md` for details.
+Code: [MIT](LICENSE). Media assets in `public/assets/` and `public/official-site/assets/` (key art, BGM, official promo art, and trailer) are project-owned but **not** covered by the code license — see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md` for details.
 
 ## Roadmap
 

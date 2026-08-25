@@ -26,8 +26,10 @@
 - `public/assets/audio/compute-tycoon-stage3-compute-citadel-v1.mp3` — AI-generated Stage 3 BGM (instrumental), owned by the project.
 - `public/assets/audio/compute-tycoon-stage4-earth-moon-relay-v1.mp3` — AI-generated Stage 4 BGM (instrumental), owned by the project.
 - `public/assets/audio/compute-tycoon-stage5-dyson-ascension-v1.mp3` — AI-generated Stage 5 BGM (instrumental), owned by the project.
+- `public/official-site/assets/compute-tycoon-icon-1440x1440.jpg` and `public/official-site/assets/compute-tycoon-{promo-16x9-1920x1080,promo-square-1440x1440,cover-horizontal-1840x860,cover-vertical-1440x2160}.jpg` — V1 official promotional artwork, generated for the project and retained as project-owned marketing assets.
+- `public/official-site/assets/compute-tycoon-trailer.mp4` — project-supplied official promotional trailer.
 
-The five BGM files are not covered by the MIT code license; redistribution outside this repository requires separate permission. See `docs/oss/BGM_GENERATION_RECORD.md` for provenance.
+The BGM files and official-site media are not covered by the MIT code license; redistribution outside this repository requires separate permission. See `docs/oss/BGM_GENERATION_RECORD.md` for BGM provenance.
 
 See `docs/oss/THIRD_PARTY_AND_ASSET_LICENSE_AUDIT.md` for the full asset provenance audit.
 
