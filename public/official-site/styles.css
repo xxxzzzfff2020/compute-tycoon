@@ -1430,15 +1430,29 @@ video {
 
   .journey-track {
     display: block;
+    position: relative;
     margin-top: 43px;
-    border-left: 1px solid rgba(102, 223, 244, 0.58);
+    padding-left: 64px;
+    border-left: 0;
   }
 
-  .journey-track::before { display: none; }
-  .journey-track li { min-height: 0; padding: 0 0 31px 27px; }
+  .journey-track::before {
+    top: 39px;
+    right: auto;
+    bottom: 0;
+    left: 23px;
+    display: block;
+    width: 1px;
+    height: auto;
+    background: linear-gradient(180deg, rgba(102, 223, 244, 0.78), rgba(102, 223, 244, 0.45) 83%, rgba(247, 200, 121, 0.65));
+    box-shadow: 0 0 12px rgba(90, 220, 242, 0.24);
+    pointer-events: none;
+  }
+
+  .journey-track li { min-height: 0; padding: 0 0 31px; }
   .journey-track li:last-child { padding-bottom: 0; }
-  .journey-index { position: absolute; top: 3px; left: -1px; transform: translateX(-100%); padding-right: 13px; }
-  .journey-node { position: absolute; top: 16px; left: -23px; width: 46px; height: 46px; margin: 0; box-shadow: 0 0 0 5px rgba(25, 156, 194, 0.08), 0 0 21px rgba(67, 211, 237, 0.25); }
+  .journey-index { display: none; }
+  .journey-node { position: absolute; top: 16px; left: -64px; width: 46px; height: 46px; margin: 0; box-shadow: 0 0 0 5px rgba(25, 156, 194, 0.08), 0 0 21px rgba(67, 211, 237, 0.25); }
   .journey-step-dyson .journey-node { box-shadow: 0 0 0 5px rgba(247, 200, 121, 0.09), 0 0 24px rgba(247, 200, 121, 0.35), inset 0 0 14px rgba(255, 223, 159, 0.15); }
   .journey-icon { width: 21px; height: 21px; }
   .journey-label { padding-top: 2px; }
