@@ -237,7 +237,7 @@ video {
 
 .hero-background {
   z-index: -4;
-  background: #07131f url("assets/compute-tycoon-promo-16x9-1920x1080.jpg") center / cover no-repeat;
+  background: #07131f url("assets/compute-tycoon-promo-16x9-1920x1080.jpg?v=20260827-wordmark-v2") center / cover no-repeat;
 }
 
 .hero-video {
