@@ -30,38 +30,42 @@ export type ModelRole =
   | "research_speed"
   | "flagship_efficiency";
 
-/** 所有当前可用模型共用的永久图鉴研发上限；训练上限仍由 ModelDef.maxLevel 决定。 */
-export const MODEL_ARCHIVE_MAX_LEVEL = 20;
+/** v8 及更早存档的共享训练上限；仅用于 v9 等价迁移与旧曲线锚点。 */
+export const LEGACY_MODEL_TRAINING_MAX_LEVEL = 20;
+/** 所有模型共用的本轮训练等级上限。 */
+export const MODEL_TRAINING_MAX_LEVEL = 40;
+/** 所有当前可用模型共用的永久图鉴研发上限。 */
+export const MODEL_ARCHIVE_MAX_LEVEL = 40;
 
 export const MODELS: ModelDef[] = [
   {
     id: "codex", name: "model.codex.name", icon: "🤖", desc: "model.codex.desc",
-    baseCompute: 1.0, maxLevel: 20, role: "base_income", roleLabel: "model.codex.roleLabel",
+    baseCompute: 1.0, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "base_income", roleLabel: "model.codex.roleLabel",
     activeBonus: 0.10, archiveBonusPerLevel: 0.01,
   },
   {
     id: "vision", name: "model.vision.name", icon: "🎨", desc: "model.vision.desc",
-    baseCompute: 1.4, maxLevel: 15, role: "processing_speed", roleLabel: "model.vision.roleLabel",
+    baseCompute: 1.4, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "processing_speed", roleLabel: "model.vision.roleLabel",
     activeBonus: 0.12, archiveBonusPerLevel: 0.01,
   },
   {
     id: "voice", name: "model.voice.name", icon: "🎙️", desc: "model.voice.desc",
-    baseCompute: 1.8, maxLevel: 12, role: "high_value_business", roleLabel: "model.voice.roleLabel",
+    baseCompute: 1.8, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "high_value_business", roleLabel: "model.voice.roleLabel",
     activeBonus: 1.0, archiveBonusPerLevel: 0.05,
   },
   {
     id: "science", name: "model.science.name", icon: "🔬", desc: "model.science.desc",
-    baseCompute: 2.4, maxLevel: 10, role: "automation_efficiency", roleLabel: "model.science.roleLabel",
+    baseCompute: 2.4, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "automation_efficiency", roleLabel: "model.science.roleLabel",
     activeBonus: 0.12, archiveBonusPerLevel: 0.01,
   },
   {
     id: "distill", name: "model.distill.name", icon: "🧠", desc: "model.distill.desc",
-    baseCompute: 1.6, maxLevel: 12, role: "research_speed", roleLabel: "model.distill.roleLabel",
+    baseCompute: 1.6, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "research_speed", roleLabel: "model.distill.roleLabel",
     activeBonus: 0.15, archiveBonusPerLevel: 0.01,
   },
   {
     id: "scheduler", name: "model.scheduler.name", icon: "🛰️", desc: "model.scheduler.desc",
-    baseCompute: 2.0, maxLevel: 10, role: "flagship_efficiency", roleLabel: "model.scheduler.roleLabel",
+    baseCompute: 2.0, maxLevel: MODEL_TRAINING_MAX_LEVEL, role: "flagship_efficiency", roleLabel: "model.scheduler.roleLabel",
     activeBonus: 0.15, archiveBonusPerLevel: 0.01,
   },
 ];
@@ -116,12 +120,19 @@ export const SERVERS: ServerDef[] = [
   { id: "server_1", index: 1, name: "server.s1.name", cost: 20000, power: 2, desc: "server.s1.desc" },
   { id: "server_2", index: 2, name: "server.s2.name", cost: 75000, power: 4, desc: "server.s2.desc" },
   { id: "server_3", index: 3, name: "server.s3.name", cost: 220000, power: 8, desc: "server.s3.desc" },
-  { id: "server_4", index: 4, name: "server.s4.name", cost: 100000, power: 24, desc: "server.s4.desc" },
-  { id: "server_5", index: 5, name: "server.s5.name", cost: 250000, power: 36, desc: "server.s5.desc" },
-  { id: "server_6", index: 6, name: "server.s6.name", cost: 950000, power: 54, desc: "server.s6.desc" },
-  { id: "server_7", index: 7, name: "server.s7.name", cost: 2600000, power: 81, desc: "server.s7.desc" },
-  { id: "server_8", index: 8, name: "server.s8.name", cost: 5200000, power: 120, desc: "server.s8.desc" },
+  { id: "server_4", index: 4, name: "server.s4.name", cost: 600000, power: 24, desc: "server.s4.desc" },
+  { id: "server_5", index: 5, name: "server.s5.name", cost: 1800000, power: 36, desc: "server.s5.desc" },
+  { id: "server_6", index: 6, name: "server.s6.name", cost: 7500000, power: 54, desc: "server.s6.desc" },
+  { id: "server_7", index: 7, name: "server.s7.name", cost: 24000000, power: 81, desc: "server.s7.desc" },
+  { id: "server_8", index: 8, name: "server.s8.name", cost: 75000000, power: 120, desc: "server.s8.desc" },
 ];
+
+/**
+ * R2/R3 inherit permanent income bonuses, so their rebuilt server fleet uses
+ * a higher cash scale. This is a price curve only; server order and actions do
+ * not change.
+ */
+export const SERVER_ROUND_COST_MULTIPLIERS = [1, 60, 60] as const;
 
 /** 服务器阶段进度：3 台初级集群 / 5 台规模化运营 / 8 台算力中心升级条件 */
 export const SERVER_CLUSTER_COUNT = 3;
@@ -141,5 +152,24 @@ export const THIRD_SERVER_COST = SERVERS[2].cost;
 /** 第一次技术迭代目标：本轮累计收入（含离线） */
 export const PRESTIGE_TARGET_INCOME = 600_000_000;
 
-export const AUTOMATION_UNLOCK_ORDERS = 6; // 完成 6 个订单解锁自动经营
-export const AUTOMATION_ORDER_CAP = 4; // 自动经营同时处理的最大订单数
+/** 历史检查点兼容值；自动经营的正式解锁条件只有首台服务器。 */
+export const AUTOMATION_UNLOCK_ORDERS = 6;
+/** 每种订单自己的并行队列容量；五种订单互不抢槽位。 */
+export const ORDER_QUEUE_CAP = 4;
+/** 四个队列位置的处理速度；前槽完成后，后续任务按新位置即时提速。 */
+export const ORDER_SLOT_SPEED_MULTIPLIERS = [1, 0.5, 0.25, 0.125] as const;
+/** 单条满队列的有效并行吞吐；容量与经济吞吐必须分开表达。 */
+export const ORDER_QUEUE_EFFECTIVE_PARALLELISM = ORDER_SLOT_SPEED_MULTIPLIERS
+  .reduce((total, multiplier) => total + multiplier, 0);
+/** 新订单的购买价：首单免费，其余按业务复杂度递增。 */
+export const ORDER_UNLOCK_COSTS: Readonly<Record<string, number>> = {
+  o1: 0,
+  o2: 500,
+  o3: 2_500,
+  o4: 12_000,
+  o5: 60_000,
+};
+/** 兼容旧调用方：此常量表示单条订单队列容量。 */
+export const AUTOMATION_ORDER_CAP = ORDER_QUEUE_CAP;
+/** 自动经营开启后的总并行格数（5 种订单 × 每种 4 格）。 */
+export const AUTOMATION_TOTAL_ORDER_CAP = ORDERS.length * ORDER_QUEUE_CAP;

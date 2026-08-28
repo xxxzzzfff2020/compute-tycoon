@@ -1,6 +1,8 @@
 // 可信时间：统一注入，支持测试固定时钟；记录与真实时间的偏移用于日期回拨保护。
 export interface Clock {
   now(): number; // 毫秒 epoch
+  /** 可选：OffsetClock 发现设备时间回拨后，供上层写入中性历程提示。 */
+  consumeRollback?(): boolean;
 }
 
 export class RealClock implements Clock {
@@ -12,12 +14,14 @@ export class RealClock implements Clock {
 export class OffsetClock implements Clock {
   private offset = 0;
   private lastReal = 0;
+  private rollbackObserved = false;
   constructor(private real: Clock = new RealClock()) {}
   now(): number {
     const r = this.real.now();
     // 检测真实时间回拨：只允许向前
     if (r < this.lastReal) {
       this.offset += this.lastReal - r;
+      this.rollbackObserved = true;
     }
     this.lastReal = Math.max(this.lastReal, r);
     return this.lastReal + this.offset;
@@ -25,6 +29,11 @@ export class OffsetClock implements Clock {
   /** 手动注入偏移（测试/加速用） */
   setOffset(ms: number): void {
     this.offset = ms;
+  }
+  consumeRollback(): boolean {
+    const observed = this.rollbackObserved;
+    this.rollbackObserved = false;
+    return observed;
   }
 }
 

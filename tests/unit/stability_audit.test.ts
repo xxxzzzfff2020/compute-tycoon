@@ -5,6 +5,7 @@ import { SaveRepository } from "../../src/save/repository";
 import { freshSaveData, MemorySaveStorage } from "../../src/save/storage";
 import type { SaveData } from "../../src/save/types";
 import { FakeClock } from "./helpers";
+import { AUTOMATION_TOTAL_ORDER_CAP, ORDERS, ORDER_QUEUE_CAP } from "../../src/data/content";
 
 function iterationReady(now: number): SaveData {
   const state = freshSaveData(now);
@@ -50,7 +51,10 @@ describe("acceptance stability audit", () => {
     }
     expect(Number.isFinite(session.getState().money)).toBe(true);
     expect(session.getState().money).toBeGreaterThan(0);
-    expect(session.getState().activeOrders.length).toBeLessThanOrEqual(4);
+    expect(session.getState().activeOrders.length).toBeLessThanOrEqual(AUTOMATION_TOTAL_ORDER_CAP);
+    for (const order of ORDERS) {
+      expect(session.getState().activeOrders.filter((active) => active.orderId === order.id).length).toBeLessThanOrEqual(ORDER_QUEUE_CAP);
+    }
     expect(storage.load()?.revision).toBeGreaterThanOrEqual(120);
   });
 

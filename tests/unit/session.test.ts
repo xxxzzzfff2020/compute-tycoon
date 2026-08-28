@@ -19,7 +19,8 @@ describe("session: lifecycle", () => {
     session.acquireModel();
     session.acceptOrder("o1");
     session.update(12);
-    expect(session.getState().activeOrders[0].status).toBe(1);
+    expect(session.getState().activeOrders).toHaveLength(0);
+    expect(session.getState().completedOrders).toBe(1);
   });
 
   it("creates fresh session and acquires model via command", () => {
@@ -37,8 +38,7 @@ describe("session: lifecycle", () => {
     const moneyBefore = session.getState().money;
     // 模型 compute=1 → 12 秒完成；租赁 0.5/秒，资金不足时钳制不负债
     runUntilOrdersComplete(session, clock, 12);
-    expect(session.getState().activeOrders[0].status).toBe(1);
-    expect(session.claimOrder(0).ok).toBe(true);
+    expect(session.getState().activeOrders).toHaveLength(0);
     const moneyAfter = session.getState().money;
     // Codex 主力收益 +10%、图鉴被动 +1%：108×1.11 - 完成 tick 租赁费 0.5 = 119.38
     expect(Number(moneyAfter)).toBeCloseTo(Number(moneyBefore) + 119.38, 1);
@@ -57,13 +57,14 @@ describe("session: lifecycle", () => {
     expect(session.getState().money).toBeCloseTo(99, 1);
   });
 
-  it("enables automation after 6 orders", () => {
+  it("enables automation after the first server", () => {
     const { session } = makeSession();
     session.acquireModel();
     const s = session.getState();
     for (let i = 0; i < 6; i++) {
       s.completedOrders += 1;
     }
+    s.serverCount = 1;
     session.save("test");
     const res = session.enableAutomation();
     expect(res.ok).toBe(true);
@@ -140,15 +141,13 @@ describe("session: lifecycle", () => {
     expect(session.getState().modelProgress).not.toBeNull();
   });
 
-  it("claim order twice is idempotent", () => {
+  it("completed orders auto-settle without a claim action", () => {
     const { session, clock } = makeSession();
     session.acquireModel();
     session.acceptOrder("o1");
     runUntilOrdersComplete(session, clock, 20);
-    const idx = session.getState().activeOrders.findIndex((o) => o.status === 1);
-    expect(idx).toBeGreaterThanOrEqual(0);
-    expect(session.claimOrder(idx).ok).toBe(true);
-    expect(session.claimOrder(idx).ok).toBe(false); // already_claimed
+    expect(session.getState().activeOrders).toHaveLength(0);
+    expect(session.claimOrder(0).ok).toBe(false); // no_order: completion was automatic
   });
 });
 
@@ -187,6 +186,33 @@ describe("session: save/restore", () => {
     const res = session2.importJson(json);
     expect(res.ok).toBe(true);
     expect(session2.getState().money).toBe(777);
+  });
+
+  it("holds the old local save unchanged while a cloud-first reset is pending", () => {
+    const { session, clock, storage } = makeSession();
+    session.acquireModel();
+    session.getState().money = 777;
+    expect(session.save("seed").ok).toBe(true);
+    const oldId = session.getState().saveId;
+
+    const prepared = session.beginResetTransaction();
+    expect(prepared.ok).toBe(true);
+    expect(JSON.parse(prepared.saveJson!).saveId).not.toBe(oldId);
+    expect(session.resetTransactionPending()).toBe(true);
+    clock.advance(30_000);
+    session.update(30);
+    expect(session.trainModel()).toEqual({ ok: false, error: "reset_in_progress" });
+    expect(storage.load()!.saveId).toBe(oldId);
+    expect(storage.load()!.money).toBe(777);
+
+    session.cancelResetTransaction();
+    expect(session.resetTransactionPending()).toBe(false);
+    expect(session.getState().saveId).toBe(oldId);
+
+    expect(session.beginResetTransaction().ok).toBe(true);
+    expect(session.commitResetTransaction()).toEqual({ ok: true });
+    expect(session.getState().saveId).not.toBe(oldId);
+    expect(storage.load()!.saveId).toBe(session.getState().saveId);
   });
 
   it("second run recovers income faster after prestige", () => {

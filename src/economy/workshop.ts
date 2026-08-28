@@ -3,14 +3,15 @@ import Decimal from "decimal.js";
 import { toStoredBig, type StoredBig } from "../core/big";
 import type { SaveData } from "../save/types";
 import { SERVERS, type OrderDef } from "../data/content";
-import { researchProgressMultiplier } from "./stage3";
 import { flowCompressionUnlocked } from "./singularity";
+import { registerOwnedServerUnit, syncTalentPoints } from "./incremental-growth";
+import { addCompanyExperience } from "./company-level";
 
 // ---------- 常数 ----------
-/** 首服里程碑：工作室等级门槛（Lua 黄金合同参考值） */
-export const FIRST_SERVER_WORKSHOP_LEVEL = 6;
-/** 首服里程碑：累计营业收入门槛（校准：标准策略首服约 9-10 分钟） */
-export const FIRST_SERVER_LIFETIME_REVENUE = 24_000;
+/** 首服/自动经营里程碑：负责人反馈 #19403 要求标准手动体验约 3 分钟。 */
+export const FIRST_SERVER_WORKSHOP_LEVEL = 3;
+/** 与首个订单自带四格的手动吞吐校准：标准策略约 3 分钟达到。 */
+export const FIRST_SERVER_LIFETIME_REVENUE = 7_200;
 
 /** 订单经验 = 毛收入 × 经验系数（向上取整；订单类型差异自然体现）。
  *  校准目标：标准策略 Lv6 约 8-10 分钟（与累计营业收入 24k 门槛同步）。 */
@@ -23,7 +24,7 @@ export const XP_AUTOMATION_UNLOCK = 60;
 /** 获得首服经验奖励 */
 export const XP_FIRST_SERVER = 100;
 
-/** 升级所需经验：平坦曲线 60 + 40×level（Lv1→2 需 100，Lv5→6 需 260；Lv1→6 累计 900） */
+/** 升级所需经验：平坦曲线 60 + 40×level（Lv1→2 需 100）。 */
 export function experienceToNextLevel(level: number): number {
   return Math.floor(60 + 40 * level);
 }
@@ -42,10 +43,9 @@ export function orderExperienceForState(state: SaveData, order: OrderDef): numbe
   return Math.max(1, Math.ceil(mult.toNumber() * base));
 }
 
-/** 每次升级提供的模型研发进度 */
-export const RESEARCH_PER_LEVEL_UP = 12;
-/** 每完成一个订单提供的模型研发进度（按毛收入折算，1 元 = 0.0008%） */
-export const RESEARCH_PER_REVENUE = 0.0008;
+/** 旧存档/测试导出兼容；免费研发机制已下线，不再产生进度。 */
+export const RESEARCH_PER_LEVEL_UP = 0;
+export const RESEARCH_PER_REVENUE = 0;
 
 /** 累积模型研发进度（0-100 封顶）。返回是否因升级获得额外进度 */
 export function addExperience(state: SaveData, xp: number): boolean {
@@ -53,6 +53,7 @@ export function addExperience(state: SaveData, xp: number): boolean {
   if (xp <= 0) return false;
   let leveled = false;
   state.workshop.experience += xp;
+  addCompanyExperience(state, xp);
   // 反复升级直到经验不足
   while (
     state.workshop.experience >= state.workshop.experienceToNextLevel
@@ -60,26 +61,20 @@ export function addExperience(state: SaveData, xp: number): boolean {
     state.workshop.experience -= state.workshop.experienceToNextLevel;
     state.workshop.level += 1;
     state.workshop.experienceToNextLevel = experienceToNextLevel(state.workshop.level);
-    // 升级推进模型研发（B 方案：完成订单 + 工作室升级 → 研发进度）
-    addResearchFromLevelUp(state);
     leveled = true;
   }
+  syncTalentPoints(state);
   return leveled;
 }
 
-/** 订单完成 → 模型研发进度（按订单毛收入折算，受迭代研发速度加成） */
-export function addResearchFromOrder(state: SaveData, order: OrderDef): void {
-  if (!state.modelResearch) state.modelResearch = { progress: 0, stage2Draws: 0 };
-  const speed = researchProgressMultiplier(state).toNumber();
-  const gain = Math.min(100, order.gross * RESEARCH_PER_REVENUE * speed);
-  state.modelResearch.progress = Math.min(100, state.modelResearch.progress + gain);
+/** @deprecated 免费研发已下线；保留无副作用导出供旧调用安全降级。 */
+export function addResearchFromOrder(_state: SaveData, _order: OrderDef): void {
+  // no-op
 }
 
-/** 工作室升级 → 模型研发进度（受迭代研发速度加成） */
-export function addResearchFromLevelUp(state: SaveData): void {
-  if (!state.modelResearch) state.modelResearch = { progress: 0, stage2Draws: 0 };
-  const speed = researchProgressMultiplier(state).toNumber();
-  state.modelResearch.progress = Math.min(100, state.modelResearch.progress + RESEARCH_PER_LEVEL_UP * speed);
+/** @deprecated 免费研发已下线；保留无副作用导出供旧调用安全降级。 */
+export function addResearchFromLevelUp(_state: SaveData): void {
+  // no-op
 }
 
 /** 当前累计营业收入（与 lifetimeIncome 同源，只增不减） */
@@ -117,12 +112,14 @@ export function awardFirstServer(state: SaveData): { ok: boolean; awarded: boole
   state.serverCount = 1;
   // 无服务器时 serverPower=1 只是计算占位；首服后改为真实服务器算力总和。
   state.serverPower = SERVERS[0].power;
+  registerOwnedServerUnit(state, SERVERS[0].id);
   state.rentalCompute = { active: false, units: 0, unitCostPerSec: 0 };
   state.workshop.firstServerAwarded = true;
   // 里程碑经验奖励（不改变等级之外的东西）
   addExperience(state, XP_FIRST_SERVER);
   return { ok: true, awarded: true };
 }
+
 
 /** 首服解锁进度（用于 UI 展示：等级 / 累计收入） */
 export function firstServerProgress(state: SaveData): {

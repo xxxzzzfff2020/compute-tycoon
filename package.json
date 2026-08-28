@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -p tsconfig.json && vite build",
+    "build": "tsc -p tsconfig.json && vite build && node scripts/verify-standalone-build.mjs dist",
+    "build:release": "tsc -p tsconfig.json && vite build --config vite.release.config.ts && node scripts/verify-standalone-build.mjs dist-release",
     "build:review": "tsc -p tsconfig.json && vite build --config vite.review.config.ts && node scripts/finalize-review-build.mjs dist-review",
     "build:platform-review": "tsc -p tsconfig.json && vite build --config vite.platform-review.config.ts",
     "build:sites": "node scripts/clean-sites-build.mjs && tsc -p tsconfig.json && vite build --outDir dist/client && node scripts/prepare-sites.mjs",

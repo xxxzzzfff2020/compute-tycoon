@@ -1,6 +1,7 @@
 // Stage 3 引擎：算力中心 / 基础设施 / 机房 / 旗舰工程 / 档案馆 / 第一次技术迭代。
 // 纯规则实现，不依赖 DOM。命令原子化（失败不落盘）。
 import Decimal from "decimal.js";
+import { blueprintGrowthMultiplier, effectiveServerPower, resetServerScaleForIteration } from "./incremental-growth";
 import { toStoredBig } from "../core/big";
 import type { SaveData } from "../save/types";
 import {
@@ -10,6 +11,7 @@ import {
   ERA_PROJECTS,
   ERAS,
   FLAGSHIP_PROJECTS,
+  INFRASTRUCTURE_ROUND_COST_MULTIPLIERS,
   infraById,
   infraUpgradeCost,
   MACHINE_ROOMS,
@@ -17,8 +19,9 @@ import {
   TECH_ARCHIVES,
   type FlagshipProjectDef,
 } from "../data/stage3";
-import { MODELS, ORDERS } from "../data/content";
+import { MODELS, ORDERS, ORDER_QUEUE_EFFECTIVE_PARALLELISM } from "../data/content";
 import { businessMixForState, modelEffectMultipliers } from "./model-effects";
+import { normalizeTrainingLevel, trainingComputeMultiplier } from "./model-training";
 import { currentRound, endgameMode } from "./singularity";
 
 // ---------- 常量 ----------
@@ -45,6 +48,25 @@ export function infraLevel(state: SaveData, id: string): number {
     case "storage": return inf.storage;
     default: return 0;
   }
+}
+
+function economicRoundIndex(state: SaveData): 0 | 1 | 2 {
+  return Math.min(2, Math.max(0, state.technologyIterationCount)) as 0 | 1 | 2;
+}
+
+/** 当前轮基建升级实际价格；页面、引擎与模拟共用。 */
+export function infrastructureUpgradeCost(state: SaveData, id: string, level = infraLevel(state, id)): number {
+  return Math.floor(
+    infraUpgradeCost(id, level) * INFRASTRUCTURE_ROUND_COST_MULTIPLIERS[economicRoundIndex(state)],
+  );
+}
+
+/** 现有工程的唯一现金启动价；不叠加累计收入门。 */
+export function projectConstructionCost(state: SaveData, projectId: string): Decimal | null {
+  const def = FLAGSHIP_PROJECTS.find((project) => project.id === projectId)
+    ?? ERA_PROJECTS.find((project) => project.id === projectId);
+  if (!def) return null;
+  return new Decimal(def.constructionCosts[economicRoundIndex(state)]);
 }
 
 export function roomCount(state: SaveData): number {
@@ -216,14 +238,14 @@ export function checkTechUnlocks(state: SaveData): string[] {
 export function canUpgradeInfrastructure(state: SaveData, id: string): boolean {
   if (!state.stage3?.entered) return false;
   if (infraLevel(state, id) >= INFRA_MAX_LEVEL) return false;
-  return new Decimal(state.money).gte(infraUpgradeCost(id, infraLevel(state, id)));
+  return new Decimal(state.money).gte(infrastructureUpgradeCost(state, id));
 }
 
 export function upgradeInfrastructure(state: SaveData, id: string): { ok: boolean; error?: string } {
   if (!state.stage3?.entered) return { ok: false, error: "stage3_not_entered" };
   const current = infraLevel(state, id);
   if (current >= INFRA_MAX_LEVEL) return { ok: false, error: "max_level" };
-  const cost = infraUpgradeCost(id, current);
+  const cost = infrastructureUpgradeCost(state, id, current);
   if (new Decimal(state.money).lt(cost)) return { ok: false, error: "insufficient_funds" };
   state.money = toStoredBig(new Decimal(state.money).minus(cost));
   const inf = { ...state.stage3.infrastructure };
@@ -235,21 +257,75 @@ export function upgradeInfrastructure(state: SaveData, id: string): { ok: boolea
 }
 
 // ---------- 瓶颈识别 ----------
+export type Stage3InfrastructureId = "power" | "computeCards" | "optical" | "storage";
+
+export interface InfrastructureUpgradeInsight {
+  id: Stage3InfrastructureId;
+  gain: Decimal;
+  nextEfficiency: number;
+}
+
+export interface InfrastructureReadiness {
+  id: Stage3InfrastructureId;
+  finalRequirement: number;
+  nextRequirement: number | null;
+  readiness: number;
+}
+
+/**
+ * 基建状态条只使用现有真实门槛：机房、科技档案、旗舰光模块门槛，
+ * 以及存储对旗舰奖励的最低等级。最终门槛固定，避免达成中途节点后进度倒退。
+ */
+export function infrastructureReadiness(
+  state: SaveData,
+  id: Stage3InfrastructureId,
+): InfrastructureReadiness {
+  const requirements = new Set<number>();
+  for (const room of MACHINE_ROOMS) {
+    const level = room.requires[id];
+    if (level > 0) requirements.add(level);
+  }
+  for (const tech of TECH_ARCHIVES) {
+    const unlock = tech.unlock;
+    if (unlock && "infra" in unlock && unlock.infra === id && unlock.level > 0) {
+      requirements.add(unlock.level);
+    }
+  }
+  if (id === "optical") {
+    for (const project of FLAGSHIP_PROJECTS) {
+      if ((project.requiresOptical ?? 0) > 0) requirements.add(project.requiresOptical!);
+    }
+  }
+  if (id === "storage") {
+    for (const project of FLAGSHIP_PROJECTS) {
+      if (project.requiresStorage > 0) requirements.add(project.requiresStorage);
+    }
+  }
+  const ordered = [...requirements]
+    .filter((level) => level <= INFRA_MAX_LEVEL)
+    .sort((a, b) => a - b);
+  const level = infraLevel(state, id);
+  const finalRequirement = ordered[ordered.length - 1] ?? INFRA_MAX_LEVEL;
+  return {
+    id,
+    finalRequirement,
+    nextRequirement: ordered.find((requirement) => requirement > level) ?? null,
+    readiness: Math.min(1, Math.max(0, level / Math.max(1, finalRequirement))),
+  };
+}
+
 export function bottleneckAnalysis(state: SaveData): {
   id: string;
   name: string;
   efficiency: number;
   upgradeEfficiency: number;
   projectedIncomeGain: Decimal;
+  candidates: InfrastructureUpgradeInsight[];
 } {
   const eff = effectiveEfficiency(state);
-  // 对每种真实升级做同公式预演，按即时收入增量选择瓶颈；存储若只影响离线上限，不伪报即时收入。
+  // 对每种真实升级做同公式预演，按即时收入增量选择瓶颈；存储若只影响工程奖励，不伪报即时收入。
   const currentIncome = stage3IncomePerSecond(state);
-  const candidates: Array<{
-    id: string;
-    gain: Decimal;
-    nextEfficiency: number;
-  }> = [];
+  const candidates: InfrastructureUpgradeInsight[] = [];
   for (const id of ["power", "computeCards", "optical", "storage"] as const) {
     const level = infraLevel(state, id);
     if (level >= INFRA_MAX_LEVEL) continue;
@@ -263,10 +339,14 @@ export function bottleneckAnalysis(state: SaveData): {
     });
   }
   if (candidates.length === 0) {
-    return { id: "", name: "stage3.noBottleneck", efficiency: eff, upgradeEfficiency: eff, projectedIncomeGain: new Decimal(0) };
+    return { id: "", name: "stage3.noBottleneck", efficiency: eff, upgradeEfficiency: eff, projectedIncomeGain: new Decimal(0), candidates };
   }
-  candidates.sort((a, b) => b.gain.comparedTo(a.gain));
-  const top = candidates[0];
+  const top = candidates.reduce((best, candidate) => (
+    candidate.gain.gt(best.gain) ? candidate : best
+  ));
+  if (top.gain.lte(0)) {
+    return { id: "", name: "stage3.noBottleneck", efficiency: eff, upgradeEfficiency: eff, projectedIncomeGain: new Decimal(0), candidates };
+  }
   const def = infraById(top.id);
   return {
     id: top.id,
@@ -274,6 +354,7 @@ export function bottleneckAnalysis(state: SaveData): {
     efficiency: eff,
     upgradeEfficiency: top.nextEfficiency,
     projectedIncomeGain: top.gain,
+    candidates,
   };
 }
 
@@ -302,7 +383,7 @@ export function effectiveEfficiency(state: SaveData, overrideInfra?: string): nu
 // ---------- 总算力 ----------
 /** Stage 3 总算力 = 基础服务器算力 × 模型 compute × 算力卡 × 科技 compute × 机房倍率。 */
 export function stage3TotalCompute(state: SaveData): Decimal {
-  const base = new Decimal(state.serverPower).mul(modelComputeFactor(state));
+  const base = effectiveServerPower(state).mul(modelComputeFactor(state));
   const cards = new Decimal(1).plus(infraLevel(state, "computeCards") * 0.25);
   const tech = techPassiveMultipliers(state).compute;
   let roomMult = new Decimal(1);
@@ -314,18 +395,15 @@ export function stage3TotalCompute(state: SaveData): Decimal {
 }
 
 function modelComputeFactor(state: SaveData): Decimal {
-  // 复用现有模型处理能力（baseCompute × (1 + (level-1)*0.1)）
+  // 模型训练只提高基础处理能力；蓝图增幅由 blueprintGrowthMultiplier 独立结算。
   if (!state.modelProgress) return new Decimal(1);
   const def = MODELS.find((m) => m.id === state.modelProgress!.modelId);
   if (!def) return new Decimal(1);
-  const archiveLevel = state.modelArchive?.[state.modelProgress.modelId]?.level ?? 1;
-  const effectiveLevel = Math.min(
-    def.maxLevel,
-    Math.max(1, state.modelProgress.level) + Math.max(1, archiveLevel) - 1,
-  );
+  const trainingLevel = normalizeTrainingLevel(state.modelProgress.level);
   return new Decimal(def.baseCompute)
-    .mul(1 + (effectiveLevel - 1) * 0.1)
-    .mul(modelEffectMultipliers(state).compute);
+    .mul(trainingComputeMultiplier(trainingLevel))
+    .mul(modelEffectMultipliers(state).compute)
+    .mul(blueprintGrowthMultiplier(state));
 }
 
 // ---------- Stage 3 收入 ----------
@@ -334,9 +412,9 @@ function modelComputeFactor(state: SaveData): Decimal {
 export function stage3IncomePerSecond(state: SaveData, nowMs = Date.now()): Decimal {
   if (!state.stage3?.entered) return new Decimal(0);
   // 基础：完整 Stage 2 收入（进入 Stage 3 时 8 台服务器 + 模型已产出可观收入）
-  const baseAuto = businessMixNetPerSecLocal(state).mul(4)
+  const baseAuto = businessMixNetPerSecLocal(state).mul(ORDER_QUEUE_EFFECTIVE_PARALLELISM)
     .mul(modelComputeFactor(state))
-    .mul(new Decimal(state.serverPower))
+    .mul(effectiveServerPower(state))
     .mul(new Decimal(state.permanentMultiplier));
   const eff = new Decimal(effectiveEfficiency(state));
   // 基础设施放大：算力卡每级 +15%，电力每级 +5%（都直接放大收入）
@@ -374,7 +452,7 @@ export function stage3IncomePerSecond(state: SaveData, nowMs = Date.now()): Deci
     .mul(rateBonus);
 }
 
-/** Stage 2 基础自动收入（复用业务组合公式：加权净收入/秒 × 4 槽；不引入循环依赖） */
+/** Stage 2 基础自动收入（复用业务组合公式：加权净收入/秒 × 1.875 有效并行吞吐；不引入循环依赖） */
 function businessMixNetPerSecLocal(state: SaveData): Decimal {
   const mix = businessMixForState(state);
   const totalShare = mix.reduce((acc, m) => acc + m.share, 0);
@@ -390,7 +468,7 @@ function businessMixNetPerSecLocal(state: SaveData): Decimal {
 
 /** Stage 2 基础自动收入（复用业务组合公式，不含中心倍率） */
 function baseAutoIncome(state: SaveData): Decimal {
-  return businessMixNetPerSecLocal(state).mul(4);
+  return businessMixNetPerSecLocal(state).mul(ORDER_QUEUE_EFFECTIVE_PARALLELISM);
 }
 
 // ---------- 机房投产 ----------
@@ -485,6 +563,8 @@ export function canStartFlagship(state: SaveData, projectId: string): boolean {
   if (state.stage3?.flagship?.activeId) return false; // 同一时间最多一个，运行中禁止重启/清零进度
   if (state.stage3?.flagship?.pendingReward) return false; // 有待领奖励时不能开新工程
   const def = FLAGSHIP_PROJECTS.find((p) => p.id === projectId);
+  const cost = projectConstructionCost(state, projectId);
+  if (!cost || new Decimal(state.money).lt(cost)) return false;
   if (!def) {
     // 时代工程复用旗舰机制，但解锁规则独立。
     if (endgameMode(state) && ERA_PROJECTS.some((p) => p.id === projectId)) {
@@ -501,6 +581,9 @@ export function startFlagship(
   nowMs = Date.now()
 ): { ok: boolean; error?: string } {
   if (!canStartFlagship(state, projectId)) return { ok: false, error: "not_unlockable" };
+  const cost = projectConstructionCost(state, projectId);
+  if (!cost || new Decimal(state.money).lt(cost)) return { ok: false, error: "insufficient_funds" };
+  state.money = toStoredBig(new Decimal(state.money).minus(cost));
   state.stage3 = {
     ...state.stage3!,
     flagship: {
@@ -623,12 +706,6 @@ export function claimFlagshipReward(state: SaveData): { ok: boolean; error?: str
     state.lifetimeIncome = toStoredBig(new Decimal(state.lifetimeIncome).plus(moneyReward));
     state.workshop.lifetimeRevenue = state.lifetimeIncome;
   }
-  if (def.reward.researchProgress > 0) {
-    state.modelResearch = {
-      ...state.modelResearch,
-      progress: Math.min(100, (state.modelResearch?.progress ?? 0) + def.reward.researchProgress),
-    };
-  }
   // 完成记录（解锁建设资格/迭代）
   state.stage3 = {
     ...state.stage3!,
@@ -713,6 +790,7 @@ export function applyFirstIteration(state: SaveData): { ok: boolean; error?: str
   syncArchitectureBlueprints(state);
   // 永久保留
   const keepOwnedModels = [...state.ownedModelIds];
+  const keepGrowth = structuredClone(state.growth);
   const keepBlueprint = state.stage3?.blueprint
     ? {
         owned: [...state.stage3.blueprint.owned],
@@ -765,6 +843,8 @@ export function applyFirstIteration(state: SaveData): { ok: boolean; error?: str
     projectProgress: 0,
     peakStats: { peakCompute: 0, peakIncomePerSec: 0, totalRequests: 0 },
   };
+  state.growth = keepGrowth;
+  resetServerScaleForIteration(state);
 
   // 永久写回
   state.technologyIterationCount = nextCount;

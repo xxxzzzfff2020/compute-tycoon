@@ -25,11 +25,13 @@ export const STAGE4_NODES: ReadonlyArray<{
 }> = [
   { id: "leo_node", name: "stage4.node.leo.name", icon: "🛰️", cost: 0, incomeMult: 1 },
   { id: "moon_base", name: "stage4.node.moonBase.name", icon: "🌕", cost: 1.8e10, incomeMult: 1.6 },
-  { id: "lunar_link", name: "stage4.node.lunarLink.name", icon: "🔗", cost: 1.8e11, incomeMult: 2.4 },
-  { id: "deep_relay", name: "stage4.node.deepRelay.name", icon: "🌌", cost: 1.8e12, incomeMult: 3.5 },
+  { id: "lunar_link", name: "stage4.node.lunarLink.name", icon: "🔗", cost: 3.3e12, incomeMult: 2.4 },
+  { id: "deep_relay", name: "stage4.node.deepRelay.name", icon: "🌌", cost: 1.32e13, incomeMult: 3.5 },
 ];
 /** 首个自费节点门 8–15 分钟由 CARD-00 冻结；此处只保留价格常量，不做硬编码时间门。 */
 export const STAGE4_FIRST_PAID_NODE_ID = "moon_base";
+/** Stage 4 交接收入：首个自费节点前统一为 3000 万/秒，对应 18B 首购约 10 分钟。 */
+export const STAGE4_ENTRY_INCOME_PER_SECOND = 30_000_000;
 
 /** 宇宙模型包装：仅展示名称/图标（不增加独立抽取、配置或复杂槽位）。 */
 export const STAGE4_COSMIC_MODELS: ReadonlyArray<{
@@ -142,10 +144,14 @@ export function nodeIncomeMultiplier(state: SaveData): Decimal {
 }
 
 // ---------- 收入 ----------
-/** Stage 4 每秒收入：地球终局收入 × 尺度系数 × 节点倍率（重新减速，保留太空冷却节奏）。 */
+/** Stage 4 每秒收入：首购前固定交接收入；首购后恢复地球终局收入 × 尺度系数 × 节点倍率。 */
 export function stage4IncomePerSecond(state: SaveData, nowMs = Date.now()): Decimal {
   if (!stage4Entered(state)) return new Decimal(0);
-  // 与 CARD-00 模拟器一致：Stage 4 起点 = 地球终局收入/秒 × 0.3（地球算力饱和后的太空冷却）。
+  const owned = state.singularity!.stage4!.nodes;
+  if (!owned.includes(STAGE4_FIRST_PAID_NODE_ID)) {
+    return new Decimal(STAGE4_ENTRY_INCOME_PER_SECOND).mul(nodeIncomeMultiplier(state));
+  }
+  // 首购完成后恢复原有策略差异：地球终局收入/秒 × 0.3（地球算力饱和后的太空冷却）。
   const earthFinal = stage3IncomePerSecond(state, nowMs);
   const base = earthFinal.gt(1e8) ? earthFinal : new Decimal(1e8);
   const baseScaled = base.mul(0.3);
@@ -153,13 +159,14 @@ export function stage4IncomePerSecond(state: SaveData, nowMs = Date.now()): Deci
 }
 
 // ---------- 地月超级工程 ----------
-/** 唯一最终工程：地月一体化算力网（最终RC：约4小时在线等效，cap=25/秒）。 */
+/** 唯一最终工程：价格承担等待，进度条只保留约2小时施工反馈。 */
 export const STAGE4_FINAL_PROJECT = {
   id: STAGE4_FINAL_PROJECT_ID,
   name: "stage4.moonNetwork",
   icon: "🌐",
   desc: "stage4.moonNetworkDesc",
-  progressRequired: 360000,
+  constructionCost: 3.3e13,
+  progressRequired: 180000,
   progressCapPerSec: 25,
 };
 
@@ -167,6 +174,7 @@ export function canStartFinalProject(state: SaveData): boolean {
   if (!stage4Entered(state)) return false;
   const s4 = state.singularity!.stage4!;
   if (!STAGE4_NODES.every((node) => s4.nodes.includes(node.id))) return false;
+  if (new Decimal(state.money).lt(STAGE4_FINAL_PROJECT.constructionCost)) return false;
   if (s4.completedProjectIds.includes(STAGE4_FINAL_PROJECT_ID)) return false;
   if (s4.activeProjectId != null) return false;
   return s4.pendingRewardProjectId == null;
@@ -174,6 +182,7 @@ export function canStartFinalProject(state: SaveData): boolean {
 
 export function startFinalProject(state: SaveData): { ok: boolean; error?: string } {
   if (!canStartFinalProject(state)) return { ok: false, error: "not_ready" };
+  state.money = toStoredBig(new Decimal(state.money).minus(STAGE4_FINAL_PROJECT.constructionCost));
   state.singularity!.stage4 = {
     ...state.singularity!.stage4!,
     activeProjectId: STAGE4_FINAL_PROJECT_ID,

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { MODELS } from "../../src/data/content";
-import { COMMISSION_BONUS_DURATION_SEC } from "../../src/data/stage3";
+import { COMMISSION_BONUS_DURATION_SEC, FLAGSHIP_PROJECTS } from "../../src/data/stage3";
 import {
   acquireFirstModel,
   applyOfflineResearchProgress,
-  researchModel,
   upgradeCenter,
 } from "../../src/economy/engine";
+import { blueprintUpgradeCost, buyBlueprintLevels } from "../../src/economy/incremental-growth";
 import {
   advanceFlagship,
   applyFirstIteration,
@@ -67,15 +67,11 @@ function makeIterationReady(state: SaveData): void {
   };
 }
 
-function drawUntil(state: SaveData, modelId: string, requiredHits: number): void {
-  let hits = 0;
-  for (let i = 0; i < 300 && hits < requiredHits; i++) {
-    state.modelResearch.progress = 100;
-    const result = researchModel(state);
-    expect(result.ok).toBe(true);
-    if (result.modelId === modelId) hits += 1;
-  }
-  expect(hits).toBe(requiredHits);
+function buyBlueprint(state: SaveData, modelId: string, quantity = 1): void {
+  state.money = 1e15;
+  const result = buyBlueprintLevels(state, modelId, quantity);
+  expect(result.ok).toBe(true);
+  expect(result.bought).toBe(quantity);
 }
 
 describe("H5 product-contract reconciliation: six models", () => {
@@ -88,11 +84,10 @@ describe("H5 product-contract reconciliation: six models", () => {
     expect(MODELS.every((model) => model.activeBonus > 0 && model.archiveBonusPerLevel > 0)).toBe(true);
   });
 
-  it("new_models_enter_research_pool", () => {
+  it("all_models_are_available_as_paid_blueprints", () => {
     const state = baseState();
-    state.serverCount = 1;
-    drawUntil(state, "distill", 1);
-    drawUntil(state, "scheduler", 1);
+    buyBlueprint(state, "distill");
+    buyBlueprint(state, "scheduler");
     expect(state.ownedModelIds).toEqual(expect.arrayContaining(["distill", "scheduler"]));
   });
 
@@ -110,40 +105,35 @@ describe("H5 product-contract reconciliation: six models", () => {
     expect(voiceHighValue).toBeGreaterThan(baseHighValue);
   });
 
-  it("duplicate_new_model_converts_to_experience", () => {
+  it("repeated_paid_upgrades_raise_the_same_blueprint", () => {
     const state = baseState();
-    state.serverCount = 1;
-    drawUntil(state, "distill", 1);
+    buyBlueprint(state, "distill");
     const before = state.modelArchive.distill.level;
-    drawUntil(state, "distill", 1);
+    buyBlueprint(state, "distill");
     expect(state.modelArchive.distill.level).toBeGreaterThan(before);
   });
 
-  it("model_draw_costs_no_money", () => {
+  it("blueprint_upgrade_spends_the_exact_quoted_amount", () => {
     const state = baseState();
-    state.serverCount = 1;
-    state.money = 12345;
-    state.modelResearch.progress = 100;
-    expect(researchModel(state).ok).toBe(true);
+    const cost = blueprintUpgradeCost(state, "distill");
+    state.money = cost.plus(12345).toNumber();
+    expect(buyBlueprintLevels(state, "distill", 1).ok).toBe(true);
     expect(state.money).toBe(12345);
   });
 
-  it("one_active_model_only", () => {
+  it("paid_blueprint_upgrades_never_switch_the_active_model", () => {
     const state = baseState();
-    state.serverCount = 1;
-    for (let i = 0; i < 20; i++) {
-      state.modelResearch.progress = 100;
-      state.completedOrders = i;
-      expect(researchModel(state).ok).toBe(true);
+    for (const model of MODELS) {
+      buyBlueprint(state, model.id);
       expect(MODELS.filter((model) => model.id === state.modelProgress?.modelId)).toHaveLength(1);
+      expect(state.modelProgress?.modelId).toBe("codex");
     }
   });
 
   it("model_archive_persists_after_iteration", () => {
     const state = baseState();
-    state.serverCount = 1;
-    drawUntil(state, "distill", 1);
-    drawUntil(state, "scheduler", 1);
+    buyBlueprint(state, "distill");
+    buyBlueprint(state, "scheduler");
     const before = structuredClone(state.modelArchive);
     makeIterationReady(state);
     expect(applyFirstIteration(state).ok).toBe(true);
@@ -269,10 +259,11 @@ describe("H5 product-contract reconciliation: storage and optical", () => {
   it("storage_increases_project_final_reward_and_claim_is_exactly_once", () => {
     const state = stage3State();
     state.stage3.infrastructure.storage = 2;
+    const required = FLAGSHIP_PROJECTS.find((project) => project.id === "project_1")!.progressRequired;
     state.stage3.flagship = {
-      activeId: "project_1", progress: 499, startedAtMs: 1, completedIds: [], pendingReward: null,
+      activeId: "project_1", progress: required - 1, startedAtMs: 1, completedIds: [], pendingReward: null,
     };
-    state.stage3.projectProgress = 499;
+    state.stage3.projectProgress = required - 1;
     expect(advanceFlagship(state, 10).completed).toBe(true);
     expect(state.stage3.flagship.pendingReward?.rewardMultiplier).toBeCloseTo(1.10);
     state.stage3.infrastructure.storage = 10;
@@ -290,15 +281,15 @@ describe("H5 product-contract reconciliation: storage and optical", () => {
     expect(flagshipRewardMultiplier(state, "project_1").toNumber()).toBe(1.25);
   });
 
-  it("storage no longer changes the sponsor-owned offline cap", () => {
+  it("storage does not change the original free offline cap in single-player", () => {
     const state = stage3State();
-    expect(offlineCapSeconds(state)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(state)).toBe(2 * 60 * 60);
     state.stage3.infrastructure.storage = 1;
-    expect(offlineCapSeconds(state)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(state)).toBe(2 * 60 * 60);
     state.stage3.infrastructure.storage = 8;
-    expect(offlineCapSeconds(state)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(state)).toBe(2 * 60 * 60);
     state.stage3.infrastructure.storage = 10;
-    expect(offlineCapSeconds(state)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(state)).toBe(2 * 60 * 60);
   });
 
   it("storage cannot buy additional offline research time", () => {

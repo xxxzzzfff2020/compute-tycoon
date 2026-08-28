@@ -8,7 +8,7 @@ import {
   endgameReviewStorageNamespace,
   type EndgameReviewCheckpointId,
 } from "../../src/review/endgame-checkpoints";
-import { SAVE_NAMESPACE, ENDGAME_SAVE_NAMESPACE } from "../../src/save/types";
+import { SAVE_NAMESPACE, ENDGAME_SAVE_NAMESPACE, SAVE_SCHEMA_VERSION } from "../../src/save/types";
 import { validateSave } from "../../src/save/validate";
 
 const NOW = 1_800_000_000_000;
@@ -24,12 +24,12 @@ describe("endgame review checkpoints (CARD-06)", () => {
     expect(codes).toEqual(["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"]);
   });
 
-  it("all checkpoints build as valid schema v6 saves", () => {
+  it("all checkpoints normalize as valid current-schema saves", () => {
     for (const cp of ENDGAME_REVIEW_CHECKPOINTS) {
       const save = build(cp.id);
       const result = validateSave(save);
       expect(result.ok, cp.id).toBe(true);
-      if (result.ok) expect(result.data.schemaVersion).toBe(6);
+      if (result.ok) expect(result.data.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     }
   });
 

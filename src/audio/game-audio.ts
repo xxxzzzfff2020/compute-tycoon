@@ -1,11 +1,16 @@
+import { LocalHaptics, type InteractionFeedbackKind } from "../platform/local-haptics";
+
+export type { InteractionFeedbackKind } from "../platform/local-haptics";
+
 export interface AudioPreferences {
   bgmEnabled: boolean;
-  sfxEnabled: boolean;
+  hapticsEnabled: boolean;
   volume: number;
 }
 
 const AUDIO_PREFS_KEY = "compute_tycoon_h5_audio_v1";
-const DEFAULT_PREFS: AudioPreferences = { bgmEnabled: true, sfxEnabled: true, volume: 0.45 };
+const DEFAULT_PREFS: AudioPreferences = { bgmEnabled: true, hapticsEnabled: true, volume: 0.45 };
+const RELEASE_PACKAGE_MODE = import.meta.env.VITE_RELEASE_PACKAGE === "1";
 
 export function loadAudioPreferences(): AudioPreferences {
   try {
@@ -14,7 +19,7 @@ export function loadAudioPreferences(): AudioPreferences {
     const parsed = JSON.parse(raw) as Partial<AudioPreferences>;
     return {
       bgmEnabled: parsed.bgmEnabled !== false,
-      sfxEnabled: parsed.sfxEnabled !== false,
+      hapticsEnabled: parsed.hapticsEnabled !== false,
       volume: Math.max(0, Math.min(1, Number(parsed.volume ?? DEFAULT_PREFS.volume))),
     };
   } catch {
@@ -39,6 +44,23 @@ export const GAME_BGM_PATHS = {
   stage5: `${import.meta.env.BASE_URL}assets/audio/compute-tycoon-stage5-dyson-ascension-v1.mp3`,
 } as const;
 
+export function feedbackKindForCommand(command: string): InteractionFeedbackKind | null {
+  if ((!RELEASE_PACKAGE_MODE && command === "set_debug_speed") || command === "tick") return null;
+  const milestoneCommands = [
+    "claim_core", "prestige", "enter_stage3", "start_space_plan", "start_stage5",
+    "complete_stage2_settlement", "claim_flagship_reward", "claim_stage4_reward", "claim_stage5_reward",
+  ];
+  if (milestoneCommands.some((prefix) => command === prefix || command.startsWith(`${prefix}:`))) return "milestone";
+  const successCommands = [
+    "acquire_model", "train_model", "buy_server", "buy_max_servers",
+    "commission_room", "upgrade_blueprint", "expand_server_scale", "allocate_talent",
+    "enable_rental", "enable_automation", "upgrade_infra", "start_flagship",
+    "buy_node", "buy_stage5_node", "start_stage4_project", "start_stage5_project",
+  ];
+  if (successCommands.some((prefix) => command === prefix || command.startsWith(`${prefix}:`))) return "success";
+  return "click";
+}
+
 export interface BgmPhaseProfile {
   key: keyof typeof GAME_BGM_PATHS;
   path: string;
@@ -53,12 +75,11 @@ export function bgmPhaseProfile(stage: number, _iteration: number): BgmPhaseProf
   };
 }
 
-/** 原创分段配乐 + 低密度里程碑音效；不播放高频订单音效。 */
+/** 五阶段独立原创配乐 + 浏览器本地触感；不依赖平台 SDK。 */
 export class GameAudio {
-  private context: AudioContext | null = null;
-  private master: GainNode | null = null;
   private bgm: HTMLAudioElement | null = null;
   private prefs = loadAudioPreferences();
+  private readonly haptics = new LocalHaptics();
   private stage = 1;
   private iteration = 0;
   private removeUnlock: (() => void) | null = null;
@@ -68,11 +89,9 @@ export class GameAudio {
   };
   private readonly onVisibility = () => {
     if (document.visibilityState === "hidden") {
-      if (this.context) void this.context.suspend();
       this.bgm?.pause();
       return;
     }
-    if (this.context && this.prefs.sfxEnabled) void this.context.resume();
     if (this.prefs.bgmEnabled) void this.playBgm();
   };
   install(): void {
@@ -108,27 +127,9 @@ export class GameAudio {
     }
   }
 
-  playCue(command: string): void {
-    if (!this.prefs.sfxEnabled) return;
-    const allowed = [
-      "research_model", "buy_server", "buy_max_servers", "commission_room",
-      "claim_core", "prestige", "buy_node", "buy_stage5_node",
-      "claim_flagship_reward", "claim_stage4_reward", "claim_stage5_reward",
-    ];
-    if (!allowed.some((prefix) => command === prefix || command.startsWith(prefix + ":"))) return;
-    const context = this.ensureContext();
-    const gain = context.createGain();
-    const oscillator = context.createOscillator();
-    const now = context.currentTime;
-    oscillator.type = command.includes("claim") || command === "prestige" ? "triangle" : "sine";
-    oscillator.frequency.setValueAtTime(command.includes("claim") ? 520 : 360, now);
-    oscillator.frequency.exponentialRampToValueAtTime(command.includes("claim") ? 880 : 520, now + 0.16);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, this.prefs.volume * 0.12), now + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-    oscillator.connect(gain).connect(this.master!);
-    oscillator.start(now);
-    oscillator.stop(now + 0.24);
+  playFeedback(kind: InteractionFeedbackKind): void {
+    if (document.visibilityState === "hidden") return;
+    this.haptics.trigger(kind, this.prefs.hapticsEnabled);
   }
 
   destroy(): void {
@@ -141,24 +142,9 @@ export class GameAudio {
       this.bgm.load();
       this.bgm = null;
     }
-    if (this.context) void this.context.close();
-    this.context = null;
-    this.master = null;
-  }
-
-  private ensureContext(): AudioContext {
-    if (this.context && this.master) return this.context;
-    this.context = new AudioContext();
-    this.master = this.context.createGain();
-    this.master.connect(this.context.destination);
-    this.master.gain.value = this.prefs.volume;
-    return this.context;
   }
 
   private applyPreferences(): void {
-    if (this.context && this.master) {
-      this.master.gain.setTargetAtTime(this.prefs.volume, this.context.currentTime, 0.04);
-    }
     const bgm = this.ensureBgm();
     bgm.volume = Math.max(0, Math.min(1, this.prefs.volume * 0.58));
     if (this.prefs.bgmEnabled && document.visibilityState !== "hidden") {

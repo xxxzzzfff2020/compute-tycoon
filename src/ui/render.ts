@@ -3,26 +3,35 @@
 // - 静态结构只创建一次，保存稳定节点引用；
 // - 高频字段（资金/收入/算力/经验/进度条/按钮禁用态）用 textContent/style 局部更新；
 // - 每个 section 有结构签名（结构性事件才变化），签名不变时只 patch，不重建 DOM；
-// - 普通订单完成、自动领取、每秒 Tick 不替换任何 section、不重建根节点；
+// - 普通订单完成自动结算；每秒 Tick 不替换任何 section、不重建根节点；
 // - 结构性事件（获取模型/解锁自动化/获得首服/阶段切换/技术迭代）才重建对应 section。
 import type { ViewModel } from "../economy/viewmodel";
 import type { GrowthFeedbackEvent } from "../economy/feel";
-import type { ArchitectureReceipt, CommandResult, ResearchReceipt } from "../app/session";
-import { AUTOMATION_ORDER_CAP } from "../data/content";
-import { loadAudioPreferences, saveAudioPreferences } from "../audio/game-audio";
+import type { ArchitectureReceipt, CommandResult } from "../app/session";
+import { TALENT_POINT_CAP } from "../economy/incremental-growth";
+import { ORDER_QUEUE_CAP } from "../data/content";
+import { loadAudioPreferences, saveAudioPreferences, type InteractionFeedbackKind } from "../audio/game-audio";
 import { getLocale, t } from "../i18n";
 import {
+  blueprintGameIcon,
   contentGameIcon,
   createGameIcon,
+  createGameObjectHeader,
   modelGameIcon,
   orderGameIcon,
+  serverGameIcon,
   setIconText,
+  setNavigationIconText,
   type GameIconName,
 } from "./icons";
 import { createFinalFeelController } from "./final-feel";
 
 export type CommandHandler = (command: string, payload?: unknown) => CommandResult;
 type AppPage = "business" | "honor" | "sponsor" | "menu";
+/** 正式交付包不创建调速 DOM；普通开发/验收构建保持原能力。 */
+const RELEASE_PACKAGE_MODE = import.meta.env.VITE_RELEASE_PACKAGE === "1";
+/** 方案 E 专用本地验收层；不进入正式构建。 */
+const CANDIDATE_E_DEBUG_MODE = import.meta.env.VITE_CANDIDATE_E_DEBUG === "1";
 
 export interface RenderMetrics {
   fullRenderCount: number;
@@ -45,6 +54,7 @@ export interface PlatformPresentationStatus {
 export interface AppShell {
   render(vm: ViewModel): void;
   setCommandHandler(handler: CommandHandler): void;
+  setInteractionFeedbackHandler(handler: (kind: InteractionFeedbackKind) => void): void;
   showToast(text: string): void;
   confirmDialog(options: { title: string; body: string; confirmText: string; onConfirm: () => void }): void;
   getElement(): HTMLElement;
@@ -52,6 +62,8 @@ export interface AppShell {
   getMetrics(): RenderMetrics;
   resetMetrics(): void;
   setPlatformStatus(status: PlatformPresentationStatus): void;
+  /** 方案 E 专用：更新本次加速测试的时间轴与变量快照，不写存档。 */
+  setDebugRuntime(vm: ViewModel, elapsedGameSec: number, runtimeSpeed: number): void;
   showGrowthFeedback(event: GrowthFeedbackEvent): void;
   setVisualPaused(paused: boolean): void;
   /** 统计：累计订单完成数(由 session 回调驱动) */
@@ -89,8 +101,12 @@ export function createAppShell(container: HTMLElement): AppShell {
   };
 
   let handler: CommandHandler = () => ({ ok: false, error: "no_handler" });
+  let interactionFeedbackHandler: (kind: InteractionFeedbackKind) => void = () => undefined;
+  const emitInteractionFeedback = (kind: InteractionFeedbackKind): void => interactionFeedbackHandler(kind);
   let toastEl: HTMLDivElement | null = null;
   let toastTimer: number | null = null;
+  let honorTabBubbleEl: HTMLElement | null = null;
+  let sponsorTabBubbleEl: HTMLElement | null = null;
 
   const el = (tag: string, cls: string, text?: string): HTMLElement => {
     const e = document.createElement(tag);
@@ -122,15 +138,24 @@ export function createAppShell(container: HTMLElement): AppShell {
   const computeEl = el("span", "stat", t("app.compute", { value: "0" }));
   const multEl = el("span", "stat", t("app.multiplier", { value: "1" }));
   const architectureEl = el("span", "stat stat-architecture", t("app.architecture", { unlocked: "0", total: "3", mult: "1.00", next: t("app.architectureNext", { count: "3", name: "" }) }));
-  const workshopEl = el("span", "stat", t("app.workshop", { level: "1", exp: "0", next: "100" }));
+  const companyEl = el("span", "stat");
+  const companyIdentityEl = el("span", "stat-company-line stat-company-identity", t("app.companyIdentity", {
+    level: "1",
+    title: t("company.title.startupStudio"),
+  }));
+  const companyExperienceEl = el("span", "stat-company-line stat-company-experience", t("app.companyExperience", {
+    exp: "0",
+    next: "100",
+  }));
   const revenueEl = el("span", "stat", t("app.revenue", { value: "0" }));
   incomeEl.classList.add("stat-income");
   computeEl.classList.add("stat-compute");
   multEl.classList.add("stat-multiplier");
-  workshopEl.classList.add("stat-workshop");
+  companyEl.classList.add("stat-company");
+  companyEl.append(companyIdentityEl, companyExperienceEl);
   revenueEl.classList.add("stat-revenue");
   stageLineEl.append(stageEl, singularityBadgeEl);
-  statsEl.append(incomeEl, computeEl, multEl, architectureEl, workshopEl, revenueEl);
+  statsEl.append(incomeEl, computeEl, multEl, architectureEl, companyEl, revenueEl);
   header.append(stageLineEl, iterationBadgeEl, moneyEl, statsEl);
   root.appendChild(header);
 
@@ -147,31 +172,158 @@ export function createAppShell(container: HTMLElement): AppShell {
   main.append(businessPage, honorPage, sponsorPage, menuPage);
 
   // Level A：固定DOM算力引擎。这里只展示真实ViewModel，不创建第二套经济入口。
-  const finalFeel = createFinalFeelController(root, moneyEl);
+  // 推荐操作先定位到真实按钮，再通过同一命令总线执行；不创建第二套经济入口。
+  let revealFeelAction: ((action: string) => void) | null = null;
+  let executeFeelAction: ((action: string) => void) | null = null;
+  const finalFeel = createFinalFeelController(root, moneyEl, {
+    beforeNavigate: (action) => revealFeelAction?.(action),
+    executeAction: (action) => executeFeelAction?.(action),
+  });
   businessPage.appendChild(finalFeel.element);
+
+  // 经营页拆成订单/模型/蓝图/机房/天赋/时代；模型和订单不再挤在同一屏。
+  const BUSINESS_TAB_DEFS: ReadonlyArray<{ id: string; labelKey: string; icon: GameIconName }> = [
+    { id: "operations", labelKey: "business.tab.operations", icon: "business" },
+    { id: "models", labelKey: "business.tab.models", icon: "models" },
+    { id: "blueprints", labelKey: "business.tab.blueprints", icon: "blueprints" },
+    { id: "facility", labelKey: "business.tab.facility", icon: "server" },
+    { id: "talents", labelKey: "business.tab.talents", icon: "growth" },
+    { id: "era", labelKey: "business.tab.era", icon: "eras" },
+  ];
+  let businessTab = "operations";
+  const businessPanels: Record<string, HTMLElement> = {};
+  const businessTabButtons: Record<string, HTMLButtonElement> = {};
+  const businessTabBubbles: Record<string, HTMLElement> = {};
+  let lastScrolledBusinessTabButton: HTMLButtonElement | null = null;
+  let eraEntryRevealKey = "";
+  const businessTabsEl = el("div", "business-tabs");
+  businessPage.appendChild(businessTabsEl);
+  for (const tab of BUSINESS_TAB_DEFS) {
+    const panel = el("div", "business-tab-panel");
+    panel.id = `business-panel-${tab.id}`;
+    panel.dataset.tab = tab.id;
+    panel.classList.toggle("hidden", tab.id !== businessTab);
+    businessPanels[tab.id] = panel;
+    businessPage.appendChild(panel);
+  }
+  const buildBusinessTabs = (): void => {
+    businessTabsEl.replaceChildren();
+    for (const tab of BUSINESS_TAB_DEFS) {
+      const button = btn(t(tab.labelKey), `business_tab:${tab.id}`, false, true);
+      button.classList.add("business-tab");
+      const selected = businessTab === tab.id;
+      button.classList.toggle("active", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-controls", `business-panel-${tab.id}`);
+      if (selected) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+      setNavigationIconText(button, tab.icon, t(tab.labelKey));
+      const bubble = el("span", "tab-bubble");
+      bubble.hidden = true;
+      button.appendChild(bubble);
+      businessTabButtons[tab.id] = button;
+      businessTabBubbles[tab.id] = bubble;
+      businessTabsEl.appendChild(button);
+    }
+  };
+  const ensureBusinessTabVisible = (tabId = businessTab): void => {
+    const button = businessTabButtons[tabId];
+    if (!button || button === lastScrolledBusinessTabButton) return;
+    lastScrolledBusinessTabButton = button;
+    const reveal = () => button.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(reveal);
+    else window.setTimeout(reveal, 0);
+  };
+  buildBusinessTabs();
+
+  revealFeelAction = (action: string): void => {
+    const tab = action === "acquire_model" || action === "train_model"
+      ? "models"
+      : action.startsWith("upgrade_blueprint:")
+      ? "blueprints"
+      : action.startsWith("expand_server_scale:") || action === "buy_server" || action === "buy_max_servers" || action === "enable_rental"
+        ? "facility"
+      : action.startsWith("allocate_talent:")
+          ? "talents"
+          : action.startsWith("start_flagship:") || action.startsWith("upgrade_infra:") || action.startsWith("commission_room:")
+            || action.startsWith("buy_node:") || action.startsWith("buy_stage5_node:")
+            || action === "start_stage4_project" || action === "start_stage5_project" || action === "start_stage5"
+            || action === "claim_flagship_reward" || action === "claim_stage4_reward" || action === "claim_stage5_reward"
+            || action === "claim_core" || action === "prestige" || action === "start_space_plan"
+            || action === "complete_stage2_settlement" || action === "enter_stage3"
+            ? "era"
+            : "operations";
+    if (businessTab === tab) return;
+    businessTab = tab;
+    buildBusinessTabs();
+    if (lastVm) syncBusinessTabs(lastVm);
+    ensureBusinessTabVisible();
+  };
 
   const modelSection = section("section-model", t("section.model"));
   const modelBody = modelSection.querySelector(".section-body") as HTMLElement;
   const modelCard = el("div", "card");
-  const modelNameEl = el("div", "model-name", t("model.notAcquired"));
-  const modelStatsEl = el("div", "model-stats", t("model.stats", { compute: "0", cost: "-" }));
+  // 当前主力只保留文字同高的小图标；下方模型目录才使用完整大图，避免同屏重复。
+  const modelHeaderEl = el("div", "model-summary-header");
+  const modelIconPlateEl = el("span", "model-summary-icon");
+  modelIconPlateEl.appendChild(createGameIcon("models", "game-icon"));
+  modelIconPlateEl.dataset.objectIcon = "models";
+  const syncModelObjectIcon = (name: GameIconName): void => {
+    if (modelIconPlateEl.dataset.objectIcon === name) return;
+    modelIconPlateEl.dataset.objectIcon = name;
+    modelIconPlateEl.replaceChildren(createGameIcon(name, "game-icon"));
+  };
+  const modelCopyEl = el("div", "model-summary-copy");
+  const modelNameEl = el("div", "model-name model-summary-title", t("model.notAcquired"));
+  const modelStatsEl = el("div", "model-stats model-summary-subtitle", t("model.stats", { compute: "0", cost: "-" }));
+  modelCopyEl.append(modelNameEl, modelStatsEl);
+  modelHeaderEl.append(modelIconPlateEl, modelCopyEl);
   const modelActionsEl = el("div", "model-actions");
   const trainPreviewEl = el("div", "train-preview", "");
-  const researchProgressEl = el("div", "research-progress", "");
-  const researchReceiptEl = el("div", "research-receipt", "");
-  researchReceiptEl.hidden = true;
-  modelCard.append(modelNameEl, modelStatsEl, modelActionsEl, trainPreviewEl, researchProgressEl, researchReceiptEl);
-  modelBody.appendChild(modelCard);
-  businessPage.appendChild(modelSection);
+  const modelCatalogEl = el("div", "model-catalog");
+  modelCard.append(modelHeaderEl, modelActionsEl, trainPreviewEl);
+  modelBody.append(modelCard, modelCatalogEl);
+  businessPanels.models.appendChild(modelSection);
+
+  // CARD-02：六蓝图全局算力（独立于服务器，不再逐服切换）。
+  const blueprintGrowthSection = section("section-blueprint-growth", t("growth.blueprints.title"), true);
+  const blueprintGrowthBody = blueprintGrowthSection.querySelector(".section-body") as HTMLElement;
+  const blueprintGrowthSummaryEl = el("div", "growth-summary");
+  const blueprintGrowthGridEl = el("div", "blueprint-growth-grid");
+  const blueprintRecommendEl = el("div", "growth-actions blueprint-quick-actions");
+  // 推荐付费升级是蓝图页的首要行动；放在总览之后、卡片列表之前。
+  blueprintGrowthBody.append(
+    blueprintGrowthSummaryEl,
+    blueprintRecommendEl,
+    blueprintGrowthGridEl,
+  );
+  businessPanels.blueprints.appendChild(blueprintGrowthSection);
 
   const orderSection = section("section-orders", t("section.orders"), true);
   const orderBody = orderSection.querySelector(".section-body") as HTMLElement;
   const orderListEl = el("div", "order-list");
-  const activeListEl = el("div", "active-orders");
   const orderSummaryEl = el("div", "order-summary", "");
-  const orderHintEl = el("div", "hint", "");
-  orderBody.append(orderSummaryEl, orderListEl, activeListEl, orderHintEl);
-  businessPage.appendChild(orderSection);
+  const orderAutomationEl = el("div", "order-automation-panel");
+  // 自动经营每秒都会变更队列数。保留这两个稳定节点，只补丁文案，
+  // 避免随着自动接单/结算反复卸载并重建整个提示面板。
+  let orderAutomationMode: "locked" | "ready" | "running" | null = null;
+  let orderAutomationStatusEl: HTMLElement | null = null;
+  type OrderRowRefs = {
+    row: HTMLElement;
+    queueLabel: HTMLElement;
+    slots: Array<{
+      slot: HTMLElement;
+      fill: HTMLElement;
+      label: HTMLElement;
+    }>;
+    acceptButton: HTMLButtonElement | null;
+    unlockButton: HTMLButtonElement | null;
+  };
+  const orderRowRefs = new Map<string, OrderRowRefs>();
+  orderBody.classList.add("order-board");
+  orderListEl.dataset.role = "available-orders";
+  orderBody.append(orderAutomationEl, orderSummaryEl, orderListEl);
+  businessPanels.operations.appendChild(orderSection);
 
   const serverSection = section("section-server", t("section.server"), true);
   const serverBody = serverSection.querySelector(".section-body") as HTMLElement;
@@ -181,14 +333,32 @@ export function createAppShell(container: HTMLElement): AppShell {
   const serverActionsEl = el("div", "server-actions");
   srvBody.append(fleetEl, serverProgressEl, serverActionsEl);
   serverBody.appendChild(srvBody);
-  businessPage.appendChild(serverSection);
+  businessPanels.facility.appendChild(serverSection);
+
+  // CARD-02：服务器横滑世代 + 单详情卡。第1单元仍等于原服务器，继续投资扩规模。
+  const scaleGrowthSection = section("section-scale-growth", t("growth.scale.title"), true);
+  const scaleGrowthBody = scaleGrowthSection.querySelector(".section-body") as HTMLElement;
+  const scaleSummaryEl = el("div", "growth-summary");
+  const scaleRailEl = el("div", "scale-generation-rail");
+  const scaleRailHintEl = el("div", "scale-generation-hint");
+  const scaleDetailEl = el("div", "scale-detail-card");
+  scaleGrowthBody.append(scaleSummaryEl, scaleRailHintEl, scaleRailEl, scaleDetailEl);
+  businessPanels.facility.appendChild(scaleGrowthSection);
+
+  const talentSection = section("section-talents", t("growth.talent.title"), true);
+  const talentBody = talentSection.querySelector(".section-body") as HTMLElement;
+  const talentSummaryEl = el("div", "growth-summary");
+  const talentGridEl = el("div", "talent-grid");
+  const talentActionsEl = el("div", "growth-actions");
+  talentBody.append(talentSummaryEl, talentGridEl, talentActionsEl);
+  businessPanels.talents.appendChild(talentSection);
 
   const centerSection = section("section-center", t("section.center"), true);
   const centerBody = centerSection.querySelector(".section-body") as HTMLElement;
   const centerInfoEl = el("div", "center-info", "");
   const centerActionsEl = el("div", "center-actions");
   centerBody.append(centerInfoEl, centerActionsEl);
-  businessPage.appendChild(centerSection);
+  businessPanels.era.appendChild(centerSection);
 
   const stage3Section = section("section-stage3", t("section.stage3"), true);
   const stage3Body = stage3Section.querySelector(".section-body") as HTMLElement;
@@ -200,7 +370,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   const flagshipActiveEl = el("div", "flagship-active", "");
   const commissionBonusEl = el("div", "commission-bonus", "");
   stage3Body.append(stage3EntryEl, commissionBonusEl, bottleneckEl, infraGridEl, roomListEl, flagshipActiveEl, flagshipListEl);
-  businessPage.appendChild(stage3Section);
+  businessPanels.era.appendChild(stage3Section);
 
   // CARD-02 Stage 4：地月算力网（隔离终局档专属；进入后取代地球经营区）
   const stage4Section = section("section-stage4", t("section.stage4"), true);
@@ -209,7 +379,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   const stage4NodesEl = el("div", "stage4-nodes", "");
   const stage4ProjectEl = el("div", "stage4-project", "");
   stage4Body.append(stage4EntryEl, stage4NodesEl, stage4ProjectEl);
-  businessPage.appendChild(stage4Section);
+  businessPanels.era.appendChild(stage4Section);
 
   // CARD-03 Stage 5：戴森算力纪元（进入后取代 Stage 4 经营区）
   const stage5Section = section("section-stage5", t("section.stage5"), true);
@@ -219,7 +389,7 @@ export function createAppShell(container: HTMLElement): AppShell {
   const stage5ProjectEl = el("div", "stage5-project", "");
   const stage5StoryEl = el("div", "stage5-story", "");
   stage5Body.append(stage5EntryEl, stage5NodesEl, stage5ProjectEl, stage5StoryEl);
-  businessPage.appendChild(stage5Section);
+  businessPanels.era.appendChild(stage5Section);
 
   // CARD-03 主线结局：戴森算力球完成全屏反馈（只触发一次；可关闭）
   const storyCompleteOverlay = el("div", "story-complete-overlay");
@@ -266,13 +436,13 @@ export function createAppShell(container: HTMLElement): AppShell {
   const prestigeListEl = el("ul", "prestige-list");
   const prestigeActionsEl = el("div", "prestige-actions");
   prestigeBody.append(prestigeInfoEl, prestigeListEl, prestigeActionsEl);
-  businessPage.appendChild(prestigeSection);
+  businessPanels.era.appendChild(prestigeSection);
 
   const sponsorSection = section("section-sponsor", t("section.sponsor"));
   const sponsorBody = sponsorSection.querySelector(".section-body") as HTMLElement;
-  const sponsorIntroEl = el("div", "sponsor-intro", t("sponsor.intro"));
-  const offlineSponsorCardEl = el("div", "sponsor-card");
-  const incomeSponsorCardEl = el("div", "sponsor-card");
+  const sponsorIntroEl = el("div", "sponsor-intro", t("standalone.adsDisabled"));
+  const offlineSponsorCardEl = el("div", "sponsor-card sponsor-card--offline");
+  const incomeSponsorCardEl = el("div", "sponsor-card sponsor-card--income");
   sponsorBody.append(sponsorIntroEl, offlineSponsorCardEl, incomeSponsorCardEl);
   sponsorPage.appendChild(sponsorSection);
 
@@ -289,7 +459,18 @@ export function createAppShell(container: HTMLElement): AppShell {
     button.className = "btn" + (item.page === "business" ? " active" : "");
     button.dataset.command = `page:${item.page}`;
     button.setAttribute("aria-label", item.label);
-    setIconText(button, item.icon, item.label);
+    setNavigationIconText(button, item.icon, item.label);
+    // CARD-06 负责人反馈：荣誉馆底部气泡（有成就可领取时显示红点计数）。
+    if (item.page === "honor") {
+      honorTabBubbleEl = el("span", "tab-bubble");
+      honorTabBubbleEl.hidden = true;
+      button.appendChild(honorTabBubbleEl);
+    }
+    if (item.page === "sponsor") {
+      sponsorTabBubbleEl = el("span", "tab-bubble");
+      sponsorTabBubbleEl.hidden = true;
+      button.appendChild(sponsorTabBubbleEl);
+    }
     toolbar.appendChild(button);
   }
   root.appendChild(toolbar);
@@ -297,13 +478,13 @@ export function createAppShell(container: HTMLElement): AppShell {
   const menuCard = el("div", "game-menu-card");
   menuCard.innerHTML = `
     <div class="game-menu-heading"><strong>${t("menu.title")}</strong></div>
-    <div class="game-menu-group"><span>${t("menu.sound")}</span><button type="button" class="btn" data-command="toggle_bgm"></button><button type="button" class="btn" data-command="toggle_sfx"></button></div>
+    <div class="game-menu-group game-menu-sensory" aria-label="${t("menu.sound")}"><button type="button" class="btn" data-command="toggle_bgm"></button><button type="button" class="btn" data-command="toggle_haptics"></button></div>
     <label class="game-menu-volume">${t("menu.volume")} <input type="range" min="0" max="100" step="5" aria-label="${t("menu.volume")}"></label>
     <div class="game-menu-group"><span>${t("menu.language")}</span><button type="button" class="btn" data-command="set_locale:zh-CN">${t("menu.languageZh")}</button><button type="button" class="btn" data-command="set_locale:en-US">${t("menu.languageEn")}</button></div>
-    <div class="game-menu-status">${t("menu.statusLocal")}</div>
-    <div class="game-menu-group"><span>${t("menu.cloud")}</span><button type="button" class="btn" data-command="cloud_upload">${t("menu.cloudUpload")}</button><button type="button" class="btn" data-command="cloud_restore">${t("menu.cloudRestore")}</button></div>
-    <div class="game-menu-group"><span>${t("menu.data")}</span><button type="button" class="btn btn-danger" data-command="reset">${t("menu.reset")}</button></div>
-    <div class="game-menu-debug platform-review-debug" hidden>
+    <div class="game-menu-status">${t("standalone.status")}</div>
+    <div class="game-menu-status">${t("standalone.backupHint")}</div>
+    <div class="game-menu-group"><span>${t("menu.data")}</span><button type="button" class="btn" data-command="export_json">${t("common.export")}</button><button type="button" class="btn" data-command="import_json">${t("common.import")}</button><button type="button" class="btn btn-danger" data-command="reset">${t("menu.reset")}</button></div>
+    ${RELEASE_PACKAGE_MODE ? "" : `<div class="game-menu-debug platform-review-debug" hidden>
       <strong>${t("menu.debugTitle")}</strong>
       <label class="game-menu-speed">${t("menu.debugSpeed")}
         <select aria-label="${t("menu.debugSpeed")}">
@@ -312,24 +493,92 @@ export function createAppShell(container: HTMLElement): AppShell {
           <option value="64">64×</option><option value="128">128×</option><option value="256">256×</option>
         </select>
       </label>
+      ${CANDIDATE_E_DEBUG_MODE ? `<section class="candidate-e-debug-panel" aria-label="方案 E 时间轴与变量调试">
+        <div class="candidate-e-debug-heading"><strong>方案 E · 时间轴 / 变量</strong><span data-debug-speed>1×</span></div>
+        <div class="candidate-e-debug-clock"><span>本次运行经营时间</span><strong data-debug-time>T+00:00:00</strong></div>
+        <dl class="candidate-e-debug-grid">
+          <div><dt>阶段 / 轮次</dt><dd data-debug-phase>- </dd></div>
+          <div><dt>公司等级</dt><dd data-debug-company>- </dd></div>
+          <div><dt>资金</dt><dd data-debug-money>- </dd></div>
+          <div><dt>收入 / 秒</dt><dd data-debug-income>- </dd></div>
+          <div><dt>服务器</dt><dd data-debug-servers>- </dd></div>
+          <div><dt>下台服务器</dt><dd data-debug-next-server>- </dd></div>
+          <div><dt>模型</dt><dd data-debug-model>- </dd></div>
+          <div><dt>工作室</dt><dd data-debug-workshop>- </dd></div>
+          <div><dt>当前工程</dt><dd data-debug-project>- </dd></div>
+          <div><dt>太空节点</dt><dd data-debug-nodes>- </dd></div>
+          <div><dt>永久倍率</dt><dd data-debug-permanent>- </dd></div>
+          <div><dt>离线待领</dt><dd data-debug-offline>- </dd></div>
+        </dl>
+        <div class="candidate-e-debug-timeline-title">阶段时间轴（本次运行）</div>
+        <ol class="candidate-e-debug-timeline" data-debug-timeline></ol>
+      </section>` : ""}
     </div>
-    <div class="review-tools-host" hidden aria-label="${t("menu.debugTitle")}"></div>`;
+    <div class="review-tools-host" hidden aria-label="${t("menu.debugTitle")}"></div>`}`;
   menuPage.appendChild(menuCard);
+  let destroyed = false;
+  const importInput = document.createElement("input");
+  importInput.type = "file";
+  importInput.accept = "application/json,.json";
+  importInput.hidden = true;
+  importInput.setAttribute("aria-label", t("common.import"));
+  menuCard.appendChild(importInput);
+  importInput.addEventListener("change", async () => {
+    const file = importInput.files?.[0];
+    importInput.value = "";
+    if (!file) return;
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error("save_too_large");
+      const text = await file.text();
+      if (destroyed) return;
+      confirmDialog({
+        title: t("standalone.importTitle"),
+        body: t("standalone.importBody"),
+        confirmText: t("common.import"),
+        onConfirm: () => {
+          const result = handler("import_json", { text });
+          if (result.ok) showToast(t("save.imported"));
+        },
+      });
+    } catch {
+      if (!destroyed) showToast(t("save.importFailed"));
+    }
+  });
   const menuStatusEl = menuCard.querySelector(".game-menu-status") as HTMLElement;
   let platformStatus: PlatformPresentationStatus = {
-    cloud: t("menu.statusCloud"),
-    leaderboard: t("menu.leaderboard"),
+    cloud: t("standalone.status"),
+    leaderboard: t("standalone.status"),
     platformReview: false,
   };
   const volumeInput = menuCard.querySelector("input[type='range']") as HTMLInputElement;
-  const platformReviewDebugEl = menuCard.querySelector(".platform-review-debug") as HTMLElement;
-  const speedSelect = menuCard.querySelector(".game-menu-speed select") as HTMLSelectElement;
+  const platformReviewDebugEl = RELEASE_PACKAGE_MODE
+    ? null
+    : menuCard.querySelector<HTMLElement>(".platform-review-debug");
+  const speedSelect = RELEASE_PACKAGE_MODE
+    ? null
+    : menuCard.querySelector<HTMLSelectElement>(".game-menu-speed select");
+  const candidateDebugEl = RELEASE_PACKAGE_MODE
+    ? null
+    : menuCard.querySelector<HTMLElement>(".candidate-e-debug-panel");
+  const debugField = (name: string): HTMLElement | null =>
+    candidateDebugEl?.querySelector<HTMLElement>(`[data-debug-${name}]`) ?? null;
+  const debugTimelineEl = debugField("timeline");
+  const debugEvents: Array<{ elapsedGameSec: number; label: string }> = [];
+  let previousDebugMilestone: {
+    stage: number;
+    iterationCount: number;
+    serverCount: number;
+    activeProject: string;
+    stage4Nodes: number;
+    stage5Nodes: number;
+    storyCompleted: boolean;
+  } | null = null;
   const refreshAudioMenu = () => {
     const preferences = loadAudioPreferences();
     const bgm = menuCard.querySelector("button[data-command='toggle_bgm']") as HTMLButtonElement;
-    const sfx = menuCard.querySelector("button[data-command='toggle_sfx']") as HTMLButtonElement;
+    const haptics = menuCard.querySelector("button[data-command='toggle_haptics']") as HTMLButtonElement;
     bgm.textContent = preferences.bgmEnabled ? t("menu.bgmOn") : t("menu.bgmOff");
-    sfx.textContent = preferences.sfxEnabled ? t("menu.sfxOn") : t("menu.sfxOff");
+    haptics.textContent = preferences.hapticsEnabled ? t("menu.hapticsOn") : t("menu.hapticsOff");
     volumeInput.value = String(Math.round(preferences.volume * 100));
   };
   refreshAudioMenu();
@@ -337,16 +586,18 @@ export function createAppShell(container: HTMLElement): AppShell {
     const preferences = loadAudioPreferences();
     saveAudioPreferences({ ...preferences, volume: Number(volumeInput.value) / 100 });
   });
-  speedSelect.addEventListener("change", () => {
-    const speed = Number(speedSelect.value);
-    const result = handler("set_debug_speed", { speed });
-    if (result.ok) {
-      showToast(t("menu.speedChanged", { speed }));
-      return;
-    }
-    speedSelect.value = String(platformStatus.runtimeSpeed ?? 1);
-    showToast(t("menu.speedForbidden"));
-  });
+  if (speedSelect) {
+    speedSelect.addEventListener("change", () => {
+      const speed = Number(speedSelect.value);
+      const result = handler("set_debug_speed", { speed });
+      if (result.ok) {
+        showToast(t("menu.speedChanged", { speed }));
+        return;
+      }
+      speedSelect.value = String(platformStatus.runtimeSpeed ?? 1);
+      showToast(t("menu.speedForbidden"));
+    });
+  }
 
   // ---------- 事件委托（root 捕获，一次绑定） ----------
   // 注意：render 每帧 replaceChildren 会替换按钮节点；真实浏览器中物理点击的
@@ -355,14 +606,99 @@ export function createAppShell(container: HTMLElement): AppShell {
   let currentPage: AppPage = "business";
   const setPlatformStatus = (status: PlatformPresentationStatus): void => {
     platformStatus = { ...status };
-    setText(menuStatusEl,
-      `${status.platformReview ? t("menu.deviceBuild") + " · " : ""}${t("menu.statusLocal")}\n${t("menu.cloudBackup")}${t("common.colon")}${tr(status.cloud)}\n${t("menu.leaderboardLabel")}${t("common.colon")}${tr(status.leaderboard)}`);
-    platformReviewDebugEl.hidden = !status.platformReview;
-    speedSelect.value = String(status.runtimeSpeed ?? 1);
-    if (currentPage === "honor" && archiveTab === "hall" && lastVm) {
-      sigArchive = "";
-      rebuildArchive(lastVm);
-      sigArchive = sigForArchive(lastVm);
+    setText(menuStatusEl, t("standalone.status"));
+    if (platformReviewDebugEl) platformReviewDebugEl.hidden = RELEASE_PACKAGE_MODE || !status.platformReview;
+    if (speedSelect) speedSelect.value = String(status.runtimeSpeed ?? 1);
+  };
+  const formatDebugElapsed = (elapsedGameSec: number): string => {
+    const total = Math.max(0, Math.floor(elapsedGameSec));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+  const setDebugRuntime = (vm: ViewModel, elapsedGameSec: number, runtimeSpeed: number): void => {
+    if (!candidateDebugEl) return;
+    const activeStage3Project = vm.stage3.flagship.find((project) => project.activeId !== null);
+    const activeProject = vm.stage5.finalProject.active
+      ? tr(vm.stage5.finalProject.name)
+      : vm.stage4.finalProject.active
+        ? tr(vm.stage4.finalProject.name)
+        : activeStage3Project
+          ? tr(activeStage3Project.activeName ?? activeStage3Project.name)
+          : "暂无";
+    const activeProjectProgress = vm.stage5.finalProject.active
+      ? vm.stage5.finalProject.progressLabel
+      : vm.stage4.finalProject.active
+        ? vm.stage4.finalProject.progressLabel
+        : activeStage3Project?.progressLabel ?? "";
+    const roundLabel = vm.prestige.round == null ? `迭代 ${vm.iterationCount}` : `R${vm.prestige.round}`;
+    const currentMilestone = {
+      stage: vm.stage,
+      iterationCount: vm.iterationCount,
+      serverCount: vm.server.ownedCount,
+      activeProject,
+      stage4Nodes: vm.stage4.ownedNodeCount,
+      stage5Nodes: vm.stage5.ownedNodeCount,
+      storyCompleted: vm.stage5.storyCompleted,
+    };
+    const milestoneLabels: string[] = [];
+    if (previousDebugMilestone === null) {
+      milestoneLabels.push(`开始：${tr(vm.stageLabel)} · 服务器 ${vm.server.ownedCount}/${vm.server.maxCount}`);
+    } else {
+      if (currentMilestone.serverCount !== previousDebugMilestone.serverCount) {
+        milestoneLabels.push(`服务器 ${currentMilestone.serverCount}/${vm.server.maxCount}`);
+      }
+      if (currentMilestone.iterationCount !== previousDebugMilestone.iterationCount) {
+        milestoneLabels.push(`技术迭代 ${currentMilestone.iterationCount}`);
+      }
+      if (currentMilestone.stage !== previousDebugMilestone.stage) {
+        milestoneLabels.push(`进入 ${tr(vm.stageLabel)}`);
+      }
+      if (currentMilestone.activeProject !== previousDebugMilestone.activeProject && activeProject !== "暂无") {
+        milestoneLabels.push(`启动 ${activeProject}`);
+      }
+      if (currentMilestone.stage4Nodes !== previousDebugMilestone.stage4Nodes) {
+        milestoneLabels.push(`地月节点 ${currentMilestone.stage4Nodes}/${vm.stage4.nodes.length}`);
+      }
+      if (currentMilestone.stage5Nodes !== previousDebugMilestone.stage5Nodes) {
+        milestoneLabels.push(`恒星节点 ${currentMilestone.stage5Nodes}/${vm.stage5.nodes.length}`);
+      }
+      if (currentMilestone.storyCompleted && !previousDebugMilestone.storyCompleted) {
+        milestoneLabels.push("主线通关");
+      }
+    }
+    previousDebugMilestone = currentMilestone;
+    if (milestoneLabels.length > 0) {
+      debugEvents.push({ elapsedGameSec, label: milestoneLabels.join(" · ") });
+      if (debugEvents.length > 16) debugEvents.splice(0, debugEvents.length - 16);
+      if (debugTimelineEl) {
+        debugTimelineEl.replaceChildren(...debugEvents.map((event) => {
+          const item = document.createElement("li");
+          item.textContent = `T+${formatDebugElapsed(event.elapsedGameSec)}  ${event.label}`;
+          return item;
+        }));
+      }
+    }
+    const fields: Record<string, string> = {
+      speed: `${runtimeSpeed}×`,
+      time: `T+${formatDebugElapsed(elapsedGameSec)}`,
+      phase: `${tr(vm.stageLabel)} · ${roundLabel}`,
+      company: `Lv.${vm.company.level} · ${tr(vm.company.title)}`,
+      money: vm.money,
+      income: vm.incomePerSec,
+      servers: `${vm.server.ownedCount}/${vm.server.maxCount} · ${tr(vm.server.phaseLabel)}`,
+      "next-server": vm.server.nextName ? `${tr(vm.server.nextName)} · ${vm.server.nextCost ?? "-"}` : "已全部解锁",
+      model: `${tr(vm.model.name)} Lv.${vm.model.level}/${vm.model.maxLevel} · 算力 ${vm.compute}`,
+      workshop: `Lv.${vm.workshop.level} · 经验 ${vm.workshop.experience}/${vm.workshop.experienceToNextLevel}`,
+      project: activeProjectProgress ? `${activeProject} · ${activeProjectProgress}` : activeProject,
+      nodes: `地月 ${vm.stage4.ownedNodeCount}/${vm.stage4.nodes.length} · 恒星 ${vm.stage5.ownedNodeCount}/${vm.stage5.nodes.length}`,
+      permanent: vm.permanentMultiplier,
+      offline: vm.offline.hasPending ? `${vm.offline.remainingLabel} · ${vm.offline.money}` : "无",
+    };
+    for (const [name, value] of Object.entries(fields)) {
+      const field = debugField(name);
+      if (field) field.textContent = value;
     }
   };
   const setCurrentPage = (page: AppPage): void => {
@@ -379,32 +715,52 @@ export function createAppShell(container: HTMLElement): AppShell {
       rebuildArchive(lastVm);
       sigArchive = sigForArchive(lastVm);
     }
+    refreshVisualMotionBudget();
     window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
   const runCommand = (command: string): void => {
-    if (command.startsWith("page:")) {
-      setCurrentPage(command.slice("page:".length) as AppPage);
+    if (command === "import_json") {
+      importInput.click();
       return;
     }
-    if (command === "toggle_bgm" || command === "toggle_sfx") {
+    if (command.startsWith("page:")) {
+      setCurrentPage(command.slice("page:".length) as AppPage);
+      emitInteractionFeedback("click");
+      return;
+    }
+    if (command.startsWith("select_scale:")) {
+      selectedScaleServerId = command.slice("select_scale:".length);
+      if (lastVm) {
+        sigGrowth = "";
+        renderGrowth(lastVm);
+        sigGrowth = sigForGrowth(lastVm);
+      }
+      emitInteractionFeedback("click");
+      return;
+    }
+    if (command === "toggle_bgm" || command === "toggle_haptics") {
       const preferences = loadAudioPreferences();
       saveAudioPreferences(command === "toggle_bgm"
         ? { ...preferences, bgmEnabled: !preferences.bgmEnabled }
-        : { ...preferences, sfxEnabled: !preferences.sfxEnabled });
+        : { ...preferences, hapticsEnabled: !preferences.hapticsEnabled });
       refreshAudioMenu();
+      emitInteractionFeedback("click");
       return;
     }
     if (command === "close_space_reveal") {
       spaceRevealOverlay.hidden = true;
+      emitInteractionFeedback("click");
       return;
     }
     if (command === "close_story_complete") {
       storyCompleteOverlay.hidden = true;
+      emitInteractionFeedback("click");
       return;
     }
     if (command === "open_space_reveal") {
       spaceRevealOverlay.hidden = false;
+      emitInteractionFeedback("click");
       return;
     }
     if (command === "reset") {
@@ -414,11 +770,17 @@ export function createAppShell(container: HTMLElement): AppShell {
         confirmText: t("menu.resetConfirm"),
         onConfirm: () => { handler("reset"); },
       });
+      emitInteractionFeedback("click");
+      return;
+    }
+    if (command === "prestige") {
+      showPrestigeConfirmation(false);
+      emitInteractionFeedback("click");
       return;
     }
     const result = handler(command);
     handleCommandResult(command, result);
-    if (result.researchReceipt) showResearchReceipt(result.researchReceipt);
+    if (result.ok) scheduleVisualBurst(command);
     if (result.architectureReceipt) showArchitectureReceipt(result.architectureReceipt);
   };
   // 从点击坐标回退查找（真实浏览器中 render 每帧 replaceChildren 会替换按钮，
@@ -443,15 +805,51 @@ export function createAppShell(container: HTMLElement): AppShell {
   // pointerup 时按坐标回退处理，保证慢速/真实点击始终可用。
   let downPos: { x: number; y: number } | null = null;
   let suppressClick = false;
+  let longPressTimer: number | null = null;
+  let longPressRepeat: number | null = null;
+  let longPressAction: string | null = null;
+  let longPressFired = false;
+
+  const stopLongPress = (): void => {
+    if (longPressTimer !== null) window.clearTimeout(longPressTimer);
+    if (longPressRepeat !== null) window.clearInterval(longPressRepeat);
+    longPressTimer = null;
+    longPressRepeat = null;
+    longPressAction = null;
+  };
 
   root.addEventListener("pointerdown", (ev) => {
     downPos = { x: ev.clientX, y: ev.clientY };
+    longPressFired = false;
+    const target = ev.target as HTMLElement | null;
+    const action = target?.closest<HTMLElement>("[data-action]")?.dataset.action ?? null;
+    // 《暴富》式长按只用于最小投资按钮，批量/MAX仍保持一次确认一次交易。
+    if (action && /^(upgrade_blueprint|expand_server_scale):[^:]+:1$/.test(action)) {
+      longPressAction = action;
+      longPressTimer = window.setTimeout(() => {
+        if (!longPressAction) return;
+        longPressFired = true;
+        suppressClick = true;
+        prefixedHandler(longPressAction);
+        longPressRepeat = window.setInterval(() => {
+          if (longPressAction) prefixedHandler(longPressAction);
+        }, 140);
+      }, 450);
+    }
+  });
+
+  root.addEventListener("pointermove", (ev) => {
+    if (!downPos) return;
+    if (Math.hypot(ev.clientX - downPos.x, ev.clientY - downPos.y) > 8) stopLongPress();
   });
 
   root.addEventListener("pointerup", (ev) => {
     if (!downPos) return;
     const dist = Math.hypot(ev.clientX - downPos.x, ev.clientY - downPos.y);
+    const repeated = longPressFired;
+    stopLongPress();
     downPos = null;
+    if (repeated) return;
     if (dist > 8) return; // 拖拽后松开，视为取消
     const fromPoint = actionFromPoint(ev.clientX, ev.clientY);
     if (!fromPoint) return;
@@ -463,9 +861,23 @@ export function createAppShell(container: HTMLElement): AppShell {
       prefixedHandler(fromPoint.action);
     }
   });
+  root.addEventListener("pointercancel", () => {
+    stopLongPress();
+    downPos = null;
+  });
 
   // 带前缀的动作命令：<cmd>:<arg> 由 handler 解析
   const prefixedHandler = (action: string): void => {
+    if (action.startsWith("business_tab:")) {
+      const next = action.slice("business_tab:".length);
+      if (BUSINESS_TAB_DEFS.some((candidate) => candidate.id === next)) businessTab = next;
+      buildBusinessTabs();
+      if (lastVm) syncBusinessTabs(lastVm);
+      ensureBusinessTabVisible();
+      refreshVisualMotionBudget();
+      emitInteractionFeedback("click");
+      return;
+    }
     if (action.startsWith("archive_tab:")) {
       archiveTab = action.slice("archive_tab:".length);
       sigArchive = "";
@@ -473,6 +885,8 @@ export function createAppShell(container: HTMLElement): AppShell {
         rebuildArchive(lastVm);
         sigArchive = sigForArchive(lastVm);
       }
+      refreshVisualMotionBudget();
+      emitInteractionFeedback("click");
       return;
     }
     if (action.startsWith("archive_category:")) {
@@ -482,12 +896,31 @@ export function createAppShell(container: HTMLElement): AppShell {
         rebuildArchive(lastVm);
         sigArchive = sigForArchive(lastVm);
       }
+      refreshVisualMotionBudget();
+      emitInteractionFeedback("click");
+      return;
+    }
+    if (action === "offline_panel:toggle") {
+      offlinePanelCollapsed = !offlinePanelCollapsed;
+      try {
+        window.localStorage.setItem(OFFLINE_PANEL_KEY, offlinePanelCollapsed ? "1" : "0");
+      } catch {
+        // 折叠偏好不可写时不影响游戏；下次打开仍可折叠。
+      }
+      sigOffline = "";
+      return;
+    }
+    if (action === "prestige") {
+      showPrestigeConfirmation(false);
       return;
     }
     const result = handler(action);
     handleCommandResult(action, result);
-    if (result.researchReceipt) showResearchReceipt(result.researchReceipt);
+    if (result.ok) scheduleVisualBurst(action);
     if (result.architectureReceipt) showArchitectureReceipt(result.architectureReceipt);
+  };
+  executeFeelAction = (action: string): void => {
+    prefixedHandler(action);
   };
 
   root.addEventListener("click", (ev) => {
@@ -531,16 +964,277 @@ export function createAppShell(container: HTMLElement): AppShell {
   // 签名不变 → 只做高频字段局部更新（partial），不替换任何节点。
   let sigModel = "";
   let sigOrder = "";
-  let sigActive = "";
   let sigServer = "";
+  let sigGrowth = "";
   let sigCenter = "";
   let sigPrestige = "";
   let sigStage4 = "";
   let sigStage5 = "";
   let sigOffline = "";
+  let selectedScaleServerId: string | null = null;
+
+  function sigForGrowth(vm: ViewModel): string {
+    return JSON.stringify({
+      b: vm.growth.blueprints.map((item) => [item.id, item.level]),
+      s: vm.growth.serverLines.map((item) => [item.id, item.owned, item.units]),
+      t: vm.growth.talent.nodes.map((item) => [item.id, item.level, item.canAllocate]),
+      p: [vm.growth.talent.earned, vm.growth.talent.available],
+    });
+  }
+
+  function growthBatchLabel(
+    title: string,
+    count: number,
+    cost: string,
+    mode: "batch" | "max",
+  ): string {
+    const detail = mode === "max"
+      ? t("growth.maxEstimate", { count, cost })
+      : t("growth.batchEstimate", { count, cost });
+    return `${title}\n${detail}`;
+  }
+
+  function serverBatchLabel(vm: ViewModel): string {
+    const detail = vm.server.buyMaxCount > 0
+      ? t("server.buyMaxAvailable", {
+          count: vm.server.buyMaxCount,
+          cost: vm.server.buyMaxCost,
+        })
+      : t("server.buyMaxUnavailable", { cost: vm.server.nextCost ?? "-" });
+    return `${t("server.buyAffordable")}\n${detail}`;
+  }
+
+  function patchGrowth(vm: ViewModel): void {
+    for (const item of vm.growth.blueprints) {
+      const card = blueprintGrowthSection.querySelector<HTMLElement>(`[data-blueprint-id="${item.id}"]`);
+      const one = card?.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${item.id}:1"]`) ?? null;
+      const ten = card?.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${item.id}:10"]`) ?? null;
+      const max = card?.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${item.id}:max"]`) ?? null;
+      if (one) {
+        one.textContent = `${t("growth.buyOne")} · ${item.nextCost}`;
+        syncButtonAffordance(one, item.canBuy);
+      }
+      if (ten) {
+        ten.textContent = growthBatchLabel(t("growth.buyTen"), item.tenCount, item.tenCost, "batch");
+      }
+      if (max) {
+        max.textContent = growthBatchLabel(t("growth.buyMax"), item.maxCount, item.maxCost, "max");
+      }
+      const preview = card?.querySelector<HTMLElement>(`[data-growth-preview="${item.id}"]`) ?? null;
+      if (preview) setText(preview, t("growth.projected", { compute: item.projectedCompute, income: item.projectedIncome }));
+      if (ten) syncButtonAffordance(ten, item.canBuy);
+      if (max) syncButtonAffordance(max, item.canBuy);
+      if (card) {
+        card.classList.toggle("is-upgradeable", item.canBuy);
+        if (item.canBuy) card.dataset.visualMotion = "ready";
+        else delete card.dataset.visualMotion;
+      }
+    }
+    const recommended = vm.growth.recommendedBlueprintId;
+    const recommendedItem = recommended
+      ? vm.growth.blueprints.find((item) => item.id === recommended)
+      : undefined;
+    if (recommendedItem) {
+      const one = blueprintRecommendEl.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${recommendedItem.id}:1"]`);
+      const ten = blueprintRecommendEl.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${recommendedItem.id}:10"]`);
+      const max = blueprintRecommendEl.querySelector<HTMLButtonElement>(`[data-action="upgrade_blueprint:${recommendedItem.id}:max"]`);
+      if (one) {
+        one.textContent = `${t("growth.buyOne")} · ${recommendedItem.nextCost}`;
+        syncButtonAffordance(one, recommendedItem.canBuy);
+      }
+      if (ten) {
+        ten.textContent = growthBatchLabel(t("growth.buyTen"), recommendedItem.tenCount, recommendedItem.tenCost, "batch");
+        syncButtonAffordance(ten, recommendedItem.canBuy);
+      }
+      if (max) {
+        max.textContent = growthBatchLabel(t("growth.buyMax"), recommendedItem.maxCount, recommendedItem.maxCost, "max");
+        syncButtonAffordance(max, recommendedItem.canBuy);
+      }
+    }
+    const selected = vm.growth.serverLines.find((item) => item.id === selectedScaleServerId);
+    if (selected) {
+      const one = scaleDetailEl.querySelector<HTMLButtonElement>(`[data-action="expand_server_scale:${selected.id}:1"]`);
+      const ten = scaleDetailEl.querySelector<HTMLButtonElement>(`[data-action="expand_server_scale:${selected.id}:10"]`);
+      const max = scaleDetailEl.querySelector<HTMLButtonElement>(`[data-action="expand_server_scale:${selected.id}:max"]`);
+      if (one) {
+        one.textContent = `${t("growth.buyOne")} · ${selected.nextCost}`;
+        syncButtonAffordance(one, selected.canBuy);
+      }
+      if (ten) {
+        ten.textContent = growthBatchLabel(t("growth.buyTen"), selected.tenCount, selected.tenCost, "batch");
+      }
+      if (max) {
+        max.textContent = growthBatchLabel(t("growth.buyMax"), selected.maxCount, selected.maxCost, "max");
+      }
+      const preview = scaleDetailEl.querySelector<HTMLElement>("[data-growth-preview]");
+      if (preview) setText(preview, t("growth.projected", { compute: selected.projectedCompute, income: selected.projectedIncome }));
+      if (ten) syncButtonAffordance(ten, selected.canBuy);
+      if (max) syncButtonAffordance(max, selected.canBuy);
+      scaleDetailEl.classList.toggle("is-upgradeable", selected.canBuy);
+      scaleDetailEl.dataset.visualMotion = selected.canBuy ? "ready" : "running";
+      const visual = scaleDetailEl.querySelector<HTMLElement>(".server-rack-visual-panel");
+      visual?.classList.toggle("is-upgradeable", selected.canBuy);
+    }
+    for (const node of vm.growth.talent.nodes) {
+      const card = talentSection.querySelector<HTMLElement>(`[data-talent-id="${node.id}"]`);
+      if (!card) continue;
+      card.classList.toggle("is-upgradeable", node.canAllocate);
+      if (node.canAllocate) card.dataset.visualMotion = "ready";
+      else delete card.dataset.visualMotion;
+    }
+  }
+
+  function renderGrowth(vm: ViewModel): void {
+    metrics.fullRenderCount += 1;
+    blueprintGrowthSection.classList.toggle("hidden", vm.growth.blueprints.every((item) => !item.owned));
+    setText(blueprintGrowthSummaryEl,
+      t("growth.blueprints.summary", { multiplier: vm.growth.blueprintMultiplier }));
+    blueprintGrowthGridEl.replaceChildren();
+    for (const item of vm.growth.blueprints) {
+      const card = el("div", `growth-card${item.owned ? "" : " investable"}${item.canBuy ? " is-upgradeable" : ""}${item.id === vm.growth.recommendedBlueprintId ? " recommended" : ""}`);
+      card.dataset.blueprintId = item.id;
+      if (item.canBuy) card.dataset.visualMotion = "ready";
+      const milestone = item.nextMilestone == null
+        ? t("growth.milestone.complete")
+        : t("growth.milestone.next", { value: item.nextMilestone });
+      const progress = el("div", "growth-progress", milestone);
+      syncProgress(progress, item.milestoneProgress * 100);
+      const actions = el("div", "growth-batch-actions");
+      const projectedText = item.level < item.maxLevel && item.nextCost !== "—"
+        ? t("growth.projected", { compute: item.projectedCompute, income: item.projectedIncome })
+        : undefined;
+      const header = createGameObjectHeader(blueprintGameIcon(item.id), tr(item.name), {
+        subtitle: t("growth.blueprints.role"),
+        value: projectedText,
+        badge: `Lv.${item.level}/${item.maxLevel}`,
+      });
+      const projected = header.querySelector<HTMLElement>(".game-object-value");
+      if (projected) projected.dataset.growthPreview = item.id;
+      if (item.level < item.maxLevel && item.nextCost !== "—") {
+        actions.append(
+          btn(`${t("growth.buyOne")} · ${item.nextCost}`, `upgrade_blueprint:${item.id}:1`, true, item.canBuy),
+          btn(growthBatchLabel(t("growth.buyTen"), item.tenCount, item.tenCost, "batch"), `upgrade_blueprint:${item.id}:10`, false, item.canBuy),
+          btn(growthBatchLabel(t("growth.buyMax"), item.maxCount, item.maxCost, "max"), `upgrade_blueprint:${item.id}:max`, false, item.canBuy),
+        );
+      } else {
+        actions.appendChild(el("div", "growth-locked-label", item.owned ? t("growth.maxed") : t("growth.locked")));
+      }
+      card.append(header, progress, actions);
+      blueprintGrowthGridEl.appendChild(card);
+    }
+    blueprintRecommendEl.replaceChildren();
+    if (vm.growth.recommendedBlueprintId) {
+      const recommended = vm.growth.blueprints.find((item) => item.id === vm.growth.recommendedBlueprintId);
+      if (recommended && recommended.level < recommended.maxLevel && recommended.nextCost !== "—") {
+        blueprintRecommendEl.append(
+          btn(`${t("growth.buyOne")} · ${recommended.nextCost}`, `upgrade_blueprint:${recommended.id}:1`, true, recommended.canBuy),
+          btn(growthBatchLabel(t("growth.buyTen"), recommended.tenCount, recommended.tenCost, "batch"), `upgrade_blueprint:${recommended.id}:10`, false, recommended.canBuy),
+          btn(growthBatchLabel(t("growth.buyMax"), recommended.maxCount, recommended.maxCost, "max"), `upgrade_blueprint:${recommended.id}:max`, false, recommended.canBuy),
+          el("div", "growth-hold-hint", t("growth.holdHint")),
+        );
+      }
+    }
+
+    scaleGrowthSection.classList.toggle("hidden", vm.server.ownedCount <= 0);
+    setText(scaleSummaryEl, t("growth.scale.summary", { multiplier: vm.growth.scaleMultiplier }));
+    scaleRailEl.replaceChildren();
+    const ownedLines = vm.growth.serverLines.filter((item) => item.owned);
+    if (!selectedScaleServerId || !ownedLines.some((item) => item.id === selectedScaleServerId)) {
+      selectedScaleServerId = ownedLines[ownedLines.length - 1]?.id ?? null;
+    }
+    setText(scaleRailHintEl, t("growth.scale.swipeHint", { current: ownedLines.length, total: vm.growth.serverLines.length }));
+    for (const item of vm.growth.serverLines) {
+      // 代际选择只切换本地展示，不应进入经济命令总线。
+      const chip = commandBtn(`${item.index} · ${tr(item.name)}`, `select_scale:${item.id}`, false, item.owned);
+      chip.classList.add("scale-generation-chip");
+      setNavigationIconText(chip, serverGameIcon(item.index), `${item.index} · ${tr(item.name)}`);
+      chip.classList.toggle("active", item.id === selectedScaleServerId);
+      scaleRailEl.appendChild(chip);
+    }
+    scaleDetailEl.replaceChildren();
+    scaleDetailEl.classList.remove("is-upgradeable");
+    delete scaleDetailEl.dataset.scaleServerId;
+    delete scaleDetailEl.dataset.visualMotion;
+    const selected = vm.growth.serverLines.find((item) => item.id === selectedScaleServerId);
+    if (selected) {
+      scaleDetailEl.classList.toggle("is-upgradeable", selected.canBuy);
+      scaleDetailEl.dataset.scaleServerId = selected.id;
+      scaleDetailEl.dataset.visualMotion = selected.canBuy ? "ready" : "running";
+      const visual = el("div", `server-rack-visual-panel${selected.canBuy ? " is-upgradeable" : ""}`);
+      const visualImage = document.createElement("img");
+      visualImage.src = `${import.meta.env.BASE_URL}assets/visuals/server-rack-array-v1.svg`;
+      visualImage.alt = t("growth.scale.visualAlt");
+      visualImage.loading = "lazy";
+      visualImage.decoding = "async";
+      // 插图自身已经包含唯一的中央“+”扩建标记；不再叠加运行时前景加号。
+      visual.append(visualImage, el("div", "server-rack-unit-badge", t("growth.scale.runningUnits", { value: selected.units })));
+      const milestone = selected.nextMilestone == null
+        ? t("growth.milestone.complete")
+        : t("growth.milestone.next", { value: selected.nextMilestone });
+      const progress = el("div", "growth-progress", milestone);
+      syncProgress(progress, selected.milestoneProgress * 100);
+      const actions = el("div", "growth-batch-actions");
+      const header = createGameObjectHeader(serverGameIcon(selected.index), tr(selected.name), {
+        subtitle: t("growth.scale.role"),
+        value: t("growth.projected", { compute: selected.projectedCompute, income: selected.projectedIncome }),
+        badge: t("growth.scale.units", { value: selected.units }),
+      });
+      // 保留既有确定性渲染测试选择器；视觉结构由 game-object-header 接管。
+      header.classList.add("growth-card-title");
+      const projected = header.querySelector<HTMLElement>(".game-object-value");
+      if (projected) projected.dataset.growthPreview = selected.id;
+      actions.append(
+        btn(`${t("growth.buyOne")} · ${selected.nextCost}`, `expand_server_scale:${selected.id}:1`, true, selected.canBuy),
+        btn(growthBatchLabel(t("growth.buyTen"), selected.tenCount, selected.tenCost, "batch"), `expand_server_scale:${selected.id}:10`, false, selected.canBuy),
+        btn(growthBatchLabel(t("growth.buyMax"), selected.maxCount, selected.maxCost, "max"), `expand_server_scale:${selected.id}:max`, false, selected.canBuy),
+      );
+      scaleDetailEl.append(visual, header, progress, actions, el("div", "growth-hold-hint", t("growth.holdHint")));
+    }
+
+    talentSection.classList.toggle("hidden", !vm.model.acquired);
+    setText(talentSummaryEl, t("growth.talent.summary", {
+      available: vm.growth.talent.available,
+      earned: vm.growth.talent.earned,
+      claimable: vm.growth.talent.claimableAchievements,
+    }));
+    talentGridEl.replaceChildren();
+    for (const branch of ["blueprint", "scale"] as const) {
+      const branchEl = el("div", `talent-branch talent-${branch}`);
+      branchEl.appendChild(el("div", "talent-branch-title", t(`growth.talent.branch.${branch}`)));
+      for (const node of vm.growth.talent.nodes.filter((candidate) => candidate.branch === branch)) {
+        const card = el("div", `talent-node${node.level >= node.maxLevel ? " maxed" : ""}${node.canAllocate ? " is-upgradeable" : ""}`);
+        card.dataset.talentId = node.id;
+        if (node.canAllocate) card.dataset.visualMotion = "ready";
+        const header = createGameObjectHeader(
+          contentGameIcon(node.id, branch === "blueprint" ? "models" : "server"),
+          t(node.nameKey),
+          {
+            subtitle: t(node.descriptionKey),
+            badge: `${node.level}/${node.maxLevel}`,
+          },
+        );
+        card.appendChild(header);
+        if (node.level < node.maxLevel) {
+          card.appendChild(btn(t("growth.talent.allocate"), `allocate_talent:${node.id}`, true, node.canAllocate));
+        }
+        branchEl.appendChild(card);
+      }
+      talentGridEl.appendChild(branchEl);
+    }
+    talentActionsEl.replaceChildren(btn(t("growth.talent.reset"), "reset_talents", false, vm.growth.talent.spent > 0));
+  }
   let sigStage3 = "";
   let sigArchive = "";
   let sigSponsor = "";
+  // CARD-04 反馈：离线收益面板常驻且可折叠；折叠状态按设备记忆。
+  const OFFLINE_PANEL_KEY = "compute_tycoon_h5_offline_panel_collapsed";
+  let offlinePanelCollapsed = (() => {
+    try {
+      return window.localStorage.getItem(OFFLINE_PANEL_KEY) === "1";
+    } catch {
+      return false;
+    }
+  })();
 
   const setText = (node: HTMLElement, text: string): void => {
     if (node.textContent !== text) node.textContent = text;
@@ -562,6 +1256,100 @@ export function createAppShell(container: HTMLElement): AppShell {
     node.setAttribute("aria-valuemax", "100");
     node.setAttribute("aria-valuenow", normalized.toFixed(0));
     node.classList.toggle("near-complete", normalized >= 90 && normalized < 100);
+  }
+
+  /**
+   * P0/P1 动效预算：真实游戏对象才可持续呼吸，且同屏最多六个。
+   * 这避免“所有卡片一起闪”造成视觉噪声，也避免隐藏页继续消耗动画资源。
+   */
+  let visualMotionRefreshFrame: number | null = null;
+
+  function refreshVisualMotionBudget(): void {
+    const priority = (node: HTMLElement): number => {
+      const base = node.dataset.visualMotion === "claim"
+        ? 30
+        : node.dataset.visualMotion === "ready"
+          ? 20
+          : node.dataset.visualMotion === "running"
+            ? 10
+            : 0;
+      const structuralPriority = node.matches(".scale-detail-card, .infra-card, .stage4-node, .stage4-project, .stage5-node, .stage5-project")
+        ? 4
+        : 0;
+      return base + structuralPriority + (node.classList.contains("recommended") ? 5 : 0);
+    };
+    const allNodes = [...root.querySelectorAll<HTMLElement>("[data-visual-motion]")];
+    // 动画预算必须随玩家实际滚动的可见区域迁移。只按 DOM 顺序挑选会让
+    // 首屏以外的对象永远没有呼吸效果，表现成“资源已接入但游戏里没看到”。
+    for (const node of allNodes) node.classList.remove("visual-motion-active");
+    if (document.visibilityState === "hidden") return;
+    const candidates = allNodes
+      .filter((node) => {
+        if (node.closest(".hidden, [hidden]")) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight;
+      })
+      .sort((a, b) => priority(b) - priority(a));
+    for (const [index, node] of candidates.entries()) {
+      node.classList.toggle("visual-motion-active", index < 6);
+    }
+  }
+
+  const requestVisualMotionBudgetRefresh = (): void => {
+    if (visualMotionRefreshFrame !== null) return;
+    const refresh = (): void => {
+      visualMotionRefreshFrame = null;
+      refreshVisualMotionBudget();
+    };
+    visualMotionRefreshFrame = typeof window.requestAnimationFrame === "function"
+      ? window.requestAnimationFrame(refresh)
+      : window.setTimeout(refresh, 0);
+  };
+  // 只在滚动/尺寸变更后的下一帧重算，既让后续 P0/P1 对象可见即呼吸，
+  // 又避免滚动时逐像素触发布局工作。
+  window.addEventListener("scroll", requestVisualMotionBudgetRefresh, { passive: true });
+  window.addEventListener("resize", requestVisualMotionBudgetRefresh, { passive: true });
+
+  function scheduleVisualBurst(command: string): void {
+    if (!command) return;
+    const selectors: string[] = [];
+    const idAfter = (prefix: string): string | null => command.startsWith(prefix) ? command.slice(prefix.length).split(":")[0] : null;
+    const blueprintId = idAfter("upgrade_blueprint:");
+    const scaleId = idAfter("expand_server_scale:");
+    const talentId = idAfter("allocate_talent:");
+    const infraId = idAfter("upgrade_infra:");
+    const orderId = idAfter("accept_order:") ?? idAfter("unlock_order:") ?? idAfter("expand_order_slot:");
+    const nodeId = idAfter("buy_node:") ?? idAfter("buy_stage5_node:");
+    const achievementId = idAfter("claim_achievement:");
+    if (blueprintId) selectors.push(`[data-blueprint-id="${blueprintId}"]`);
+    if (scaleId) selectors.push(`[data-scale-server-id="${scaleId}"]`);
+    if (talentId) selectors.push(`[data-talent-id="${talentId}"]`);
+    if (infraId) selectors.push(`[data-infrastructure="${infraId}"]`);
+    if (orderId) selectors.push(`[data-order-id="${orderId}"]`);
+    if (nodeId) selectors.push(`[data-node-id="${nodeId}"]`);
+    if (achievementId) selectors.push(`[data-achievement-id="${achievementId}"]`);
+    if (command === "buy_server" || command === "buy_max_servers") selectors.push("#section-scale-growth .scale-detail-card", "#section-server");
+    if (command.startsWith("commission_room:")) selectors.push(`[data-room-index="${command.slice("commission_room:".length)}"]`);
+    if (command.startsWith("start_flagship:") || command === "claim_flagship_reward") selectors.push("#section-stage3 .flagship-active", "#section-stage3 .flagship-card");
+    if (command === "start_stage4_project" || command === "claim_stage4_reward") selectors.push("#section-stage4 .stage4-project");
+    if (command === "start_stage5_project" || command === "claim_stage5_reward") selectors.push("#section-stage5 .stage5-project");
+    if (command === "claim_core" || command === "prestige") selectors.push("#section-prestige");
+    if (command === "claim_offline") selectors.push(".offline-card");
+    if (command.startsWith("prepare_sponsor_ad:")) selectors.push(command.endsWith("offline_capacity") ? ".sponsor-card--offline" : ".sponsor-card--income");
+
+    const animate = (): void => {
+      const target = selectors
+        .map((selector) => root.querySelector<HTMLElement>(selector))
+        .find((node): node is HTMLElement => node !== null);
+      if (!target) return;
+      target.classList.remove("visual-feedback-burst");
+      // 强制重排只发生于玩家单次购买，不能进入 Tick 路径。
+      void target.offsetWidth;
+      target.classList.add("visual-feedback-burst");
+      window.setTimeout(() => target.classList.remove("visual-feedback-burst"), 720);
+    };
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(animate);
+    else window.setTimeout(animate, 0);
   }
 
   function patchHeader(vm: ViewModel): void {
@@ -589,18 +1377,43 @@ export function createAppShell(container: HTMLElement): AppShell {
         : t("app.architectureNextDefault", { count: vm.architecture.nextServerCount });
     setText(architectureEl,
       t("app.architecture", { unlocked: vm.architecture.unlockedCount, total: vm.architecture.total, mult: vm.architecture.multiplier, next: nextArchitecture }));
-    setText(workshopEl, t("app.workshop", { level: vm.workshop.level, exp: vm.workshop.experience, next: vm.workshop.experienceToNextLevel }));
-    setText(revenueEl, t("app.revenue", { value: vm.workshop.lifetimeRevenue }));
+    const companyIdentityText = t("app.companyIdentity", {
+      level: vm.company.level,
+      title: tr(vm.company.title),
+    });
+    const companyExperienceText = t("app.companyExperience", {
+      exp: vm.company.experience,
+      next: vm.company.experienceToNextLevel,
+    });
+    setText(companyIdentityEl, companyIdentityText);
+    setText(companyExperienceEl, companyExperienceText);
+    companyEl.title = `${companyIdentityText}\n${companyExperienceText}`;
+    // 累计营业额走主账本 ViewModel；它与可消费资金不同，允许在大数阶段换行而不截断。
+    const revenueText = t("app.revenue", { value: vm.chronicle.cumulativeIncome });
+    setText(revenueEl, revenueText);
+    revenueEl.title = revenueText;
+    revenueEl.dataset.cumulativeIncome = vm.chronicle.cumulativeIncome;
   }
 
 function sigForModel(vm: ViewModel): string {
-    return `${vm.model.acquired}|${vm.model.name}|${vm.model.level}|${vm.model.roleLabel}|${vm.model.effectText}|${vm.model.atMaxLevel}|${vm.automationUnlocked}|${vm.automationEnabled}|${vm.research.canResearch}|${vm.research.archiveComplete}`;
+    const archive = vm.modelArchive.map((item) => `${item.id}:${item.owned ? 1 : 0}:${item.current ? 1 : 0}`).join(",");
+    return `${vm.model.acquired}|${vm.model.id ?? ""}|${vm.model.name}|${vm.model.level}|${vm.model.blueprintLevel}|${vm.model.roleLabel}|${vm.model.effectText}|${vm.model.atMaxLevel}|${archive}`;
   }
   function rebuildModel(vm: ViewModel): void {
     metrics.fullRenderCount += 1;
-    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), t("model.nameLevel", { name: tr(vm.model.name), level: vm.model.level }));
+    // P0：可训练时，只让当前主力模型呈现低频提示；
+    // 其余五款图鉴模型保持静态，避免同屏“全都在闪”。
+    if (vm.model.canTrain) modelCard.dataset.visualMotion = "ready";
+    else delete modelCard.dataset.visualMotion;
+    syncModelObjectIcon("training");
+    setText(modelNameEl, vm.model.acquired
+      ? t("model.sharedTrainingTitle", { level: vm.model.level, max: vm.model.maxLevel })
+      : t("model.notAcquired"));
     setText(modelStatsEl, vm.model.acquired
-      ? `${t("model.statsAcquired", { role: tr(vm.model.roleLabel), effect: tr(vm.model.effectText), compute: vm.model.compute })} · ${vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost })}`
+      ? t("model.sharedTrainingStats", {
+          compute: vm.model.compute,
+          state: vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost }),
+        })
       : t("model.stats", { compute: vm.model.compute, cost: vm.model.trainCost }));
     modelActionsEl.replaceChildren();
     if (!vm.model.acquired) {
@@ -609,34 +1422,34 @@ function sigForModel(vm: ViewModel): string {
       if (vm.model.atMaxLevel) {
         modelActionsEl.appendChild(el("div", "model-max-level", t("model.maxLevel", { level: vm.model.level })));
       } else {
-        modelActionsEl.appendChild(btn(t("action.trainModel"), "train_model", false, vm.model.canTrain));
-      }
-      if (vm.automationUnlocked && !vm.automationEnabled) {
-        modelActionsEl.appendChild(btn(t("action.enableAutomation"), "enable_automation", true));
+        modelActionsEl.appendChild(btn(
+          `${t("action.trainModel")} · ${vm.model.trainCost}`,
+          "train_model",
+          false,
+          vm.model.canTrain,
+        ));
       }
     }
-    // 模型研发循环（自动经营解锁后持续保留）
-    if (vm.model.acquired && vm.automationUnlocked) {
-      setText(researchProgressEl,
-        vm.research.archiveComplete
-          ? t("model.researchComplete")
-          : t(vm.research.canResearch ? "model.researchReady" : "model.researchProgress", { progress: vm.research.progressLabel }));
-      researchProgressEl.style.display = "";
-      syncProgress(researchProgressEl, vm.research.progress);
-      if (!vm.research.archiveComplete && vm.research.canResearch) {
-        modelActionsEl.appendChild(btn(t("action.researchModel"), "research_model", true));
-      }
-    } else {
-      setText(researchProgressEl, "");
-      researchProgressEl.style.display = "none";
-    }
-    if (vm.trainPreview) {
-      setText(trainPreviewEl,
-        t("model.trainPreview", { from: vm.trainPreview.computeNow, to: vm.trainPreview.computeAfter, incomeFrom: vm.trainPreview.incomeNow, incomeTo: vm.trainPreview.incomeAfter }));
-      trainPreviewEl.style.display = "";
-    } else {
-      setText(trainPreviewEl, "");
-      trainPreviewEl.style.display = "none";
+    patchTrainPreview(vm);
+    // 模型页同时展示完整模型目录：未解锁模型也显示职责与解锁条件，
+    // 避免玩家只能看到当前主力而无法理解后续成长路线。
+    modelCatalogEl.replaceChildren();
+    for (const model of vm.modelArchive) {
+      const card = el("article", "model-catalog-card" + (model.owned ? "" : " locked") + (model.current ? " current" : ""));
+      card.appendChild(createGameObjectHeader(modelGameIcon(model.id), tr(model.name), {
+        subtitle: tr(model.description),
+        value: `${tr(model.roleLabel)} · ${tr(model.effectText)}`,
+        badge: model.current
+          ? t("model.catalogCurrent")
+          : model.owned
+            ? t("model.catalogOwned")
+            : t("growth.locked"),
+      }));
+      card.appendChild(el("div", "model-catalog-status",
+        model.owned
+          ? t("model.catalogOwnedStatus")
+          : t("model.catalogLocked", { condition: tr(model.unlockHint) })));
+      modelCatalogEl.appendChild(card);
     }
     // 档案馆已打开时，同步刷新模型蓝图等级（研发/训练后的收藏成长立即可见，
     // 无需先关闭再打开档案馆；未打开时由 render 的签名重建覆盖）。
@@ -647,33 +1460,25 @@ function sigForModel(vm: ViewModel): string {
 
 function patchModel(vm: ViewModel): void {
     metrics.partialPatchCount += 1;
-    setIconText(modelNameEl, modelGameIcon(vm.model.id ?? ""), t("model.nameLevel", { name: tr(vm.model.name), level: vm.model.level }));
+    if (vm.model.canTrain) modelCard.dataset.visualMotion = "ready";
+    else delete modelCard.dataset.visualMotion;
+    syncModelObjectIcon("training");
+    setText(modelNameEl, vm.model.acquired
+      ? t("model.sharedTrainingTitle", { level: vm.model.level, max: vm.model.maxLevel })
+      : t("model.notAcquired"));
     setText(modelStatsEl, vm.model.acquired
-      ? `${t("model.statsAcquired", { role: tr(vm.model.roleLabel), effect: tr(vm.model.effectText), compute: vm.model.compute })} · ${vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost })}`
+      ? t("model.sharedTrainingStats", {
+          compute: vm.model.compute,
+          state: vm.model.atMaxLevel ? t("model.maxLevel", { level: vm.model.level }) : t("model.trainCostLabel", { cost: vm.model.trainCost }),
+        })
       : t("model.stats", { compute: vm.model.compute, cost: vm.model.trainCost }));
-    // 训练/自动经营按钮禁用态
+    // 训练按钮禁用态；自动经营入口位于订单页顶部。
     const trainBtn = modelActionsEl.querySelector("button[data-action='train_model']") as HTMLButtonElement | null;
-    if (trainBtn) syncButtonAffordance(trainBtn, vm.model.canTrain);
-    const autoBtn = modelActionsEl.querySelector("button[data-action='enable_automation']") as HTMLButtonElement | null;
-    if (autoBtn) syncButtonAffordance(autoBtn, true);
-    const researchBtn = modelActionsEl.querySelector("button[data-action='research_model']") as HTMLButtonElement | null;
-    if (researchBtn) syncButtonAffordance(researchBtn, vm.research.canResearch);
-    if (vm.model.acquired && vm.automationUnlocked) {
-      setText(researchProgressEl,
-        vm.research.archiveComplete
-          ? t("model.researchComplete")
-          : t(vm.research.canResearch ? "model.researchReady" : "model.researchProgress", { progress: vm.research.progressLabel }));
-      researchProgressEl.style.display = "";
-      syncProgress(researchProgressEl, vm.research.progress);
+    if (trainBtn) {
+      setText(trainBtn, `${t("action.trainModel")} · ${vm.model.trainCost}`);
+      syncButtonAffordance(trainBtn, vm.model.canTrain);
     }
-    if (vm.trainPreview) {
-      setText(trainPreviewEl,
-        t("model.trainPreview", { from: vm.trainPreview.computeNow, to: vm.trainPreview.computeAfter, incomeFrom: vm.trainPreview.incomeNow, incomeTo: vm.trainPreview.incomeAfter }));
-      trainPreviewEl.style.display = "";
-    } else {
-      setText(trainPreviewEl, "");
-      trainPreviewEl.style.display = "none";
-    }
+    patchTrainPreview(vm);
     // 档案馆已打开时，同步刷新模型蓝图等级（研发/训练后的收藏成长立即可见，
     // 无需先关闭再打开档案馆；未打开时由 render 的签名重建覆盖）。
     if (!archiveSection.classList.contains("hidden")) {
@@ -681,62 +1486,24 @@ function patchModel(vm: ViewModel): void {
     }
   }
 
-function sigForOrders(vm: ViewModel): string {
-    // 静态订单列表只随结构性事件重建：模型获得/自动化解锁/自动化开关。
-    // canAcceptAnyOrder（含空槽状态）不在此签名内：满槽/空槽只重建 active 子区，
-    // 静态列表与按钮禁用态走局部 patch，避免订单区闪烁。
-    return `${vm.model.acquired}|${vm.automationUnlocked}|${vm.automationEnabled}`;
+  function sigForOrders(vm: ViewModel): string {
+    return `${vm.model.acquired}|${vm.automationUnlocked}|${vm.automationEnabled}|${vm.orders.map((row) =>
+      `${row.order.id}:${row.unlocked}`).join(",")}`;
   }
-  function sigForActive(vm: ViewModel): string {
-    if (vm.automationEnabled) return `automation:${AUTOMATION_ORDER_CAP}`;
-    return `${vm.activeOrders.length}|${vm.activeOrders.map((o) => o.orderId).join(",")}`;
-  }
-  function patchActiveRow(
-    row: HTMLElement,
-    ao: ViewModel["activeOrders"][number] | undefined,
-    automationEnabled: boolean,
-  ): void {
-    const name = row.querySelector(".ao-name") as HTMLElement;
-    const bar = row.querySelector(".progress-fill") as HTMLElement;
-    const status = row.querySelector(".ao-status") as HTMLElement;
-    const claim = row.querySelector("button[data-action^='claim_order:']") as HTMLButtonElement | null;
-
-    if (!ao) {
-      row.classList.add("auto-waiting");
-      setIconText(name, "business", t("order.autoWaiting"));
-      bar.style.width = "0%";
-      delete bar.dataset.key;
-      setText(status, t("order.fillingSlots"));
-      claim?.remove();
-      return;
-    }
-
-    row.classList.remove("auto-waiting");
-    setIconText(name, orderGameIcon(ao.orderId), tr(ao.name));
-    bar.style.width = (ao.progress * 100).toFixed(1) + "%";
-    bar.dataset.key = `${ao.orderId}:${ao.orderIndex}`;
-    setText(status, automationEnabled
-      ? (ao.status === "ready" ? t("order.automationSettling") : ao.remainingLabel)
-      : (ao.status === "ready" ? t("order.ready") : ao.remainingLabel));
-
-    if (!automationEnabled && ao.status === "ready" && !claim) {
-      row.appendChild(btn(t("order.claim"), `claim_order:${ao.orderIndex}`, true));
-    } else if ((automationEnabled || ao.status !== "ready") && claim) {
-      claim.remove();
-    }
-  }
-  function buildActiveRows(vm: ViewModel): void {
-    activeListEl.replaceChildren();
-    const rowCount = vm.automationEnabled ? AUTOMATION_ORDER_CAP : vm.activeOrders.length;
-    for (let index = 0; index < rowCount; index++) {
-      const row = el("div", "active-order");
-      row.dataset.slot = String(index + 1);
-      const barWrap = el("div", "progress-wrap");
-      const bar = el("div", "progress-fill");
-      barWrap.appendChild(bar);
-      row.append(el("div", "ao-name", ""), barWrap, el("div", "ao-status", ""));
-      patchActiveRow(row, vm.activeOrders[index], vm.automationEnabled);
-      activeListEl.appendChild(row);
+  /**
+   * 保留训练预览的版位：能训练时显示真实预览，达到上限时只隐藏内容，
+   * 不收缩卡片高度，避免研发/图鉴状态切换令下方内容跳动。
+   */
+  function patchTrainPreview(vm: ViewModel): void {
+    if (vm.trainPreview) {
+      setText(trainPreviewEl,
+        t("model.trainPreview", { from: vm.trainPreview.computeNow, to: vm.trainPreview.computeAfter, incomeFrom: vm.trainPreview.incomeNow, incomeTo: vm.trainPreview.incomeAfter }));
+      trainPreviewEl.classList.remove("is-empty");
+      trainPreviewEl.setAttribute("aria-hidden", "false");
+    } else {
+      setText(trainPreviewEl, "\u00a0");
+      trainPreviewEl.classList.add("is-empty");
+      trainPreviewEl.setAttribute("aria-hidden", "true");
     }
   }
   function renderOrderSummary(vm: ViewModel): void {
@@ -746,7 +1513,10 @@ function sigForOrders(vm: ViewModel): string {
       orderSummaryEl.style.display = "none";
     } else if (d.mode === "flow") {
       setText(orderSummaryEl,
-        `${t("order.flowSummary", { ops: d.opsPerSec, gross: d.grossPerSec, cost: d.costPerSec, net: d.netPerSec })}`);
+        // The flow copy uses the player-facing `income` placeholder. Keep the
+        // display contract aligned with the ViewModel so no raw `{income}`
+        // token can leak into the order page.
+        `${t("order.flowSummary", { ops: d.opsPerSec, gross: d.grossPerSec, cost: d.costPerSec, income: d.netPerSec })}`);
       orderSummaryEl.style.display = "";
     } else {
       setText(orderSummaryEl,
@@ -754,64 +1524,130 @@ function sigForOrders(vm: ViewModel): string {
       orderSummaryEl.style.display = "";
     }
   }
+  function renderOrderAutomation(vm: ViewModel): void {
+    const mode = vm.automationEnabled ? "running" : vm.automationUnlocked ? "ready" : "locked";
+    if (orderAutomationMode !== mode || orderAutomationStatusEl === null) {
+      orderAutomationMode = mode;
+      orderAutomationEl.replaceChildren();
+      orderAutomationEl.classList.toggle("running", mode === "running");
+      orderAutomationStatusEl = el("div", "order-automation-status");
+      const identity = createGameObjectHeader(
+        "business",
+        mode === "running" ? t("order.automationRunning") : t("order.automationTitle"),
+        { subtitle: "" },
+      );
+      identity.classList.add("order-automation-identity");
+      const copy = identity.querySelector<HTMLElement>(".game-object-copy");
+      copy?.appendChild(orderAutomationStatusEl);
+      orderAutomationEl.append(identity);
+      if (mode === "ready") {
+        orderAutomationEl.appendChild(btn(t("action.enableAutomation"), "enable_automation", true, true));
+      }
+    }
+    if (orderAutomationStatusEl === null) return;
+    if (mode === "running") {
+      const capacity = vm.orders.reduce((total, order) => total + (order.unlocked ? order.queueCapacity : 0), 0);
+      const ready = vm.automationReadyCount > 0
+        ? t("order.readyCount", { count: vm.automationReadyCount })
+        : t("order.automationQueueHint", { count: vm.activeOrders.length, capacity });
+      setText(orderAutomationStatusEl, ready);
+    } else if (mode === "locked") {
+      setText(orderAutomationStatusEl, t("order.automationNeedServer"));
+    } else {
+      setText(orderAutomationStatusEl, t("order.automationReadyHint"));
+    }
+  }
+
+  function patchOrderTaskSlots(
+    refs: OrderRowRefs,
+    item: ViewModel["orders"][number],
+  ): void {
+    setText(refs.queueLabel, item.unlocked
+      ? t("order.queueCount", { count: item.queueCount, capacity: item.queueCapacity })
+      : t("order.slotsIncluded", { count: ORDER_QUEUE_CAP }));
+    refs.slots.forEach(({ slot, fill, label }, index) => {
+      const task = item.unlocked ? item.tasks[index] : undefined;
+      slot.classList.toggle("locked", !item.unlocked);
+      slot.classList.toggle("empty", item.unlocked && !task);
+      slot.classList.toggle("running", !!task && task.progress < 1);
+      fill.style.width = `${task ? (task.progress * 100).toFixed(1) : "0"}%`;
+      setText(label, !item.unlocked ? t("order.slotLocked") : task?.progressLabel ?? t("order.slotEmpty"));
+    });
+    if (item.readyCount > 0) refs.row.dataset.visualMotion = "ready";
+    else if (item.unlocked && item.tasks[0]) refs.row.dataset.visualMotion = "running";
+    else delete refs.row.dataset.visualMotion;
+  }
+
+  function buildOrderTaskSlots(): { element: HTMLElement; slots: OrderRowRefs["slots"] } {
+    const element = el("div", "order-task-list");
+    const slots: OrderRowRefs["slots"] = [];
+    for (let index = 0; index < ORDER_QUEUE_CAP; index += 1) {
+      const slot = el("div", "order-task-item");
+      slot.dataset.slot = String(index + 1);
+      const progress = el("div", "progress-wrap order-task-progress");
+      const fill = el("div", "progress-fill");
+      const label = el("div", "order-task-label");
+      progress.appendChild(fill);
+      slot.append(progress, label);
+      element.appendChild(slot);
+      slots.push({ slot, fill, label });
+    }
+    return { element, slots };
+  }
+
   function rebuildOrderList(vm: ViewModel): void {
     metrics.fullRenderCount += 1;
-    orderSection.classList.toggle("hidden", !vm.canAcceptAnyOrder && vm.activeOrders.length === 0 && !vm.automationUnlocked);
+    orderSection.classList.toggle("hidden", !vm.model.acquired);
     orderListEl.replaceChildren();
+    orderRowRefs.clear();
     for (const row of vm.orders) {
-      const r = el("div", "order-row" + (row.recommended ? " recommended" : ""));
+      const r = el("div", "order-row" + (row.recommended ? " recommended" : "") + (row.unlocked ? "" : " locked"));
+      r.dataset.orderId = row.order.id;
       const info = el("div", "order-info");
       const orderName = el("div", "order-name");
       setIconText(orderName, orderGameIcon(row.order.id), tr(row.order.name));
       info.appendChild(orderName);
       info.appendChild(el("div", "order-meta",
         `${t("order.meta", { sec: row.order.durationSec, gross: row.gross, rental: row.rentalCost, net: row.netIncome })}${row.recommended ? t("order.recommended") : ""}`));
-      r.append(info, btn(t("order.accept"), `accept_order:${row.order.id}`, true, row.canAccept));
+      const queueLabel = el("div", "order-queue-label");
+      info.appendChild(queueLabel);
+      const taskSlots = buildOrderTaskSlots();
+      const actions = el("div", "order-actions");
+      let acceptButton: HTMLButtonElement | null = null;
+      let unlockButton: HTMLButtonElement | null = null;
+      if (!row.unlocked) {
+        unlockButton = btn(t("order.unlock", { cost: row.unlockCost }), `unlock_order:${row.order.id}`, true, row.canUnlock);
+        actions.appendChild(unlockButton);
+      } else if (vm.automationEnabled) {
+        actions.appendChild(el("div", "order-auto-queueing", t("order.autoQueueing")));
+      } else {
+        acceptButton = btn(t("order.accept"), `accept_order:${row.order.id}`, true, row.canAccept);
+        actions.appendChild(acceptButton);
+      }
+      r.append(info, taskSlots.element, actions);
+      const refs = { row: r, queueLabel, slots: taskSlots.slots, acceptButton, unlockButton };
+      orderRowRefs.set(row.order.id, refs);
+      patchOrderTaskSlots(refs, row);
+      r.classList.toggle("has-ready", row.readyCount > 0);
       orderListEl.appendChild(r);
     }
-    // 三档表现：flow/compute 模式折叠单笔列表为只读业务分布摘要
-    if (vm.orderDisplay.mode === "flow" || vm.orderDisplay.mode === "compute") {
-      orderListEl.classList.add("collapsed");
-      activeListEl.classList.add("collapsed");
-    } else {
-      orderListEl.classList.remove("collapsed");
-      activeListEl.classList.remove("collapsed");
-    }
+    orderListEl.classList.remove("collapsed");
     renderOrderSummary(vm);
-    buildActiveRows(vm);
-    sigActive = sigForActive(vm);
-    setText(orderHintEl, vm.automationEnabled
-      ? t("order.automationRunning")
-      : t("order.hintManual", { count: `${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold}` }));
+    renderOrderAutomation(vm);
   }
   function patchOrders(vm: ViewModel): void {
     metrics.partialPatchCount += 1;
-    orderSection.classList.toggle("hidden", !vm.canAcceptAnyOrder && vm.activeOrders.length === 0 && !vm.automationUnlocked);
-    // 折叠态与聚合摘要：流水/算力模式每秒更新一次（不重建任何节点）
-    const collapsed = vm.orderDisplay.mode === "flow" || vm.orderDisplay.mode === "compute";
-    orderListEl.classList.toggle("collapsed", collapsed);
-    activeListEl.classList.toggle("collapsed", collapsed);
+    orderSection.classList.toggle("hidden", !vm.model.acquired);
+    orderListEl.classList.remove("collapsed");
     renderOrderSummary(vm);
-    setText(orderHintEl, vm.automationEnabled
-      ? t("order.automationRunning")
-      : t("order.hintManual", { count: `${Math.min(vm.automationCompletedOrders, vm.automationThreshold)}/${vm.automationThreshold}` }));
-    const orderButtons = orderListEl.querySelectorAll("button[data-action^='accept_order:']");
-    for (let i = 0; i < orderButtons.length; i++) {
-      syncButtonAffordance(orderButtons[i] as HTMLButtonElement, vm.orders[i]?.canAccept ?? false);
-    }
-    // 流水/算力模式：单笔订单区折叠为只读聚合，跳过单笔行重建（避免高频频闪）
-    if (collapsed) return;
-    // 手动模式的接单/领取会改变行结构；自动模式固定四个槽位，签名恒定。
-    const sActive = sigForActive(vm);
-    if (sActive !== sigActive) {
-      sigActive = sActive;
-      buildActiveRows(vm);
-      return;
-    }
-    // 行结构不变：名称、进度和状态都在原节点局部更新。
-    const rows = activeListEl.querySelectorAll(".active-order");
-    for (let i = 0; i < rows.length; i++) {
-      patchActiveRow(rows[i] as HTMLElement, vm.activeOrders[i], vm.automationEnabled);
+    renderOrderAutomation(vm);
+    for (const item of vm.orders) {
+      const refs = orderRowRefs.get(item.order.id);
+      if (!refs) continue;
+      refs.row.classList.toggle("has-ready", item.readyCount > 0);
+      patchOrderTaskSlots(refs, item);
+      if (refs.acceptButton) syncButtonAffordance(refs.acceptButton, item.canAccept);
+      if (refs.unlockButton) syncButtonAffordance(refs.unlockButton, item.canUnlock);
     }
   }
 
@@ -825,7 +1661,9 @@ function sigForOrders(vm: ViewModel): string {
     fleetEl.dataset.phase = vm.server.phase;
     fleetEl.dataset.owned = String(vm.server.ownedCount);
     for (const s of vm.server.servers) {
-      const chip = el("div", "server-chip" + (s.owned ? " owned" : ""), `${tr(s.name)}${s.owned ? " ✓" : ""}(${s.power}×)`);
+      const chip = el("div", "server-chip" + (s.owned ? " owned" : ""));
+      // 列表芯片空间有限，使用旧版简洁服务器线标；详细机柜母版留给下方大卡。
+      setNavigationIconText(chip, serverGameIcon(s.index), `${tr(s.name)}${s.owned ? " ✓" : ""}(${s.power}×)`);
       chip.dataset.serverIndex = String(s.index);
       chip.dataset.owned = s.owned ? "true" : "false";
       fleetEl.appendChild(chip);
@@ -858,7 +1696,12 @@ function sigForOrders(vm: ViewModel): string {
       serverActionsEl.appendChild(btn(label, "buy_server", true, vm.server.canBuy));
     }
     if (vm.server.batchUnlocked && vm.server.ownedCount >= 1 && vm.server.ownedCount < vm.server.maxCount) {
-      serverActionsEl.appendChild(btn(t("server.buyAffordable"), "buy_max_servers", false, vm.server.canBuyMax));
+      serverActionsEl.appendChild(btn(
+        serverBatchLabel(vm),
+        "buy_max_servers",
+        false,
+        vm.server.canBuyMax,
+      ));
     }
   }
   function patchServer(vm: ViewModel): void {
@@ -875,7 +1718,10 @@ function sigForOrders(vm: ViewModel): string {
     const buyBtn = serverActionsEl.querySelector("button[data-action='buy_server']") as HTMLButtonElement | null;
     if (buyBtn) syncButtonAffordance(buyBtn, vm.server.canBuy);
     const buyMaxBtn = serverActionsEl.querySelector("button[data-action='buy_max_servers']") as HTMLButtonElement | null;
-    if (buyMaxBtn) syncButtonAffordance(buyMaxBtn, vm.server.canBuyMax);
+    if (buyMaxBtn) {
+      buyMaxBtn.textContent = serverBatchLabel(vm);
+      syncButtonAffordance(buyMaxBtn, vm.server.canBuyMax);
+    }
   }
 
   function sigForCenter(vm: ViewModel): string {
@@ -905,6 +1751,8 @@ function sigForOrders(vm: ViewModel): string {
       s4.ownedNodeCount,
       s4.batchUnlocked,
       s4.canBuyMaxNodes,
+      s4.batchCount,
+      s4.batchCost,
       s4.nodes.map((n) => `${n.id}:${n.owned}:${n.canBuy}`).join("|"),
       s4.finalProject.active,
       s4.finalProject.canStart,
@@ -929,7 +1777,12 @@ function sigForOrders(vm: ViewModel): string {
     stage4EntryEl.appendChild(el("div", "stage4-cosmic-model", t("stage4.cosmicModel", { name: tr(s4.cosmicModelName ?? "—") })));
     stage4EntryEl.appendChild(el("div", "stage4-income", `${t("stage4.income")} ${s4.incomePerSec} · ${t("stage4.nodeMult")} ${s4.nodeMult}`));
     if (s4.batchUnlocked) {
-      stage4EntryEl.appendChild(btn(t("stage4.batchDeploy"), "buy_node:verified_nodes", false, s4.canBuyMaxNodes));
+      stage4EntryEl.appendChild(btn(
+        growthBatchLabel(t("stage4.batchDeploy"), s4.batchCount, s4.batchCost, "max"),
+        "buy_node:verified_nodes",
+        false,
+        s4.canBuyMaxNodes,
+      ));
     }
 
     // 轨道节点阵列
@@ -937,14 +1790,17 @@ function sigForOrders(vm: ViewModel): string {
     for (const n of s4.nodes) {
       const card = el("div", "stage4-node" + (n.owned ? " owned" : n.canBuy ? " available" : " locked"));
       card.dataset.nodeId = n.id;
-      const nodeName = el("div", "stage4-node-name");
-      setIconText(nodeName, contentGameIcon(n.id, "satellite"), n.name);
-      card.appendChild(nodeName);
-      card.appendChild(el("div", "stage4-node-cost", n.owned ? t("stage4.deployed") : n.cost));
+      if (n.canBuy) card.dataset.visualMotion = "ready";
+      const lockedHint = n.id === "moon_base" ? t("stage4.firstPaidNode") : t("stage4.needPreviousNode");
+      card.appendChild(createGameObjectHeader(contentGameIcon(n.id, "satellite"), tr(n.name), {
+        subtitle: n.owned ? t("stage4.deployed") : n.canBuy ? t("stage4.deployNode") : lockedHint,
+        value: n.owned ? undefined : n.cost,
+        badge: n.owned ? t("common.done") : n.canBuy ? t("stage4.deployNode") : t("growth.locked"),
+      }));
       if (n.canBuy) {
-        card.appendChild(btn(t("stage4.deployNode"), `buy_node:${n.id}`, true));
+        card.appendChild(btn(`${t("stage4.deployNode")} · ${n.cost}`, `buy_node:${n.id}`, true));
       } else if (!n.owned) {
-        card.appendChild(el("div", "stage4-node-locked", n.id === "moon_base" ? t("stage4.firstPaidNode") : t("stage4.needPreviousNode")));
+        card.appendChild(el("div", "stage4-node-locked", lockedHint));
       }
       stage4NodesEl.appendChild(card);
     }
@@ -952,9 +1808,22 @@ function sigForOrders(vm: ViewModel): string {
     // 地月一体化算力网
     stage4ProjectEl.replaceChildren();
     const fp = s4.finalProject;
-    const projectTitle = el("div", "stage4-project-title");
-    setIconText(projectTitle, "orbit", fp.name);
-    stage4ProjectEl.appendChild(projectTitle);
+    if (fp.active) stage4ProjectEl.dataset.visualMotion = "running";
+    else if (fp.pendingReward) stage4ProjectEl.dataset.visualMotion = "claim";
+    else if (fp.canStart) stage4ProjectEl.dataset.visualMotion = "ready";
+    else delete stage4ProjectEl.dataset.visualMotion;
+    stage4ProjectEl.appendChild(createGameObjectHeader(contentGameIcon("moon_network", "orbit"), tr(fp.name), {
+      subtitle: `${tr(fp.rewardText)} · ${t("stage3.constructionCost")} ${fp.constructionCost}`,
+      badge: fp.active
+        ? fp.progressLabel
+        : fp.pendingReward
+          ? t("common.pendingClaim")
+          : fp.completed
+            ? t("common.done")
+            : fp.canStart
+              ? t("stage4.startMoonNetwork")
+              : t("growth.locked"),
+    }));
     if (fp.active) {
       const progress = el("div", "stage4-project-progress", `${t("stage4.projectProgress")}${t("common.colon")}${fp.progressLabel}`);
       syncProgress(progress, Number.parseFloat(fp.progressLabel));
@@ -972,11 +1841,10 @@ function sigForOrders(vm: ViewModel): string {
         stage4ProjectEl.appendChild(btn(t("stage4.enterDyson"), "start_stage5", true));
       }
     } else {
-      stage4ProjectEl.appendChild(el("div", "stage4-project-desc", tr(fp.rewardText)));
       if (fp.canStart) {
-        stage4ProjectEl.appendChild(btn(t("stage4.startMoonNetwork"), "start_stage4_project", true));
+        stage4ProjectEl.appendChild(btn(`${t("stage4.startMoonNetwork")} · ${fp.constructionCost}`, "start_stage4_project", true));
       } else {
-        stage4ProjectEl.appendChild(el("div", "stage4-project-locked", `${t("stage4.nodesLabel")} ${s4.ownedNodeCount}/${s4.nodes.length} · ${t("stage4.allNodesToStart")}`));
+        stage4ProjectEl.appendChild(el("div", "stage4-project-locked", `${t("stage4.nodesLabel")} ${s4.ownedNodeCount}/${s4.nodes.length} · ${t("stage4.allNodesToStart")} · ${t("stage3.constructionCost")} ${fp.constructionCost}`));
       }
     }
   }
@@ -996,11 +1864,24 @@ function sigForOrders(vm: ViewModel): string {
     for (const n of s4.nodes) {
       const btns = stage4Section.querySelectorAll(`button[data-action='buy_node:${n.id}']`);
       for (const b of btns) syncButtonAffordance(b as HTMLButtonElement, n.canBuy);
+      const card = stage4Section.querySelector<HTMLElement>(`[data-node-id="${n.id}"]`);
+      if (card) {
+        card.classList.toggle("available", n.canBuy);
+        if (n.canBuy) card.dataset.visualMotion = "ready";
+        else delete card.dataset.visualMotion;
+      }
     }
     const batch = stage4Section.querySelector("button[data-action='buy_node:verified_nodes']") as HTMLButtonElement | null;
-    if (batch) syncButtonAffordance(batch, s4.canBuyMaxNodes);
+    if (batch) {
+      batch.textContent = growthBatchLabel(t("stage4.batchDeploy"), s4.batchCount, s4.batchCost, "max");
+      syncButtonAffordance(batch, s4.canBuyMaxNodes);
+    }
     const start = stage4Section.querySelector("button[data-action='start_stage4_project']") as HTMLButtonElement | null;
     if (start) syncButtonAffordance(start, s4.finalProject.canStart);
+    if (s4.finalProject.active) stage4ProjectEl.dataset.visualMotion = "running";
+    else if (s4.finalProject.pendingReward) stage4ProjectEl.dataset.visualMotion = "claim";
+    else if (s4.finalProject.canStart) stage4ProjectEl.dataset.visualMotion = "ready";
+    else delete stage4ProjectEl.dataset.visualMotion;
   }
 
   function sigForStage5(vm: ViewModel): string {
@@ -1034,12 +1915,14 @@ function sigForOrders(vm: ViewModel): string {
     for (const n of s5.nodes) {
       const card = el("div", "stage5-node" + (n.owned ? " owned" : n.canBuy ? " available" : " locked"));
       card.dataset.nodeId = n.id;
-      const nodeName = el("div", "stage5-node-name");
-      setIconText(nodeName, contentGameIcon(n.id, "sparkles"), n.name);
-      card.appendChild(nodeName);
-      card.appendChild(el("div", "stage5-node-cost", n.owned ? t("stage4.deployed") : n.cost));
+      if (n.canBuy) card.dataset.visualMotion = "ready";
+      card.appendChild(createGameObjectHeader(contentGameIcon(n.id, "sparkles"), tr(n.name), {
+        subtitle: n.owned ? t("stage4.deployed") : n.canBuy ? t("stage4.deployNode") : t("stage4.needPreviousNode"),
+        value: n.owned ? undefined : n.cost,
+        badge: n.owned ? t("common.done") : n.canBuy ? t("stage4.deployNode") : t("growth.locked"),
+      }));
       if (n.canBuy) {
-        card.appendChild(btn(t("stage4.deployNode"), `buy_stage5_node:${n.id}`, true));
+        card.appendChild(btn(`${t("stage4.deployNode")} · ${n.cost}`, `buy_stage5_node:${n.id}`, true));
       } else if (!n.owned) {
         card.appendChild(el("div", "stage5-node-locked", t("stage4.needPreviousNode")));
       }
@@ -1048,9 +1931,22 @@ function sigForOrders(vm: ViewModel): string {
 
     stage5ProjectEl.replaceChildren();
     const fp = s5.finalProject;
-    const projectTitle = el("div", "stage5-project-title");
-    setIconText(projectTitle, "dyson_sphere", fp.name);
-    stage5ProjectEl.appendChild(projectTitle);
+    if (fp.active) stage5ProjectEl.dataset.visualMotion = "running";
+    else if (fp.pendingReward) stage5ProjectEl.dataset.visualMotion = "claim";
+    else if (fp.canStart) stage5ProjectEl.dataset.visualMotion = "ready";
+    else delete stage5ProjectEl.dataset.visualMotion;
+    stage5ProjectEl.appendChild(createGameObjectHeader("dyson_sphere", tr(fp.name), {
+      subtitle: `${tr(fp.rewardText)} · ${t("stage3.constructionCost")} ${fp.constructionCost}`,
+      badge: fp.active
+        ? fp.progressLabel
+        : fp.pendingReward
+          ? t("common.pendingClaim")
+          : fp.completed
+            ? t("common.done")
+            : fp.canStart
+              ? t("stage5.startDyson")
+              : t("growth.locked"),
+    }));
     if (fp.active) {
       const progress = el("div", "stage5-project-progress", `${t("stage4.projectProgress")}${t("common.colon")}${fp.progressLabel}`);
       syncProgress(progress, Number.parseFloat(fp.progressLabel));
@@ -1065,11 +1961,10 @@ function sigForOrders(vm: ViewModel): string {
       setIconText(done, "complete", t("stage5.storyDonePerpetual"));
       stage5ProjectEl.appendChild(done);
     } else {
-      stage5ProjectEl.appendChild(el("div", "stage5-project-desc", tr(fp.rewardText)));
       if (fp.canStart) {
-        stage5ProjectEl.appendChild(btn(t("stage5.startDyson"), "start_stage5_project", true));
+        stage5ProjectEl.appendChild(btn(`${t("stage5.startDyson")} · ${fp.constructionCost}`, "start_stage5_project", true));
       } else {
-        stage5ProjectEl.appendChild(el("div", "stage5-project-locked", t("stage5.lockedHint")));
+        stage5ProjectEl.appendChild(el("div", "stage5-project-locked", `${t("stage5.lockedHint")} · ${t("stage3.constructionCost")} ${fp.constructionCost}`));
       }
     }
 
@@ -1119,9 +2014,19 @@ function sigForOrders(vm: ViewModel): string {
     for (const n of s5.nodes) {
       const btns = stage5Section.querySelectorAll(`button[data-action='buy_stage5_node:${n.id}']`);
       for (const b of btns) syncButtonAffordance(b as HTMLButtonElement, n.canBuy);
+      const card = stage5Section.querySelector<HTMLElement>(`[data-node-id="${n.id}"]`);
+      if (card) {
+        card.classList.toggle("available", n.canBuy);
+        if (n.canBuy) card.dataset.visualMotion = "ready";
+        else delete card.dataset.visualMotion;
+      }
     }
     const start = stage5Section.querySelector("button[data-action='start_stage5_project']") as HTMLButtonElement | null;
     if (start) syncButtonAffordance(start, s5.finalProject.canStart);
+    if (s5.finalProject.active) stage5ProjectEl.dataset.visualMotion = "running";
+    else if (s5.finalProject.pendingReward) stage5ProjectEl.dataset.visualMotion = "claim";
+    else if (s5.finalProject.canStart) stage5ProjectEl.dataset.visualMotion = "ready";
+    else delete stage5ProjectEl.dataset.visualMotion;
   }
   function rebuildPrestige(vm: ViewModel): void {
     metrics.fullRenderCount += 1;
@@ -1130,6 +2035,12 @@ function sigForOrders(vm: ViewModel): string {
       ? vm.singularity.coreClaimable || vm.singularity.iterationReady || vm.singularity.spacePlanRevealed
       : vm.prestige.canPrestige || vm.prestige.count > 0;
     prestigeSection.classList.toggle("hidden", !showPrestige);
+    if (vm.singularity.coreClaimable) prestigeSection.dataset.visualMotion = "claim";
+    else if (vm.singularity.iterationReady || vm.singularity.spacePlanRevealed || vm.prestige.canPrestige) {
+      prestigeSection.dataset.visualMotion = "ready";
+    } else {
+      delete prestigeSection.dataset.visualMotion;
+    }
     prestigeInfoEl.replaceChildren();
     prestigeListEl.replaceChildren();
     prestigeActionsEl.replaceChildren();
@@ -1143,10 +2054,12 @@ function sigForOrders(vm: ViewModel): string {
             : "round-active";
       const round = vm.singularity.round ?? 1;
       const nextMult = round === 1 ? 1.5 : 2.0;
-      prestigeInfoEl.appendChild(el("div", "prestige-kicker",
+      const coreKicker = el("div", "prestige-kicker");
+      setIconText(coreKicker, "singularity",
         vm.singularity.spacePlanRevealed
           ? t("prestige.earthComplete")
-          : t("prestige.singularityCore", { round })));
+          : t("prestige.singularityCore", { round }));
+      prestigeInfoEl.appendChild(coreKicker);
       if (vm.singularity.spacePlanRevealed) {
         prestigeInfoEl.appendChild(el("div", "prestige-multiplier", t("prestige.spacePlanRevealed")));
         prestigeInfoEl.appendChild(el("div", "prestige-info-text",
@@ -1199,22 +2112,63 @@ function sigForOrders(vm: ViewModel): string {
 
   function patchOffline(vm: ViewModel): void {
     metrics.partialPatchCount += 1;
+    // 面板常驻：只随离线报价内容变化重建（领取/扩容/替换/折叠），普通帧不重建。
+    const nextSig = JSON.stringify([
+      vm.offline.hasPending,
+      vm.offline.paidLabel,
+      vm.offline.remainingLabel,
+      vm.offline.allSettled,
+      vm.offline.canWatchOfflineAd,
+      vm.offline.canClaim,
+      vm.offline.money,
+      vm.offline.rawElapsedLabel,
+      vm.offline.eligibleLabel,
+      vm.offline.adUnlocksUsed,
+      vm.offline.adUnlocksMax,
+      vm.offline.excessLabel,
+      vm.offline.projectProgressDelta,
+      vm.offline.projectName,
+      offlinePanelCollapsed,
+    ]);
     const existing = main.querySelector(".offline-card");
-    if (vm.offline.hasPending && !existing) {
-      const oc = el("div", "offline-card");
-      // CARD-04 回归回执：展示 本次离线/有效结算/上限/超出未计入/资金/研发/工程
+    if (!vm.offline.hasPending) {
+      sigOffline = nextSig;
+      existing?.remove();
+      return;
+    }
+    if (nextSig === sigOffline) return;
+    sigOffline = nextSig;
+    existing?.remove();
+    const oc = el("div", "offline-card" + (offlinePanelCollapsed ? " collapsed" : ""));
+    if (vm.offline.canClaim) oc.dataset.visualMotion = "claim";
+    const header = el("div", "offline-card-header");
+    const headerTitle = el("div", "offline-receipt-title", t("offline.title"));
+    headerTitle.classList.add("offline-card-header-title");
+    header.appendChild(headerTitle);
+    const foldBtn = btn(offlinePanelCollapsed ? t("offline.expand") : t("offline.fold"), "offline_panel:toggle");
+    foldBtn.classList.add("offline-fold-btn");
+    header.appendChild(foldBtn);
+    oc.appendChild(header);
+    if (!offlinePanelCollapsed) {
+      const body = el("div", "offline-card-body");
+      // 新账单只有原免费额度，历史已解锁收益仍按存档回执展示。
       const lines: string[] = [t("offline.rawElapsed", { value: vm.offline.rawElapsedLabel })];
+      lines.push(t("standalone.offlineHint"));
       lines.push(t("offline.elapsed", { value: vm.offline.elapsedLabel }));
+      lines.push(t("offline.claimed", { paid: vm.offline.paidLabel, remaining: vm.offline.remainingLabel }));
       lines.push(t("offline.cap", { value: vm.offline.capLabel }));
       if (vm.offline.excessLabel) lines.push(t("offline.excess", { value: vm.offline.excessLabel }));
-      lines.push(t("offline.money", { value: vm.offline.money }));
+      if (vm.offline.allSettled) {
+        lines.push(t("offline.allClaimed"));
+      } else {
+        lines.push(t("offline.money", { value: vm.offline.money }));
+      }
       const feelPreview = vm.feel.offlinePreview;
       if (feelPreview) {
         lines.push(t("offline.moneyBefore", { value: feelPreview.moneyBefore }));
         lines.push(t("offline.moneyAfter", { value: feelPreview.moneyAfter }));
         lines.push(t("offline.compute", { value: feelPreview.computeLabel }));
       }
-      lines.push(t("offline.researchProgress", { value: vm.offline.researchProgress.toFixed(1) }));
       lines.push(
         vm.offline.projectName && vm.offline.projectProgressDelta > 0
           ? t("offline.projectProgress", { name: tr(vm.offline.projectName), delta: vm.offline.projectProgressDelta.toFixed(0) })
@@ -1227,75 +2181,52 @@ function sigForOrders(vm: ViewModel): string {
             : t("offline.noneAffordable"),
         );
       }
-      oc.appendChild(el("div", "offline-receipt-title", t("offline.receiptTitle")));
-      lines.forEach((line) => oc.appendChild(el("div", "offline-receipt-line", line)));
-      oc.appendChild(btn(t("action.claimOffline"), "claim_offline", true));
-      businessPage.insertBefore(oc, businessPage.firstChild);
-    } else if (!vm.offline.hasPending && existing) {
-      existing.remove();
+      lines.forEach((line) => body.appendChild(el("div", "offline-receipt-line", line)));
+      if (!vm.offline.allSettled) {
+        const actions = el("div", "offline-actions");
+        actions.appendChild(btn(
+          t("offline.claimAvailable", { value: vm.offline.money }),
+          "claim_offline",
+          true,
+          vm.offline.canClaim,
+        ));
+        actions.appendChild(btn(
+          t("standalone.adsButton"),
+          "prepare_sponsor_ad:offline_capacity",
+          false,
+          false,
+        ));
+        body.appendChild(actions);
+      }
+      oc.appendChild(body);
     }
+    businessPage.insertBefore(oc, businessPage.firstChild);
   }
 
   function renderSponsor(vm: ViewModel): void {
     const nextSignature = JSON.stringify(vm.sponsor);
     if (nextSignature === sigSponsor) return;
     sigSponsor = nextSignature;
-    const sponsor = vm.sponsor;
-
     offlineSponsorCardEl.replaceChildren();
-    if (sponsor.pendingAdKind) {
-      const pending = el("div", "sponsor-pending");
-      pending.appendChild(el("div", "sponsor-pending-title", t("sponsor.pendingTitle")));
-      pending.appendChild(el("div", "sponsor-card-copy",
-        sponsor.pendingAdKind === "offline_capacity"
-          ? t("sponsor.offlinePending")
-          : t("sponsor.incomePending")));
-      const pendingActions = el("div", "sponsor-actions");
-      pendingActions.appendChild(btn(t("sponsor.resume"), "resume_sponsor_ad", true));
-      pendingActions.appendChild(btn(t("common.cancel"), "cancel_pending_sponsor_ad"));
-      pending.appendChild(pendingActions);
-      offlineSponsorCardEl.appendChild(pending);
-    }
     const offlineTitle = el("div", "sponsor-card-title");
     setIconText(offlineTitle, "moon", t("sponsor.offlineCardTitle"));
-    offlineSponsorCardEl.appendChild(offlineTitle);
-    offlineSponsorCardEl.appendChild(el("div", "sponsor-card-copy",
-      t("sponsor.offlineHint")));
-    const offlineProgress = el("div", "sponsor-progress",
-      `${t("sponsor.offlineCap")} ${sponsor.offlineCapacityLabel} · ${t("sponsor.todayAds")} ${sponsor.offlineAdsUsed}/${sponsor.offlineAdsMax}`);
-    syncProgress(offlineProgress, sponsor.offlineCapacityProgress * 100);
-    offlineSponsorCardEl.appendChild(offlineProgress);
-    offlineSponsorCardEl.appendChild(btn(
-      sponsor.canWatchOfflineAd ? t("sponsor.watchOffline") : t("sponsor.offlineFull"),
-      "prepare_sponsor_ad:offline_capacity",
-      true,
-      sponsor.canWatchOfflineAd,
-    ));
-
+    offlineSponsorCardEl.append(
+      offlineTitle,
+      el("div", "sponsor-card-copy", t("standalone.offlineHint")),
+      btn(t("standalone.adsButton"), "prepare_sponsor_ad:offline_capacity", true, false),
+    );
     incomeSponsorCardEl.replaceChildren();
     const incomeTitle = el("div", "sponsor-card-title");
     setIconText(incomeTitle, "sponsor", t("sponsor.incomeCardTitle"));
-    incomeSponsorCardEl.appendChild(incomeTitle);
-    incomeSponsorCardEl.appendChild(el("div", "sponsor-card-copy",
-      t("sponsor.incomeHint")));
-    const incomeProgress = el("div", "sponsor-progress",
-      `${t("sponsor.remaining")} ${sponsor.incomeBoostRemainingLabel} · ${t("sponsor.free")} ${sponsor.incomeFreeUsed}/${sponsor.incomeFreeMax} · ${t("sponsor.ads")} ${sponsor.incomeAdsUsed}/${sponsor.incomeAdsMax}`);
-    syncProgress(incomeProgress, sponsor.incomeBoostProgress * 100);
-    incomeSponsorCardEl.appendChild(incomeProgress);
-    const actions = el("div", "sponsor-actions");
-    actions.appendChild(btn(
-      sponsor.canClaimFreeIncome ? t("sponsor.claimFree") : t("sponsor.freeClaimed"),
-      "claim_free_income_sponsor",
-      false,
-      sponsor.canClaimFreeIncome,
-    ));
-    actions.appendChild(btn(
-      sponsor.canWatchIncomeAd ? t("sponsor.watchIncome") : t("sponsor.incomeFull"),
-      "prepare_sponsor_ad:income_boost",
-      true,
-      sponsor.canWatchIncomeAd,
-    ));
-    incomeSponsorCardEl.appendChild(actions);
+    incomeSponsorCardEl.append(
+      incomeTitle,
+      el("div", "sponsor-card-copy", t("standalone.incomeHint")),
+      btn(t("standalone.adsButton"), "prepare_sponsor_ad:income_boost", true, false),
+    );
+    if (vm.sponsor.incomeBoostActive) {
+      incomeSponsorCardEl.appendChild(el("div", "sponsor-progress",
+        t("standalone.legacyBoost", { remaining: vm.sponsor.incomeBoostRemainingLabel })));
+    }
   }
 
   function render(vm: ViewModel): void {
@@ -1311,6 +2242,14 @@ function sigForOrders(vm: ViewModel): string {
       rebuildModel(vm);
     } else {
       patchModel(vm);
+    }
+
+    const sGrowth = sigForGrowth(vm);
+    if (sGrowth !== sigGrowth) {
+      sigGrowth = sGrowth;
+      renderGrowth(vm);
+    } else {
+      patchGrowth(vm);
     }
 
     // 订单区：静态签名变化（可接单/自动化）→ 重建整区；否则局部 patch。
@@ -1368,9 +2307,13 @@ function sigForOrders(vm: ViewModel): string {
       patchStage5(vm);
     }
 
-    // 主线结局：戴森算力球完成后全屏反馈（只触发一次；可关闭）
-    if (vm.stage5.storyCompleted && vm.stage5.perpetualActive && !storyCompleteOverlay.dataset.shown) {
-      storyCompleteOverlay.dataset.shown = "1";
+    // 主线结局：按“存档 + 完成时刻”只展示一次。Shell 会跨完整重置/导入复用，
+    // 不能用 DOM 生命周期的布尔值拦截另一份存档的新庆典。
+    const storyMilestoneKey = `${vm.saveId}:${vm.legendaryArchive?.completedAtMs ?? 0}`;
+    const storyPending = vm.stage5.storyCompleted && vm.stage5.perpetualActive;
+    if (!storyPending) storyCompleteOverlay.hidden = true;
+    if (storyPending && storyCompleteOverlay.dataset.shown !== storyMilestoneKey) {
+      storyCompleteOverlay.dataset.shown = storyMilestoneKey;
       if (!storyCompleteVisualEl.src) storyCompleteVisualEl.src = storyCompleteVisualEl.dataset.src ?? "";
       storyCompleteCard.classList.add("dyson-celebration");
       setText(storyCompleteTitleEl, t("story.celebrationTitle"));
@@ -1381,7 +2324,7 @@ function sigForOrders(vm: ViewModel): string {
           "",
           t("story.journey"),
           "",
-          `${t("story.coresAndStudio", { level: vm.workshop.level })}`,
+          `${t("story.coresAndCompany", { cores: vm.singularity.coreCount, level: vm.company.level })}`,
           `${t("story.maxCompute")}${t("common.colon")}${legendary?.maxCompute ?? vm.compute}`,
           `${t("story.maxIncome")}${t("common.colon")}${legendary?.maxIncome ?? vm.incomePerSec}`,
           legendary?.completedAtMs ? `${t("story.completedAt")}${t("common.colon")}${new Date(legendary.completedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}` : "",
@@ -1393,8 +2336,12 @@ function sigForOrders(vm: ViewModel): string {
       storyCompleteOverlay.hidden = false;
     }
 
-    // 惊喜事件：地外算力计划揭示后自动弹出一次（只触发一次；可关闭后从档案馆重开）
-    if (vm.singularity.spacePlanRevealed && !vm.singularity.spacePlanStarted) {
+    // 惊喜事件：按“存档 + 揭示时刻”自动弹出一次。关闭后可从档案馆重开；
+    // 换档/完整重置后，相同里程碑不会被上一份存档的 DOM 标记吞掉。
+    const spaceRevealMilestoneKey = `${vm.saveId}:${vm.singularity.spacePlanRevealedAtMs}`;
+    const spaceRevealPending = vm.singularity.spacePlanRevealed && !vm.singularity.spacePlanStarted;
+    if (!spaceRevealPending) spaceRevealOverlay.hidden = true;
+    if (spaceRevealPending) {
       if (!spaceRevealOverlay.hidden) {
         // 已在展示中：保持内容同步
         setText(spaceRevealTitleEl, t("spaceReveal.title"));
@@ -1402,8 +2349,8 @@ function sigForOrders(vm: ViewModel): string {
           t("spaceReveal.body"));
         spaceRevealActionsEl.replaceChildren();
         spaceRevealActionsEl.appendChild(btn(t("spaceReveal.start"), "start_space_plan", true));
-      } else if (!spaceRevealOverlay.dataset.shown) {
-        spaceRevealOverlay.dataset.shown = "1";
+      } else if (spaceRevealOverlay.dataset.shown !== spaceRevealMilestoneKey) {
+        spaceRevealOverlay.dataset.shown = spaceRevealMilestoneKey;
         setText(spaceRevealTitleEl, t("spaceReveal.title"));
         setText(spaceRevealBodyEl,
           t("spaceReveal.body"));
@@ -1453,13 +2400,9 @@ function sigForOrders(vm: ViewModel): string {
       modelSection.querySelector(".section-title")!.textContent = t("section.model");
     }
 
-    // 自动经营解锁后，把服务器增长放到聚合订单之前；只在顺序真正变化时移动既有节点。
+    // CARD-06：经营页按子 Tab 分组（经营/蓝图/机房/天赋/时代），
+    // 组内顺序由创建顺序固定，不再做跨组的 DOM 移动。
     const stage2Automated = vm.stage === 2 && vm.automationEnabled;
-    if (stage2Automated && serverSection.nextElementSibling !== orderSection) {
-      businessPage.insertBefore(serverSection, orderSection);
-    } else if (!stage2Automated && orderSection.nextElementSibling !== serverSection) {
-      businessPage.insertBefore(orderSection, serverSection);
-    }
     if (stage2Automated) {
       modelSection.querySelector(".section-title")!.textContent = t("section.stage3Model");
       serverSection.querySelector(".section-title")!.textContent = t("section.serverAutomated");
@@ -1493,11 +2436,113 @@ function sigForOrders(vm: ViewModel): string {
     patchOffline(vm);
 
     // Stage 2 结算：8 台后首次 render 触发（引擎 exactly-once）
+    syncBusinessTabs(vm);
+    refreshVisualMotionBudget();
     lastVm = vm;
     maybeShowStage2Settlement(vm);
   }
 
   let lastVm: ViewModel | null = null;
+
+  // CARD-06：子 Tab 可见性 + 气泡计数。每帧执行（只做 class/text 局部更新）。
+  function syncBusinessTabs(vm: ViewModel): void {
+    // 荣誉馆底部气泡：可领取成就数（红点计数）。
+    const claimableAchievements = vm.achievements.filter((item) => item.claimable).length;
+    if (honorTabBubbleEl) {
+      honorTabBubbleEl.hidden = claimableAchievements <= 0;
+      setText(honorTabBubbleEl, claimableAchievements > 0 ? String(claimableAchievements) : "");
+    }
+    // 赞助页红点显示当前仍可观看的广告次数（两类权益合计）。
+    if (sponsorTabBubbleEl) {
+      const sponsorCount = vm.sponsor.availableAdCount;
+      sponsorTabBubbleEl.hidden = sponsorCount <= 0;
+      setText(sponsorTabBubbleEl, sponsorCount > 99 ? "99+" : sponsorCount > 0 ? String(sponsorCount) : "");
+    }
+    const sectionGroups: Record<string, HTMLElement[]> = {
+      operations: [orderSection],
+      models: [modelSection],
+      blueprints: [blueprintGrowthSection],
+      facility: [serverSection, scaleGrowthSection],
+      talents: [talentSection],
+      era: [centerSection, stage3Section, stage4Section, stage5Section, prestigeSection],
+    };
+    // 组内 section 全部隐藏（阶段/所有权规则）时，该 Tab 视为空组。
+    const emptyGroups: Record<string, boolean> = {};
+    for (const tab of BUSINESS_TAB_DEFS) {
+      const sections = sectionGroups[tab.id] ?? [];
+      emptyGroups[tab.id] = sections.length > 0 && sections.every((candidate) => candidate.classList.contains("hidden"));
+    }
+    const eraEntryReady = !vm.stage3.entered && vm.stage3.entryMet;
+    if (eraEntryReady) emptyGroups.operations = true;
+    const visibleCount = BUSINESS_TAB_DEFS.filter((tab) => !emptyGroups[tab.id]).length;
+    businessTabsEl.dataset.visibleCount = String(visibleCount);
+    businessTabsEl.dataset.overflow = String(visibleCount > 5);
+    const nextEraEntryRevealKey = eraEntryReady ? `${vm.saveId}:stage3-entry` : "";
+    if (nextEraEntryRevealKey && nextEraEntryRevealKey !== eraEntryRevealKey) {
+      eraEntryRevealKey = nextEraEntryRevealKey;
+      businessTab = "era";
+      buildBusinessTabs();
+    } else if (!nextEraEntryRevealKey) {
+      eraEntryRevealKey = "";
+    }
+    if (emptyGroups[businessTab]) {
+      businessTab = eraEntryReady && !emptyGroups.era
+        ? "era"
+        : BUSINESS_TAB_DEFS.find((tab) => !emptyGroups[tab.id])?.id ?? "operations";
+      buildBusinessTabs();
+    }
+    for (const tab of BUSINESS_TAB_DEFS) {
+      const panel = businessPanels[tab.id];
+      if (panel) panel.classList.toggle("hidden", tab.id !== businessTab);
+      const button = businessTabButtons[tab.id];
+      if (button) {
+        const selected = tab.id === businessTab;
+        button.classList.toggle("active", selected);
+        button.classList.toggle("hidden", emptyGroups[tab.id] && !selected);
+        button.setAttribute("aria-pressed", String(selected));
+        if (selected) button.setAttribute("aria-current", "page");
+        else button.removeAttribute("aria-current");
+      }
+    }
+    const stage3ImmediateAction = vm.center.canUpgrade
+      || vm.stage3.infrastructure.some((item) => item.canUpgrade)
+      || vm.stage3.machineRooms.some((item) => item.canCommission)
+      || vm.stage3.flagship.some((item) => item.canStart || item.pendingRewardId != null);
+    const bubbleCounts: Record<string, number> = {
+      // 订单页红点代表所有订单队列的空余槽位；尚未获得模型时不提示不可用操作。
+      // Before automation, an empty slot is a useful next action. Once
+      // automation owns the FIFO lanes, accepting the next task is automatic;
+      // suppress the order-tab bubble to avoid a persistent flashing “1”.
+      operations: vm.model.acquired && !vm.automationEnabled && vm.orderEmptySlotCount > 0 ? 1 : 0,
+      models: vm.model.canTrain ? 1 : 0,
+      // 每页只有一个“最佳下一步”提示；其余可买项目不能把红点膨胀成噪声。
+      blueprints: vm.growth.recommendedBlueprintId
+        && vm.growth.blueprints.some((item) => item.id === vm.growth.recommendedBlueprintId && item.canBuy)
+        ? 1
+        : 0,
+      // 首服、后续服务器代际与规模扩容都属于机房页的下一步。
+      facility: (vm.server.canBuy || vm.growth.serverLines.some((item) => item.canBuy)) ? 1 : 0,
+      talents: vm.growth.talent.available,
+      // 红点只表示可以立即执行的推进动作；已进入的阶段和永续终局不能留下常亮提示。
+      era: vm.stage5.perpetualActive
+        ? 0
+        : (vm.prestige.canPrestige ? 1 : 0)
+          + (!vm.stage3.entered && vm.stage3.entryMet ? 1 : 0)
+          + (vm.stage3.entered && stage3ImmediateAction ? 1 : 0)
+          + (vm.stage4.active && !vm.stage5.entered && (vm.stage4.nodes.some((item) => item.canBuy)
+            || vm.stage4.finalProject.canStart || vm.stage4.finalProject.pendingReward) ? 1 : 0)
+          + (vm.stage5.active && !vm.stage5.perpetualActive && (vm.stage5.nodes.some((item) => item.canBuy)
+            || vm.stage5.finalProject.canStart || vm.stage5.finalProject.pendingReward) ? 1 : 0),
+    };
+    for (const tab of BUSINESS_TAB_DEFS) {
+      const bubble = businessTabBubbles[tab.id];
+      if (!bubble) continue;
+      const count = bubbleCounts[tab.id] ?? 0;
+      bubble.hidden = count <= 0;
+      setText(bubble, count > 99 ? "99+" : count > 0 ? String(count) : "");
+    }
+    ensureBusinessTabVisible(eraEntryReady ? "era" : businessTab);
+  }
 
   function btn(label: string, action: string, primary = false, enabled = true): HTMLButtonElement {
     const b = document.createElement("button");
@@ -1563,25 +2608,56 @@ function sigForOrders(vm: ViewModel): string {
     toastTimer = window.setTimeout(() => toastEl?.classList.remove("show"), 2000);
   }
 
-  function showResearchReceipt(receipt: ResearchReceipt): void {
-    researchReceiptEl.textContent = [
-      t("receipt.researchResult", { name: tr(receipt.resultModelName) }),
-      t("receipt.blueprint", { name: tr(receipt.resultModelName), before: receipt.archiveLevelBefore, after: receipt.archiveLevelAfter, delta: receipt.archiveLevelDelta }),
-      t("receipt.compute", { before: receipt.computeBefore, after: receipt.computeAfter, delta: receipt.computeDelta }),
-      t("receipt.income", { before: receipt.incomeBefore, after: receipt.incomeAfter, delta: receipt.incomeDelta }),
-      receipt.switched
-        ? t("receipt.switched", { oldName: tr(receipt.oldModelName), newName: tr(receipt.resultModelName) })
-        : t("receipt.kept", { name: tr(receipt.oldModelName) }),
-      t("receipt.reason", { reason: tr(receipt.switchReason) }),
-    ].join("\n");
-    researchReceiptEl.hidden = false;
-  }
-
   function showArchitectureReceipt(receipt: ArchitectureReceipt): void {
     showToast(
       t("receipt.architecture", { before: receipt.beforeCount, after: receipt.afterCount }) + " · " +
       t("receipt.architectureMult", { before: receipt.beforeMultiplier, after: receipt.afterMultiplier }),
     );
+  }
+
+  function commitPrestige(): void {
+    const result = handler("prestige");
+    handleCommandResult("prestige", result);
+    if (result.ok) scheduleVisualBurst("prestige");
+  }
+
+  /**
+   * 技术迭代只有这一层确认。确认前不调用状态机，取消时资金、阶段与主题均保持原样。
+   * 刚领取核心时复用同一个庆典弹窗；直接从“执行迭代”入口进入时仍走相同门禁。
+   */
+  function showPrestigeConfirmation(coreJustClaimed: boolean): void {
+    const vm = lastVm;
+    const endgame = vm?.singularity.active === true;
+    const round = vm?.singularity.round ?? 1;
+    const isFinalEarthRound = endgame && round === 3;
+    const nextMult = round === 1 ? "×1.5" : "×2.0";
+    const title = coreJustClaimed
+      ? t("core.claimTitle", { round })
+      : isFinalEarthRound
+        ? t("core.confirmReveal")
+        : endgame
+          ? t("core.confirmRound", { round: Math.min(3, round + 1) })
+          : t("prestige.confirmTitle");
+    const body = isFinalEarthRound
+      ? t("core.claimBodyFinal", { mult: nextMult })
+      : coreJustClaimed
+        ? t("core.claimBody", { mult: nextMult })
+        : endgame
+          ? t("core.resetBody")
+          : t("prestige.readyBody");
+    const confirmText = isFinalEarthRound
+      ? t("core.revealPlan")
+      : endgame
+        ? t("core.confirmReset")
+        : t("action.prestige");
+
+    confirmDialog({
+      title,
+      body,
+      confirmText,
+      cancelText: coreJustClaimed ? t("core.stayRound") : t("common.cancel"),
+      onConfirm: commitPrestige,
+    });
   }
 
   function handleCommandResult(command: string, result: CommandResult): void {
@@ -1596,34 +2672,13 @@ function sigForOrders(vm: ViewModel): string {
       }
     }
     if (command === "claim_core" && result.ok) {
-      const round = lastVm?.singularity.round ?? 1;
-      const nextMult = round === 1 ? "×1.5" : "×2.0";
-      const isFinalEarthRound = round === 3;
-      confirmDialog({
-        title: t("core.claimTitle", { round }),
-        body: isFinalEarthRound
-          ? t("core.claimBodyFinal", { mult: nextMult })
-          : t("core.claimBody", { mult: nextMult }),
-        confirmText: isFinalEarthRound ? t("core.revealPlan") : t("core.nextRound"),
-        cancelText: t("core.stayRound"),
-        onConfirm: () => {
-          if (isFinalEarthRound) {
-            handler("prestige");
-            return;
-          }
-          confirmDialog({
-            title: t("core.confirmRound", { round: round + 1 }),
-            body: t("core.resetBody"),
-            confirmText: t("core.confirmReset"),
-            cancelText: t("common.cancel"),
-            onConfirm: () => { handler("prestige"); },
-          });
-        },
-      });
+      showPrestigeConfirmation(true);
     }
   }
 
   function confirmDialog(options: { title: string; body: string; confirmText: string; cancelText?: string; onConfirm: () => void }): void {
+    // 重复指针事件或连续命令最多保留一个弹窗，避免旧确认层叠在新确认上。
+    root.querySelectorAll(".dialog-overlay").forEach((existing) => existing.remove());
     const overlay = el("div", "dialog-overlay") as HTMLDivElement;
     const dialog = el("div", "dialog");
     dialog.appendChild(el("div", "dialog-title", options.title));
@@ -1634,11 +2689,22 @@ function sigForOrders(vm: ViewModel): string {
     dialog.appendChild(row);
     overlay.appendChild(dialog);
     root.appendChild(overlay);
+    for (const eventName of ["pointerdown", "pointerup", "pointercancel"] as const) {
+      overlay.addEventListener(eventName, (ev) => ev.stopPropagation());
+    }
+    let settled = false;
     overlay.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (settled) return;
       const t = ev.target as HTMLElement | null;
       if (!t) return;
-      if (t.closest("[data-action='dialog_cancel']")) overlay.remove();
+      if (t.closest("[data-action='dialog_cancel']")) {
+        settled = true;
+        overlay.remove();
+      }
       if (t.closest("[data-action='dialog_confirm']")) {
+        settled = true;
         overlay.remove();
         options.onConfirm();
       }
@@ -1646,7 +2712,15 @@ function sigForOrders(vm: ViewModel): string {
   }
 
   function destroy(): void {
+    destroyed = true;
     if (toastTimer !== null) window.clearTimeout(toastTimer);
+    window.removeEventListener("scroll", requestVisualMotionBudgetRefresh);
+    window.removeEventListener("resize", requestVisualMotionBudgetRefresh);
+    if (visualMotionRefreshFrame !== null) {
+      window.cancelAnimationFrame(visualMotionRefreshFrame);
+      window.clearTimeout(visualMotionRefreshFrame);
+      visualMotionRefreshFrame = null;
+    }
     finalFeel.destroy();
     root.remove();
   }
@@ -1663,7 +2737,7 @@ function sigForOrders(vm: ViewModel): string {
       st.entered,
       st.entryMet,
       st.roomsOwned,
-      st.infrastructure.map((i) => `${i.id}:${i.level}`).join(","),
+      st.infrastructure.map((i) => `${i.id}:${i.level}:${i.pressure.toFixed(3)}:${i.nextRequirement ?? "done"}:${i.isBottleneck}:${i.projectedIncomeGain}`).join(","),
       st.blueprintChoice ?? "",
       st.flagship.map((f) => `${f.id}:${f.unlocked}:${f.canStart}:${f.activeId ?? ""}:${f.pendingRewardId ?? ""}`).join("|"),
       vm.stage3.bottleneck.id,
@@ -1679,8 +2753,11 @@ function sigForOrders(vm: ViewModel): string {
     // 进入入口（Stage 3 条件满足但未进入）
     stage3EntryEl.replaceChildren();
     if (!st.entered && st.entryMet) {
-      stage3EntryEl.appendChild(el("div", "stage3-entry-title", t("stage3.entryTitle")));
-      stage3EntryEl.appendChild(el("div", "stage3-entry-text", t("stage3.entryText")));
+      const entryHeader = createGameObjectHeader("compute_center", t("stage3.entryTitle"), {
+        subtitle: t("stage3.entryText"),
+      });
+      entryHeader.classList.add("stage3-entry-header");
+      stage3EntryEl.appendChild(entryHeader);
       stage3EntryEl.appendChild(btn(t("stage3.enterCenter"), "enter_stage3", true));
       stage3Section.classList.remove("hidden");
       return;
@@ -1695,18 +2772,28 @@ function sigForOrders(vm: ViewModel): string {
     if (st.commissionBonusActive) {
       setIconText(commissionBonusEl, "celebration", t("stage3.commissionBonus", { remaining: st.commissionBonusRemaining }));
       commissionBonusEl.style.display = "";
+      commissionBonusEl.dataset.visualMotion = "running";
+    } else {
+      delete commissionBonusEl.dataset.visualMotion;
     }
 
     // 瓶颈
     bottleneckEl.replaceChildren();
     if (st.bottleneck.id) {
+      const bottleneckInfrastructure = st.infrastructure.find((i) => i.id === st.bottleneck.id);
       bottleneckEl.appendChild(el("div", "bottleneck-title",
         t("stage3.bottleneckLabel", { name: tr(st.bottleneck.name) })));
       bottleneckEl.appendChild(el("div", "bottleneck-line",
         `${t("stage3.effectiveEfficiency")}${t("common.colon")}${(st.bottleneck.efficiency * 100).toFixed(0)}% · ${t("stage3.upgradeEfficiency")}${t("common.colon")}${(st.bottleneck.upgradeEfficiency * 100).toFixed(0)}% · ${t("stage3.projectedIncome")}${t("common.colon")}${st.bottleneck.projectedIncomeGain}`));
       syncProgress(bottleneckEl.lastElementChild as HTMLElement, st.bottleneck.efficiency * 100);
-      bottleneckEl.appendChild(btn(t("stage3.upgradeBottleneck"), `upgrade_infra:${st.bottleneck.id}`, true,
-        st.infrastructure.find((i) => i.id === st.bottleneck.id)?.canUpgrade ?? false));
+      bottleneckEl.appendChild(btn(
+        bottleneckInfrastructure
+          ? `${t("stage3.upgradeBottleneck")} · ${bottleneckInfrastructure.upgradeCost}`
+          : t("stage3.upgradeBottleneck"),
+        `upgrade_infra:${st.bottleneck.id}`,
+        true,
+        bottleneckInfrastructure?.canUpgrade ?? false,
+      ));
     } else {
       bottleneckEl.appendChild(el("div", "bottleneck-title", t("stage3.noBottleneck")));
     }
@@ -1714,13 +2801,61 @@ function sigForOrders(vm: ViewModel): string {
     // 基础设施
     infraGridEl.replaceChildren();
     for (const inf of st.infrastructure) {
-      const card = el("div", "infra-card");
+      const card = el("div", `infra-card${inf.canUpgrade ? " is-upgradeable" : ""}${inf.isBottleneck ? " is-bottleneck" : ""}`);
       card.dataset.infrastructure = inf.id;
-      const infraName = el("div", "infra-name");
-      setIconText(infraName, contentGameIcon(inf.id, "server"), `${tr(inf.name)} Lv.${inf.level}/${inf.maxLevel}`);
-      card.appendChild(infraName);
-      card.appendChild(el("div", "infra-desc", tr(inf.desc)));
-      if (inf.detail) card.appendChild(el("div", "infra-detail", inf.detail));
+      if (inf.canUpgrade) card.dataset.visualMotion = "ready";
+      card.appendChild(createGameObjectHeader(contentGameIcon(inf.id, "server"), `${tr(inf.name)} Lv.${inf.level}/${inf.maxLevel}`, {
+        subtitle: tr(inf.desc),
+        value: inf.detail || undefined,
+        badge: inf.upgradeCost,
+      }));
+      const levelPercent = Math.round(Math.min(1, inf.level / Math.max(1, inf.maxLevel)) * 100);
+      const pressurePercent = Math.round(inf.pressure * 100);
+      const warningEndPercent = Math.min(100, pressurePercent + 18);
+      const nextRequirement = inf.nextRequirement;
+      const gateStatus = nextRequirement == null
+        ? t("stage3.infrastructureRequirementsMet")
+        : t("stage3.infrastructureNextRequirement", { level: nextRequirement });
+      if (inf.isBottleneck) {
+        card.appendChild(el("div", "infra-bottleneck-badge", t("stage3.infrastructureCurrentBottleneck")));
+      }
+      const pressureHead = el("div", "infra-pressure-head");
+      pressureHead.append(
+        el("span", "infra-pressure-label", t("stage3.infrastructurePressure", { percent: pressurePercent })),
+        el("span", "infra-pressure-value", t("stage3.infrastructureLevelScale", {
+          current: inf.level,
+          max: inf.maxLevel,
+        })),
+      );
+      const pressureMeter = el("div", "infra-pressure-meter");
+      pressureMeter.setAttribute("role", "progressbar");
+      pressureMeter.setAttribute("aria-valuemin", "0");
+      pressureMeter.setAttribute("aria-valuemax", "100");
+      pressureMeter.setAttribute("aria-valuenow", String(levelPercent));
+      pressureMeter.setAttribute("aria-valuetext", t("stage3.infrastructurePressureAria", {
+        name: tr(inf.name),
+        current: inf.level,
+        max: inf.maxLevel,
+        pressure: pressurePercent,
+        status: gateStatus,
+      }));
+      pressureMeter.style.setProperty("--level-position", `${levelPercent}%`);
+      pressureMeter.style.setProperty("--pressure-red-end", `${pressurePercent}%`);
+      pressureMeter.style.setProperty("--pressure-warning-end", `${warningEndPercent}%`);
+      pressureMeter.appendChild(el("span", "infra-pressure-pointer"));
+      const impactText = inf.level >= inf.maxLevel
+        ? t("stage3.infrastructureMaxed")
+        : inf.id === "storage"
+          ? t("stage3.infrastructureStorageEffect")
+          : inf.hasImmediateIncomeGain
+            ? t("stage3.infrastructureIncomeGain", { gain: inf.projectedIncomeGain })
+            : t("stage3.infrastructureNoIncomeGain");
+      card.append(
+        pressureHead,
+        pressureMeter,
+        el("div", "infra-stage-gate", gateStatus),
+        el("div", "infra-upgrade-impact", impactText),
+      );
       card.appendChild(btn(`${t("action.upgrade")}(${inf.upgradeCost})`, `upgrade_infra:${inf.id}`, false, inf.canUpgrade));
       infraGridEl.appendChild(card);
     }
@@ -1731,14 +2866,15 @@ function sigForOrders(vm: ViewModel): string {
       const card = el("div", "room-card" + (r.commissioned ? " owned" : ""));
       card.dataset.roomIndex = String(r.index);
       card.dataset.commissioned = r.commissioned ? "true" : "false";
-      const roomName = el("div", "room-name");
-      setIconText(roomName, r.commissioned ? "complete" : "server", tr(r.name));
-      card.appendChild(roomName);
+      const requirementText = `${t("infra.power.name")} Lv${r.requirements.power} · ${t("infra.computeCards.name")} Lv${r.requirements.computeCards} · ${t("infra.optical.name")} Lv${r.requirements.optical} · ${t("infra.storage.name")} Lv${r.requirements.storage}`;
+      // P1：机房保留各自的主题图标；投产状态由卡片状态表达，
+      // 不再让三座已投产机房退回为相同的通用勾选图标。
+      card.appendChild(createGameObjectHeader(contentGameIcon(`room_${r.index}`, "server"), tr(r.name), {
+        subtitle: r.commissioned ? tr(r.scaleName) : r.index === 1 ? t("stage3.commissionRoom", { name: tr(r.name) }) : requirementText,
+        badge: r.commissioned ? t("stage4.deployed") : `0${r.index}`,
+      }));
       if (r.commissioned) {
-        card.appendChild(el("div", "room-scale", tr(r.scaleName)));
       } else if (r.index === 2 || r.index === 3) {
-        card.appendChild(el("div", "room-require",
-          `${t("infra.power.name")} Lv${r.requirements.power} · ${t("infra.computeCards.name")} Lv${r.requirements.computeCards} · ${t("infra.optical.name")} Lv${r.requirements.optical} · ${t("infra.storage.name")} Lv${r.requirements.storage}`));
         const prerequisiteDone = r.index === 2
           ? st.flagship.some((f) => f.id === "project_1" && f.completed)
           : st.flagship.some((f) => f.id === "project_2" && f.completed);
@@ -1747,6 +2883,7 @@ function sigForOrders(vm: ViewModel): string {
         } else if (r.index === 3 && !prerequisiteDone) {
           card.appendChild(el("div", "room-gate", `${t("stage3.needPrereq")}${t("common.colon")}${t("flagship.2.name")}`));
         } else if (r.requirementsMet) {
+          card.dataset.visualMotion = "ready";
           card.appendChild(btn(t("stage3.commissionRoom", { name: tr(r.name) }), `commission_room:${r.index}`, true));
         }
       }
@@ -1755,19 +2892,25 @@ function sigForOrders(vm: ViewModel): string {
 
     // 旗舰工程进行中
     flagshipActiveEl.replaceChildren();
+    delete flagshipActiveEl.dataset.visualMotion;
     const active = st.flagship.find((f) => f.activeId);
     if (active) {
-      const activeName = el("div", "flagship-active-name");
-      setIconText(activeName, contentGameIcon(active.id, "project_1"), tr(active.name));
-      flagshipActiveEl.appendChild(activeName);
-      const progress = el("div", "flagship-active-progress", `${t("stage3.progressLabel")}${t("common.colon")}${active.progressLabel} · ${t("stage3.contributeCompute")}${t("common.colon")}${active.totalCompute}`);
-      syncProgress(progress, Number.parseFloat(active.progressLabel));
-      flagshipActiveEl.appendChild(progress);
+      flagshipActiveEl.dataset.visualMotion = "running";
+      const activeHeader = createGameObjectHeader(contentGameIcon(active.id, "project_1"), tr(active.name), {
+        subtitle: `${t("stage3.contributeCompute")}${t("common.colon")}${active.totalCompute}`,
+        value: `${t("stage3.progressLabel")}${t("common.colon")}${active.progressLabel}`,
+        valueClassName: "flagship-active-progress",
+        badge: active.progressLabel,
+      });
+      flagshipActiveEl.appendChild(activeHeader);
+      const progress = activeHeader.querySelector<HTMLElement>(".flagship-active-progress");
+      if (progress) syncProgress(progress, Number.parseFloat(active.progressLabel));
     } else {
       flagshipActiveEl.style.display = "none";
     }
     const pending = st.flagship.find((f) => f.pendingRewardId);
     if (pending) {
+      flagshipActiveEl.dataset.visualMotion = "claim";
       const pendingReward = el("div", "flagship-reward-ready");
       setIconText(pendingReward, "reward", `${tr(pending.pendingRewardName)} · ${t("common.pendingClaim")}`);
       flagshipActiveEl.appendChild(pendingReward);
@@ -1785,12 +2928,19 @@ function sigForOrders(vm: ViewModel): string {
       const stateClass = f.canStart ? " available" : f.completed ? " completed" : !f.unlocked ? " locked" : "";
       const card = el("div", "flagship-card" + stateClass);
       card.dataset.projectId = f.id;
-      const flagshipName = el("div", "flagship-name");
-      setIconText(flagshipName, contentGameIcon(f.id, "project_1"), tr(f.name));
-      card.appendChild(flagshipName);
-      card.appendChild(el("div", "flagship-reward", tr(f.rewardText)));
+      if (f.canStart) card.dataset.visualMotion = "ready";
+      card.appendChild(createGameObjectHeader(contentGameIcon(f.id, "project_1"), tr(f.name), {
+        subtitle: `${tr(f.rewardText)} · ${t("stage3.constructionCost")} ${f.constructionCost}`,
+        badge: f.canStart
+          ? t("stage3.startProject")
+          : f.completed
+            ? t("common.done")
+            : !f.unlocked
+              ? t("growth.locked")
+              : t("stage3.started"),
+      }));
       if (f.canStart) {
-        card.appendChild(btn(t("stage3.startProject"), `start_flagship:${f.id}`, true));
+        card.appendChild(btn(`${t("stage3.startProject")} · ${f.constructionCost}`, `start_flagship:${f.id}`, true));
       } else if (f.completed) {
         const completed = el("div", "flagship-completed");
         setIconText(completed, "complete", t("common.done"));
@@ -1834,7 +2984,16 @@ function sigForOrders(vm: ViewModel): string {
       for (const b of btns) {
         syncButtonAffordance(b as HTMLButtonElement, inf.canUpgrade);
       }
+      const card = stage3Section.querySelector<HTMLElement>(`[data-infrastructure="${inf.id}"]`);
+      if (card) {
+        card.classList.toggle("is-upgradeable", inf.canUpgrade);
+        if (inf.canUpgrade) card.dataset.visualMotion = "ready";
+        else delete card.dataset.visualMotion;
+      }
     }
+    if (active) flagshipActiveEl.dataset.visualMotion = "running";
+    else if (st.flagship.some((f) => f.pendingRewardId)) flagshipActiveEl.dataset.visualMotion = "claim";
+    else delete flagshipActiveEl.dataset.visualMotion;
   }
 
   // ============ 算力档案馆 ============
@@ -1855,7 +3014,7 @@ function sigForOrders(vm: ViewModel): string {
           ]
         : null,
       legendary: vm.legendaryArchive,
-      achievements: vm.achievements.map((achievement) => [achievement.id, achievement.achieved]),
+      achievements: vm.achievements.map((achievement) => [achievement.id, achievement.achieved, achievement.claimed]),
       singularity: vm.singularity.active
         ? [vm.singularity.label, vm.singularity.round, vm.singularity.coreClaimable, vm.singularity.spacePlanRevealed]
         : null,
@@ -1869,13 +3028,24 @@ function sigForOrders(vm: ViewModel): string {
     const tabs = [
       { id: "catalog", label: "archive.tab.catalog", icon: "archive" as GameIconName },
       { id: "achievements", label: "archive.tab.achievements", icon: "achieved" as GameIconName },
-      { id: "hall", label: "archive.tab.hall", icon: "honor" as GameIconName },
+      { id: "chronicle", label: "archive.tab.chronicle", icon: "honor" as GameIconName },
     ];
     const activeTab = tabs.some((t) => t.id === archiveTab) ? archiveTab : "catalog";
 
     for (const t of tabs) {
       const b = btn(tr(t.label), `archive_tab:${t.id}`, activeTab === t.id);
-      setIconText(b, t.icon, tr(t.label));
+      setNavigationIconText(b, t.icon, tr(t.label));
+      b.classList.toggle("active", activeTab === t.id);
+      b.setAttribute("aria-pressed", String(activeTab === t.id));
+      // CARD-06：里程碑 Tab 气泡（可领取成就数）。
+      if (t.id === "achievements") {
+        const claimable = vm.achievements.filter((item) => item.claimable).length;
+        if (claimable > 0) {
+          const bubble = el("span", "tab-bubble");
+          bubble.textContent = String(claimable);
+          b.appendChild(bubble);
+        }
+      }
       archiveTabsEl.appendChild(b);
     }
 
@@ -1894,7 +3064,9 @@ function sigForOrders(vm: ViewModel): string {
       archiveCategory = activeCategory;
       for (const category of categories) {
         const categoryButton = btn(category.label, `archive_category:${category.id}`, activeCategory === category.id);
-        setIconText(categoryButton, category.icon, tr(category.label));
+        setNavigationIconText(categoryButton, category.icon, tr(category.label));
+        categoryButton.classList.toggle("active", activeCategory === category.id);
+        categoryButton.setAttribute("aria-pressed", String(activeCategory === category.id));
         categoryBar.appendChild(categoryButton);
       }
       archivePanelEl.appendChild(categoryBar);
@@ -1906,16 +3078,21 @@ function sigForOrders(vm: ViewModel): string {
       const list = el("div", "archive-models");
       for (const model of vm.modelArchive) {
         const card = el("div", "archive-card" + (model.owned ? "" : " locked") + (model.current ? " current" : ""));
-        const title = el("div", "archive-card-title");
-        setIconText(title, modelGameIcon(model.id),
-          `${model.owned ? tr(model.name) : t("archive.notOwned")}${model.current ? t("archive.currentActive") : ""}`);
-        card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", `${tr(model.roleLabel)} · ${tr(model.effectText)}`));
-        const details = el("div", "archive-card-line", model.owned
+        const detailsText = model.owned
           ? `${t("archive.blueprintLevel")} Lv.${model.archiveLevel} · ${t("archive.researchCount")} ${model.researchCount} · ${t("archive.lifetimeTraining")} ${model.lifetimeTrainingCount} · ${t("archive.lifetimeContribution")} ${model.lifetimeContribution}`
-          : t("archive.continueResearch"));
+          : t("archive.continueResearch");
+        const header = createGameObjectHeader(modelGameIcon(model.id), tr(model.name), {
+          subtitle: `${tr(model.roleLabel)} · ${tr(model.effectText)}`,
+          value: detailsText,
+          badge: model.current
+            ? t("archive.currentActive")
+            : model.owned
+              ? `Lv.${model.archiveLevel}`
+              : t("archive.notOwned"),
+        });
+        const details = header.querySelector<HTMLElement>(".game-object-value") ?? el("div", "game-object-value", detailsText);
         details.dataset.modelId = model.id;
-        card.appendChild(details);
+        card.appendChild(header);
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
@@ -1923,21 +3100,25 @@ function sigForOrders(vm: ViewModel): string {
       const list = el("div", "archive-blueprints");
       for (const bp of vm.stage3.blueprints) {
         const card = el("div", "archive-card" + (bp.active ? " active" : ""));
-        const title = el("div", "archive-card-title");
-        setIconText(title, contentGameIcon(bp.id, "blueprints"), `${tr(bp.name)}${bp.owned ? t("archive.unlocked") : t("archive.locked")}`);
-        card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", tr(bp.desc)));
+        card.appendChild(createGameObjectHeader(contentGameIcon(bp.id, "blueprints"), tr(bp.name), {
+          subtitle: tr(bp.desc),
+          badge: bp.active
+            ? t("archive.currentActive")
+            : bp.owned
+              ? t("archive.unlocked")
+              : t("archive.locked"),
+        }));
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
     } else if (contentTab === "tech") {
       const list = el("div", "archive-tech");
-      for (const t of vm.stage3.techArchive) {
-        const card = el("div", "archive-card" + (t.unlocked ? "" : " locked"));
-        const title = el("div", "archive-card-title");
-        setIconText(title, t.unlocked ? "unlocked" : "locked", tr(t.name));
-        card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", tr(t.desc)));
+      for (const tech of vm.stage3.techArchive) {
+        const card = el("div", "archive-card" + (tech.unlocked ? "" : " locked"));
+        card.appendChild(createGameObjectHeader(contentGameIcon(tech.id, tech.unlocked ? "tech" : "locked"), tr(tech.name), {
+          subtitle: tr(tech.desc),
+          badge: tech.unlocked ? t("archive.unlocked") : t("archive.locked"),
+        }));
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
@@ -1945,9 +3126,9 @@ function sigForOrders(vm: ViewModel): string {
       const list = el("div", "archive-eras");
       for (const e of vm.stage3.eraArchive) {
         const card = el("div", "archive-card" + (e.reached ? "" : " locked"));
-        const title = el("div", "archive-card-title");
-        setIconText(title, e.reached ? "achieved" : "locked", tr(e.name));
-        card.appendChild(title);
+        card.appendChild(createGameObjectHeader(e.reached ? contentGameIcon(e.id, "eras") : "locked", tr(e.name), {
+          badge: e.reached ? t("archive.unlocked") : t("archive.locked"),
+        }));
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
@@ -1986,6 +3167,7 @@ function sigForOrders(vm: ViewModel): string {
       for (const core of history.singularityCores) {
         const coreCard = el("div", "archive-card" + (core.claimed ? "" : " locked"));
         setIconText(coreCard, core.claimed ? "singularity" : "locked", tr(core.label));
+        if (!core.claimed && vm.singularity.coreClaimable) coreCard.dataset.visualMotion = "claim";
         list.appendChild(coreCard);
       }
       list.appendChild(el("div", "archive-subtitle", t("archive.subtitle.civilization")));
@@ -2025,27 +3207,65 @@ function sigForOrders(vm: ViewModel): string {
     } else if (contentTab === "achievements") {
       const list = el("div", "archive-achievements");
       const achieved = vm.achievements.filter((item) => item.achieved).length;
-      list.appendChild(el("div", "archive-subtitle", `${t("archive.milestones")} ${achieved}/${vm.achievements.length}`));
+      const claimable = vm.achievements.filter((item) => item.claimable).length;
+      list.appendChild(el("div", "archive-subtitle",
+        `${t("archive.milestones")} ${achieved}/${vm.achievements.length}${t("archive.claimable")} ${claimable}`));
       for (const item of vm.achievements) {
-        const card = el("div", "archive-card" + (item.achieved ? "" : " locked"));
-        const title = el("div", "archive-card-title");
-        setIconText(title, item.achieved ? "achieved" : "locked", tr(item.name));
-        card.appendChild(title);
-        card.appendChild(el("div", "archive-card-line", item.description));
+        // CARD-06 负责人反馈：成就改为手动领取天赋点（可领取/已领取/未达成三态）。
+        const card = el("div", "archive-card"
+          + (item.claimable ? " claimable" : item.claimed ? " claimed" : item.achieved ? "" : " locked"));
+        card.dataset.achievementId = item.id;
+        if (item.claimable) card.dataset.visualMotion = "claim";
+        const achievedAt = item.achievedAtMs > 0
+          ? `${t("archive.achievedAt")}${t("common.colon")}${new Date(item.achievedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}`
+          : undefined;
+        card.appendChild(createGameObjectHeader(contentGameIcon(item.id, item.achieved ? "achieved" : "locked"), tr(item.name), {
+          subtitle: tr(item.description),
+          value: achievedAt,
+          badge: item.claimable
+            ? t("archive.claimable")
+            : item.claimed
+              ? t("ach.claimed", { points: item.talentPoints })
+              : item.achieved
+                ? t("archive.unlocked")
+                : t("archive.locked"),
+        }));
         if (item.achievedAtMs > 0) {
-          card.appendChild(el("div", "archive-card-line", `${t("archive.achievedAt")}${t("common.colon")}${new Date(item.achievedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}`));
+          // 达成时间已经进入统一卡头；保留后续阶段快照作为第二层信息。
+        }
+        // CARD-03：达成时快照的阶段与工作室等级（旧档无记录时不展示）。
+        if (item.achieved && item.stage > 0) {
+          const stageName = t(`civilization.stage${Math.min(5, item.stage)}`);
+          card.appendChild(el("div", "archive-card-line",
+            `${t("ach.recordStage")}${t("common.colon")}${stageName} · ${t("ach.recordWorkshop")}${item.workshopLevel}`));
+        }
+        if (item.claimable) {
+          if (vm.growth.talent.earned >= TALENT_POINT_CAP) {
+            card.appendChild(el("div", "archive-card-line", t("ach.capReached")));
+          } else {
+            card.appendChild(btn(t("ach.claim", { points: item.talentPoints }), `claim_achievement:${item.id}`, true));
+          }
+        } else if (item.claimed) {
+          card.appendChild(el("div", "archive-card-line claimable-label", t("ach.claimed", { points: item.talentPoints })));
+        } else {
+          card.appendChild(el("div", "archive-card-line", t("ach.lockedHint")));
         }
         list.appendChild(card);
       }
       archivePanelEl.appendChild(list);
-    } else if (contentTab === "hall") {
+    } else if (contentTab === "chronicle") {
       const list = el("div", "archive-hall");
       const hallTitle = el("div", "archive-card-title");
-      setIconText(hallTitle, "honor", t("hall.title"));
+      setIconText(hallTitle, "honor", t("standalone.chronicleTitle"));
       list.appendChild(hallTitle);
       const personal = el("div", "archive-card hall-personal-record");
-      personal.appendChild(el("div", "archive-card-title", t("archive.myRecords")));
-      personal.appendChild(el("div", "archive-card-line", `${t("archive.currentWealth")}${t("common.colon")}${vm.money} · ${t("app.workshop", { level: vm.workshop.level, exp: "", next: "" })}`));
+      personal.appendChild(createGameObjectHeader("growth", t("archive.myRecords"), {
+        subtitle: `${t("hall.companyTitle")}${t("common.colon")}${tr(vm.company.title)}`,
+        value: `${t("hall.cumulativeIncome")}${t("common.colon")}${vm.chronicle.cumulativeIncome}`,
+        badge: `Lv.${vm.company.level}`,
+      }));
+      personal.appendChild(el("div", "archive-card-line", `${t("hall.companyLevel")}${t("common.colon")}Lv.${vm.company.level} · ${tr(vm.company.title)}`));
+      personal.appendChild(el("div", "archive-card-line", `${t("hall.currentStage")}${t("common.colon")}${tr(vm.chronicle.stageLabel)} · ${t("hall.currentWorkshopLevel", { level: vm.chronicle.workshopLevel })}`));
       if (vm.legendaryArchive) {
         const elapsedMs = Math.max(0, vm.legendaryArchive.completedAtMs - vm.createdAtMs);
         const totalMinutes = Math.floor(elapsedMs / 60_000);
@@ -2056,11 +3276,29 @@ function sigForOrders(vm: ViewModel): string {
         personal.appendChild(el("div", "archive-card-line", t("archive.clearTimeHint")));
       }
       list.appendChild(personal);
-      list.appendChild(el("div", "archive-card hall-board-contract",
-        t("hall.rules")));
-      list.appendChild(el("div", "archive-card-line", `${t("hall.serviceStatus")}${t("common.colon")}${tr(platformStatus.leaderboard)}`));
-      list.appendChild(btn(t("hall.viewFastest"), "open_leaderboard:fastest", true));
-      list.appendChild(btn(t("hall.viewWealth"), "open_leaderboard:wealth", true));
+
+      // 个人历程只来自当前本地存档，不提交到任何排行榜。
+      const chronicle = el("div", "archive-card hall-chronicle");
+      chronicle.appendChild(createGameObjectHeader("growth", t("hall.chronicleTitle"), {
+        subtitle: t("standalone.chronicleIntro"),
+        badge: String(vm.chronicle.milestones.filter((entry) => entry.achievedAtMs > 0).length),
+      }));
+      const recordedMilestones = vm.chronicle.milestones.filter((entry) => entry.achievedAtMs > 0);
+      if (recordedMilestones.length === 0) {
+        chronicle.appendChild(el("div", "archive-card-line", t("hall.chronicleEmpty")));
+      } else {
+        for (const entry of recordedMilestones) {
+          chronicle.appendChild(el(
+            "div",
+            "archive-card-line",
+            `${t(`hall.milestone.${entry.id}`)}${t("common.colon")}${new Date(entry.achievedAtMs).toLocaleString(getLocale(), { timeZone: "Asia/Shanghai" })}`,
+          ));
+        }
+      }
+      if (vm.chronicle.clockAdjustmentCount > 0) {
+        chronicle.appendChild(el("div", "archive-card-line", t("hall.clockAdjusted", { count: vm.chronicle.clockAdjustmentCount })));
+      }
+      list.appendChild(chronicle);
       archivePanelEl.appendChild(list);
     }
   }
@@ -2079,6 +3317,7 @@ function sigForOrders(vm: ViewModel): string {
   return {
     render,
     setCommandHandler(h) { handler = h; },
+    setInteractionFeedbackHandler(h) { interactionFeedbackHandler = h; },
     showToast,
     confirmDialog,
     getElement() { return root; },
@@ -2100,8 +3339,12 @@ function sigForOrders(vm: ViewModel): string {
       metrics.rootReplacementCount = 0;
     },
     setPlatformStatus,
+    setDebugRuntime,
     showGrowthFeedback(event) { finalFeel.showFeedback(event); },
-    setVisualPaused(paused) { finalFeel.setPaused(paused); },
+    setVisualPaused(paused) {
+      root.classList.toggle("visual-paused", paused);
+      finalFeel.setPaused(paused);
+    },
     incrementOrderCompletion(by: number) {
       metrics.orderCompletionCount += by;
     },

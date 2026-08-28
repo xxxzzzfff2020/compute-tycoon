@@ -28,6 +28,7 @@ import {
   flagshipProgressPerSec,
   hasPendingFlagshipReward,
   infraLevel,
+  infrastructureReadiness,
   iterationRequirementsMet,
   recordEra,
   roomRequirementsMet,
@@ -144,6 +145,30 @@ describe("stage3: infrastructure & bottleneck", () => {
     expect(b.id.length).toBeGreaterThan(0);
     expect(b.efficiency).toBeLessThanOrEqual(1);
     expect(b.efficiency).toBeGreaterThan(0);
+    expect(b.candidates.map((candidate) => candidate.id)).toEqual([
+      "power", "computeCards", "optical", "storage",
+    ]);
+    expect(b.candidates.find((candidate) => candidate.id === "storage")?.gain.eq(0)).toBe(true);
+  });
+
+  it("derives monotonic readiness from real Stage 3 requirements", () => {
+    const s = stage3State();
+    const expected = {
+      power: { next: 3, final: 6 },
+      computeCards: { next: 3, final: 7 },
+      optical: { next: 2, final: 5 },
+      storage: { next: 2, final: 8 },
+    } as const;
+    for (const id of ["power", "computeCards", "optical", "storage"] as const) {
+      const status = infrastructureReadiness(s, id);
+      expect(status.nextRequirement, id).toBe(expected[id].next);
+      expect(status.finalRequirement, id).toBe(expected[id].final);
+      expect(status.readiness, id).toBe(0);
+      s.stage3.infrastructure[id] = expected[id].final;
+      const complete = infrastructureReadiness(s, id);
+      expect(complete.nextRequirement, id).toBeNull();
+      expect(complete.readiness, id).toBe(1);
+    }
   });
 
   it("effective_efficiency_reduces_income_not_damage", () => {
@@ -240,6 +265,7 @@ describe("stage3: flagship projects", () => {
       },
     };
     commissionRoom(s, 2);
+    s.money = 1e15;
     expect(canStartFlagship(s, "project_2")).toBe(true);
     expect(startFlagship(s, "project_2").ok).toBe(true);
     expect(canStartFlagship(s, "project_2")).toBe(false); // 同一时间最多一个
@@ -447,15 +473,15 @@ describe("stage3: iteration 1", () => {
 });
 
 describe("offline: stage3 contract", () => {
-  it("offline_cap_is_six_hours_and_storage_does_not_change_it", () => {
+  it("single_player_free_cap_is_two_hours_and_storage_does_not_change_it", () => {
     const s = makeState();
-    expect(offlineCapSeconds(s)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(s)).toBe(2 * 60 * 60);
     s.stage3 = { ...s.stage3, entered: true, enteredAtMs: 1 };
-    expect(offlineCapSeconds(s)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(s)).toBe(2 * 60 * 60);
     s.stage3 = { ...s.stage3, infrastructure: { power: 0, computeCards: 0, optical: 0, storage: 3 } };
-    expect(offlineCapSeconds(s)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(s)).toBe(2 * 60 * 60);
     s.stage3 = { ...s.stage3, infrastructure: { power: 0, computeCards: 0, optical: 0, storage: 7 } };
-    expect(offlineCapSeconds(s)).toBe(6 * 60 * 60);
+    expect(offlineCapSeconds(s)).toBe(2 * 60 * 60);
   });
 
   it("offline_reward_exactly_once", () => {
@@ -483,7 +509,7 @@ describe("offline: stage3 contract", () => {
 });
 
 describe("stage3: iteration second-run acceleration", () => {
-  it("second_run_automation_earlier: 迭代后自动经营解锁阈值从 6 单降到 3 单", () => {
+  it("second_run_automation_earlier: 迭代后仍以首服作为自动经营门槛", () => {
     const s = makeState();
     // 首轮阈值：6 单
     expect(automationUnlockThreshold(s)).toBe(6);
@@ -491,24 +517,25 @@ describe("stage3: iteration second-run acceleration", () => {
     iterationReady(s);
     expect(applyFirstIteration(s).ok).toBe(true);
     expect(automationUnlockThreshold(s)).toBe(3);
-    // 二轮只需 3 单即可解锁
+    // 新合同：订单数量不再解锁自动经营；首台自有服务器才是门槛。
     s.completedOrders = 3;
+    expect(automationUnlocked(s)).toBe(false);
+    s.serverCount = 1;
     expect(automationUnlocked(s)).toBe(true);
     s.completedOrders = 2;
-    expect(automationUnlocked(s)).toBe(false);
+    expect(automationUnlocked(s)).toBe(true);
   });
 
-  it("second_run_research_speed_bonus: 迭代后模型研发速度永久 +25%", () => {
+  it("legacy research bonus cannot restore the removed free Blueprint path", () => {
     const s = makeState();
     expect(iterationResearchBonus(s).toNumber()).toBe(1);
     iterationReady(s);
     applyFirstIteration(s);
     expect(iterationResearchBonus(s).toNumber()).toBe(1.25);
-    // 订单研发进度受加成（sci 值：180 × 0.0008 × 1.25 = 0.18）
     const order = ORDERS[0];
     s.modelResearch = { progress: 0, stage2Draws: 0 };
     addResearchFromOrder(s, order);
-    expect(s.modelResearch.progress).toBeCloseTo(0.18, 5);
+    expect(s.modelResearch.progress).toBe(0);
   });
 
   it("iteration_permanent_multiplier_speeds_workshop_xp: 永久倍率加速二轮订单经验（首轮不受影响）", () => {

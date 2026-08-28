@@ -54,6 +54,9 @@ export function archiveCollectionComputeBonus(state: SaveData): Decimal {
 }
 
 export function modelEffectMultipliers(state: SaveData): ModelEffectMultipliers {
+  // v6基础曲线继续由系统自动选出的研发主力承载，确保迁移瞬间完全等价。
+  // CARD-01新增的所有蓝图共同成长由 blueprintGrowthMultiplier 统一结算，
+  // UI不再提供逐服部署/手动切换，因此不存在玩家反复换“最优模型”的操作。
   const active = activeModel(state);
   const activeBonus = (role: ModelRole): number => active?.role === role ? active.activeBonus : 0;
   const multiplier = (role: Exclude<ModelRole, "high_value_business">): Decimal =>
@@ -82,12 +85,7 @@ export function businessMixForState(state: SaveData): Array<{ orderId: string; s
 }
 
 export function modelRoleEffectText(model: ModelDef): string {
-  const activePercent = Math.round(model.activeBonus * 100);
-  const passivePercent = Math.round(model.archiveBonusPerLevel * 100);
-  if (model.role === "high_value_business") {
-    return `model.effect.highValue`;
-  }
-  return `model.effect.role`;
+  return `model.effect.${model.role}`;
 }
 
 export function distinctModelRoles(): ModelRole[] {

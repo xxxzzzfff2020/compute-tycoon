@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { freshSaveData, MemorySaveStorage } from "../../src/save/storage";
 import { SaveRepository } from "../../src/save/repository";
 import { validateSave, normalizeSave } from "../../src/save/validate";
-import { MAX_SUPPORTED_SCHEMA_VERSION, type SaveData } from "../../src/save/types";
+import { MAX_SUPPORTED_SCHEMA_VERSION, SAVE_SCHEMA_VERSION, type SaveData } from "../../src/save/types";
 
 function now() {
   return 1_700_000_000_000;
@@ -45,6 +45,39 @@ describe("save: validation", () => {
     expect(n).not.toBeNull();
     expect(n!.ownedModelIds).toEqual(["codex"]);
     expect(n!.activeOrders).toEqual([]);
+  });
+
+  it("migrates legacy active orders into stable fixed lanes without losing progress", () => {
+    const legacy = freshSaveData(now()) as unknown as Record<string, unknown>;
+    legacy.activeOrders = [12, 9, 6, 3].map((remainingSec) => ({
+      orderId: "o1",
+      startedAtMs: now(),
+      remainingSec,
+      status: 0,
+    }));
+
+    const result = validateSave(legacy);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.repaired).toBe(true);
+    expect(result.data.activeOrders.map((order) => order.slotIndex)).toEqual([0, 1, 2, 3]);
+    expect(result.data.activeOrders.map((order) => order.remainingSec)).toEqual([12, 9, 6, 3]);
+  });
+
+  it("repairs duplicate and out-of-range order lanes deterministically", () => {
+    const legacy = freshSaveData(now()) as unknown as Record<string, unknown>;
+    legacy.activeOrders = [0, 0, 9, 3].map((slotIndex, index) => ({
+      orderId: "o1",
+      startedAtMs: now(),
+      slotIndex,
+      remainingSec: 12 - index,
+      status: 0,
+    }));
+
+    const normalized = normalizeSave(legacy)!;
+
+    expect(normalized.activeOrders.map((order) => order.slotIndex)).toEqual([0, 1, 2, 3]);
   });
 
   it("migrates legacy blueprints by earned count into fixed order", () => {
@@ -103,8 +136,26 @@ describe("save: validation", () => {
     };
     const normalized = normalizeSave(legacy)!;
     expect(normalized.modelProgress?.level).toBe(12);
-    expect(normalized.modelArchive.voice.level).toBe(20);
-    expect(normalized.modelArchive.voice.researchCount).toBe(20);
+    expect(normalized.modelArchive.voice.level).toBe(40);
+    expect(normalized.modelArchive.voice.researchCount).toBe(40);
+  });
+
+  it("migrates the legacy shared training scale from 20 levels to 40 once", () => {
+    const legacy = freshSaveData(now()) as unknown as Record<string, unknown>;
+    legacy.schemaVersion = 8;
+    legacy.ownedModelIds = ["codex"];
+    legacy.modelProgress = { modelId: "codex", level: 19, trainingCount: 18 };
+
+    const migrated = normalizeSave(legacy)!;
+    expect(migrated.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated.modelProgress?.level).toBe(38);
+    expect(migrated.modelProgress?.trainingCount).toBe(18);
+
+    const normalizedAgain = normalizeSave(migrated)!;
+    expect(normalizedAgain.modelProgress?.level).toBe(38);
+
+    legacy.modelProgress = { modelId: "codex", level: 20, trainingCount: 19 };
+    expect(normalizeSave(legacy)?.modelProgress?.level).toBe(40);
   });
 });
 
@@ -179,7 +230,7 @@ describe("save: repository", () => {
     const importedRepo = new SaveRepository({ storage: new MemorySaveStorage(), nowMs: now });
     const imported = importedRepo.importJson(exported);
     expect(imported.ok).toBe(true);
-    expect(imported.data?.schemaVersion).toBe(6);
+    expect(imported.data?.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(imported.data?.money).toBe(huge);
     expect(imported.data?.lifetimeIncome).toBe(huge);
     expect(imported.data?.workshop.lifetimeRevenue).toBe(huge);
@@ -195,7 +246,7 @@ describe("save: repository", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.repaired).toBe(true);
-      expect(result.data.schemaVersion).toBe(6);
+      expect(result.data.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
       expect(result.data.money).toBe(8_000_000_000);
       expect(result.data.lifetimeIncome).toBe(12_000_000_000);
     }
@@ -223,6 +274,26 @@ describe("save: repository", () => {
     expect(reset.ok).toBe(true);
     expect(reset.data.money).toBe(0);
     expect(repo.load().data.saveId).not.toBe(out.data.saveId);
+  });
+
+  it("prepares a reset without touching the current local save, then commits exactly that candidate", () => {
+    const storage = new MemorySaveStorage();
+    const repo = new SaveRepository({ storage, nowMs: now });
+    const old = repo.load().data;
+    old.money = 999;
+    expect(repo.save(old).ok).toBe(true);
+    const oldId = storage.load()!.saveId;
+
+    const prepared = repo.prepareReset();
+    expect(prepared.ok).toBe(true);
+    expect(prepared.data.saveId).not.toBe(oldId);
+    expect(storage.load()!.saveId).toBe(oldId);
+    expect(storage.load()!.money).toBe(999);
+
+    const committed = repo.commitPreparedReset(prepared.data);
+    expect(committed.ok).toBe(true);
+    expect(storage.load()!.saveId).toBe(prepared.data.saveId);
+    expect(storage.load()!.money).toBe(0);
   });
 });
 

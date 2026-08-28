@@ -1,13 +1,25 @@
 import type { RewardedAdOfferState, SaveData } from "../save/types";
+import {
+  OFFLINE_AD_SLICE_LIMIT,
+  OFFLINE_AD_SLICE_SECONDS,
+  OFFLINE_FREE_SECONDS,
+  OFFLINE_MAX_SECONDS,
+} from "../save/offline";
 
-export const SPONSOR_OFFLINE_BASE_SECONDS = 6 * 60 * 60;
-export const SPONSOR_OFFLINE_AD_SECONDS = 2 * 60 * 60;
-export const SPONSOR_OFFLINE_ADS_PER_DAY = 9;
-export const SPONSOR_OFFLINE_MAX_SECONDS = 24 * 60 * 60;
+export const SPONSOR_OFFLINE_BASE_SECONDS = OFFLINE_FREE_SECONDS;
+export const SPONSOR_OFFLINE_AD_SECONDS = OFFLINE_AD_SLICE_SECONDS;
+/** 兼容旧导出名；额度属于单次离线回归会话，不按自然日刷新。 */
+export const SPONSOR_OFFLINE_ADS_PER_DAY = OFFLINE_AD_SLICE_LIMIT;
+export const SPONSOR_OFFLINE_MAX_SECONDS = OFFLINE_MAX_SECONDS;
 export const SPONSOR_INCOME_CHARGE_SECONDS = 2 * 60 * 60;
-export const SPONSOR_INCOME_FREE_CHARGES_PER_DAY = 3;
-export const SPONSOR_INCOME_ADS_PER_DAY = 9;
-export const SPONSOR_INCOME_MAX_REMAINING_SECONDS = 24 * 60 * 60;
+/**
+ * 收入加速只由成功观看激励视频获得。保留这个常量和旧字段是为了兼容历史存档，
+ * 但它固定为 0，不能再向玩家显示或发放“免费充能”。
+ */
+export const SPONSOR_INCOME_FREE_CHARGES_PER_DAY = 0;
+/** 每次广告增加 2 小时；每日 3 次，最多保持 6 小时。 */
+export const SPONSOR_INCOME_ADS_PER_DAY = 3;
+export const SPONSOR_INCOME_MAX_REMAINING_SECONDS = 6 * 60 * 60;
 export const SPONSOR_INCOME_MULTIPLIER = 2;
 export const SPONSOR_PENDING_OFFER_MAX_AGE_MS = 15 * 60 * 1000;
 
@@ -33,17 +45,15 @@ export function normalizeSponsorDay(state: SaveData, nowMs: number): void {
   if (!sponsor.dayKey) sponsor.dayKey = nextKey;
   if (nextKey > sponsor.dayKey) {
     sponsor.dayKey = nextKey;
-    sponsor.offlineAdsWatchedToday = 0;
+    // 离线广告额度已经绑定到 pendingOfflineReward，不在自然日切换时刷新。
     sponsor.incomeFreeChargesUsedToday = 0;
     sponsor.incomeAdsWatchedToday = 0;
   }
 }
 
 export function offlineCapacitySeconds(state: SaveData): number {
-  return Math.min(
-    SPONSOR_OFFLINE_MAX_SECONDS,
-    SPONSOR_OFFLINE_BASE_SECONDS + Math.max(0, state.monetization.sponsor.offlineCapacityBonusSec),
-  );
+  void state;
+  return SPONSOR_OFFLINE_BASE_SECONDS;
 }
 
 export function incomeBoostRemainingSeconds(state: SaveData, nowMs: number): number {
@@ -55,104 +65,38 @@ export function sponsorIncomeMultiplier(state: SaveData, nowMs: number): number 
   return incomeBoostRemainingSeconds(state, nowMs) > 0 ? SPONSOR_INCOME_MULTIPLIER : 1;
 }
 
-function addIncomeBoost(state: SaveData, nowMs: number): void {
-  const sponsor = state.monetization.sponsor;
-  const safeNow = Math.max(nowMs, sponsor.lastObservedNowMs);
-  const base = Math.max(safeNow, sponsor.incomeBoostUntilMs);
-  sponsor.incomeBoostUntilMs = Math.min(
-    base + SPONSOR_INCOME_CHARGE_SECONDS * 1000,
-    safeNow + SPONSOR_INCOME_MAX_REMAINING_SECONDS * 1000,
-  );
+/** 单机版不把原广告奖励替换成免费奖励。 */
+export function claimFreeIncomeCharge(_state: SaveData, _nowMs: number): { ok: boolean; error?: string } {
+  return { ok: false, error: "free_income_charge_disabled" };
 }
 
-export function claimFreeIncomeCharge(state: SaveData, nowMs: number): { ok: boolean; error?: string } {
-  normalizeSponsorDay(state, nowMs);
-  const sponsor = state.monetization.sponsor;
-  if (sponsor.incomeFreeChargesUsedToday >= SPONSOR_INCOME_FREE_CHARGES_PER_DAY) {
-    return { ok: false, error: "free_income_charges_exhausted" };
-  }
-  if (incomeBoostRemainingSeconds(state, nowMs) >= SPONSOR_INCOME_MAX_REMAINING_SECONDS) {
-    return { ok: false, error: "income_boost_full" };
-  }
-  sponsor.incomeFreeChargesUsedToday += 1;
-  addIncomeBoost(state, nowMs);
-  return { ok: true };
-}
-
+/** 保留旧签名以兼容调用方；不生成事件，不变更存档。 */
 export function prepareSponsorAd(
-  state: SaveData,
-  kind: SponsorAdKind,
-  nowMs: number,
+  _state: SaveData,
+  _kind: SponsorAdKind,
+  _nowMs: number,
 ): { ok: boolean; error?: string; offer?: RewardedAdOfferState } {
-  normalizeSponsorDay(state, nowMs);
-  const sponsor = state.monetization.sponsor;
-  if (state.monetization.pendingOffer) return { ok: false, error: "ad_offer_pending" };
-  if (kind === "offline_capacity") {
-    if (sponsor.offlineAdsWatchedToday >= SPONSOR_OFFLINE_ADS_PER_DAY) {
-      return { ok: false, error: "offline_ads_exhausted" };
-    }
-    if (offlineCapacitySeconds(state) >= SPONSOR_OFFLINE_MAX_SECONDS) {
-      return { ok: false, error: "offline_capacity_full" };
-    }
-  } else {
-    if (sponsor.incomeAdsWatchedToday >= SPONSOR_INCOME_ADS_PER_DAY) {
-      return { ok: false, error: "income_ads_exhausted" };
-    }
-    if (incomeBoostRemainingSeconds(state, nowMs) >= SPONSOR_INCOME_MAX_REMAINING_SECONDS) {
-      return { ok: false, error: "income_boost_full" };
-    }
-  }
-  const used = kind === "offline_capacity" ? sponsor.offlineAdsWatchedToday : sponsor.incomeAdsWatchedToday;
-  const offer: RewardedAdOfferState = {
-    eventId: `sponsor:${state.saveId}:${sponsor.dayKey}:${kind}:${used + 1}`,
-    kind,
-    createdAtMs: nowMs,
-  };
-  state.monetization.pendingOffer = offer;
-  return { ok: true, offer };
+  return { ok: false, error: "ads_disabled" };
 }
 
-export function grantSponsorAd(state: SaveData, eventId: string, nowMs: number): { ok: boolean; error?: string } {
-  normalizeSponsorDay(state, nowMs);
-  const offer = state.monetization.pendingOffer;
-  if (!offer || offer.eventId !== eventId) return { ok: false, error: "ad_offer_missing" };
-  if (state.monetization.completedRewardEventIds.includes(eventId)) {
-    return { ok: false, error: "ad_reward_already_granted" };
-  }
-  const sponsor = state.monetization.sponsor;
-  if (offer.kind === "offline_capacity") {
-    if (sponsor.offlineAdsWatchedToday >= SPONSOR_OFFLINE_ADS_PER_DAY) return { ok: false, error: "offline_ads_exhausted" };
-    sponsor.offlineAdsWatchedToday += 1;
-    sponsor.offlineCapacityBonusSec = Math.min(
-      SPONSOR_OFFLINE_MAX_SECONDS - SPONSOR_OFFLINE_BASE_SECONDS,
-      sponsor.offlineCapacityBonusSec + SPONSOR_OFFLINE_AD_SECONDS,
-    );
-  } else {
-    if (sponsor.incomeAdsWatchedToday >= SPONSOR_INCOME_ADS_PER_DAY) return { ok: false, error: "income_ads_exhausted" };
-    sponsor.incomeAdsWatchedToday += 1;
-    addIncomeBoost(state, nowMs);
-  }
-  state.monetization.completedRewardEventIds = [
-    ...state.monetization.completedRewardEventIds,
-    eventId,
-  ].slice(-128);
-  state.monetization.pendingOffer = null;
-  return { ok: true };
+export function grantSponsorAd(_state: SaveData, _eventId: string, _nowMs: number): { ok: boolean; error?: string; offlineAddedSec?: number } {
+  return { ok: false, error: "ads_disabled" };
 }
 
-/** 只有实际使用基础6小时以外的扩展区间时才消耗已充入容量。 */
+/**
+ * 旧调用兼容：v8 起不再存在预充给“下一次离线”的容量；广告必须绑定当前待领取回执。
+ */
 export function consumeOfflineCapacityCharge(state: SaveData, rawElapsedSec: number): boolean {
+  void rawElapsedSec;
   if (state.monetization.sponsor.offlineCapacityBonusSec <= 0) return false;
-  if (rawElapsedSec <= SPONSOR_OFFLINE_BASE_SECONDS) return false;
   state.monetization.sponsor.offlineCapacityBonusSec = 0;
   return true;
 }
 
-/** 启动时清理过期事件；新鲜事件留给玩家在赞助页显式继续或取消。 */
-export function expirePendingSponsorAd(state: SaveData, nowMs: number): boolean {
+/** 单机启动清理历史待播放事件，不兑现或恢复广告。 */
+export function expirePendingSponsorAd(state: SaveData, _nowMs: number): boolean {
   const offer = state.monetization.pendingOffer;
   if (!offer) return false;
-  if (nowMs - offer.createdAtMs <= SPONSOR_PENDING_OFFER_MAX_AGE_MS) return false;
   state.monetization.pendingOffer = null;
   return true;
 }

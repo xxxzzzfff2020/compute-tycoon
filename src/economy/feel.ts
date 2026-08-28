@@ -4,8 +4,6 @@ import {
   automationUnlocked,
   canBuyMaxServers,
   canBuyServer,
-  canEnableRental,
-  canResearchModel,
   canTrain,
   currentStage,
   incomePerSecond,
@@ -53,6 +51,15 @@ import {
   MACHINE_ROOMS,
 } from "../data/stage3";
 import { SERVERS } from "../data/content";
+import {
+  blueprintUpgradeCost,
+  effectiveServerPower,
+  recommendedBlueprintId,
+  serverScaleUnitCost,
+  TALENT_NODES,
+  TALENT_NODE_MAX_LEVEL,
+  talentPointsAvailable,
+} from "./incremental-growth";
 import { formatBig, formatHeaderMoney, formatMoney, formatTime, toStoredBig } from "../core/big";
 import { t } from "../i18n";
 import type { SaveData } from "../save/types";
@@ -139,6 +146,10 @@ const EARTH_TIER_LIMITS: ReadonlyArray<{ min: Decimal.Value; tier: ComputeTier }
   { min: 10, tier: "studio" },
   { min: 1, tier: "micro" },
 ];
+
+function formatDisplayedCompute(value: Decimal.Value): string {
+  return formatBig(new Decimal(value).mul(1000));
+}
 
 export function resolveComputeTier(value: Decimal.Value, stage: number): ComputeTier {
   if (stage >= 5) return "stellar";
@@ -256,13 +267,50 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
   if (!s4 && !s5 && canBuyMaxServers(state)) {
     addAction(actions, { id: "buy_max_servers", label: t("feel.action.buyMaxServers"), anchorAction: "buy_max_servers", priority: 75 });
   }
-  if (!s4 && !s5 && state.serverCount === 0 && canEnableRental(state)) {
-    addAction(actions, { id: "enable_rental", label: t("action.enableRental"), anchorAction: "enable_rental", priority: 80 });
+  // 自动经营只负责持续收入；新主动层的投资决策必须一直回到玩家手里。
+  const recommendedBlueprint = recommendedBlueprintId(state);
+  if (recommendedBlueprint && new Decimal(state.money).gte(blueprintUpgradeCost(state, recommendedBlueprint))) {
+    addAction(actions, {
+      id: `upgrade_blueprint:${recommendedBlueprint}:1`,
+      label: t("feel.action.upgradeBlueprint"),
+      anchorAction: `upgrade_blueprint:${recommendedBlueprint}:1`,
+      priority: 88,
+    });
   }
+  const latestServer = state.serverCount > 0 ? SERVERS[Math.max(0, state.serverCount - 1)] : null;
+  if (latestServer && new Decimal(state.money).gte(serverScaleUnitCost(state, latestServer.id))) {
+    addAction(actions, {
+      id: `expand_server_scale:${latestServer.id}:1`,
+      label: t("feel.action.expandScale"),
+      anchorAction: `expand_server_scale:${latestServer.id}:1`,
+      priority: 87,
+    });
+  }
+  const availableTalentPoints = talentPointsAvailable(state);
+  const allocations = state.growth.talent.allocations;
+  const nextTalent = TALENT_NODES.find((node) => {
+    if ((allocations[node.id] ?? 0) >= TALENT_NODE_MAX_LEVEL) return false;
+    if (node.tier === 1) return true;
+    const previous = TALENT_NODES.find((candidate) =>
+      candidate.branch === node.branch && candidate.tier === node.tier - 1);
+    return previous != null && (allocations[previous.id] ?? 0) >= TALENT_NODE_MAX_LEVEL;
+  });
+  if (availableTalentPoints > 0 && nextTalent) {
+    addAction(actions, {
+      id: "available_talent",
+      label: t("feel.action.allocateTalent"),
+      anchorAction: `allocate_talent:${nextTalent.id}`,
+      priority: 89,
+    });
+  }
+  // 租赁算力是首服前的过渡设施，不是“现在可投入”的成长投资。
+  // 推荐卡只展示满足首服门槛后可直接推进规模的购买项；实际租赁按钮仍保留在机房页。
 
   if (stage3 && !s4 && !s5) {
     const bottleneck = bottleneckAnalysis(state);
-    if (canUpgradeInfrastructure(state, bottleneck.id)) {
+    // 四项设施全部满级时 bottleneckAnalysis 以空 id 表达“无瓶颈”。
+    // 该状态不能继续进入升级价格查询，否则 infraById("") 会让每帧 ViewModel 构建抛错。
+    if (bottleneck.id && canUpgradeInfrastructure(state, bottleneck.id)) {
       addAction(actions, {
         id: `upgrade_infra:${bottleneck.id}`,
         label: `${t("feel.action.upgrade")}${t(bottleneck.name)}`,
@@ -302,9 +350,6 @@ export function buildAffordableActions(state: SaveData): FeelActionVM[] {
     }
   }
 
-  if (canResearchModel(state)) {
-    addAction(actions, { id: "research_model", label: t("feel.action.researchModel"), anchorAction: "research_model", priority: 65 });
-  }
   if (canTrain(state)) {
     addAction(actions, { id: "train_model", label: t("action.trainModel"), anchorAction: "train_model", priority: 55 });
   }
@@ -324,7 +369,7 @@ function feelStage(state: SaveData): number {
 function baseCompute(state: SaveData): Decimal {
   return state.stage3?.entered
     ? stage3TotalCompute(state)
-    : modelCompute(state).mul(state.serverPower);
+    : modelCompute(state).mul(effectiveServerPower(state));
 }
 
 function identityLabel(state: SaveData, stage: number): string {
@@ -361,7 +406,7 @@ function buildGrowthReview(state: SaveData, stage: number, compute: Decimal, inc
     fromLabel: t("civilization.stage1"),
     currentLabel,
     elapsedLabel: formatTime(elapsedSeconds),
-    computeLabel: formatBig(compute),
+    computeLabel: formatDisplayedCompute(compute),
     incomeLabel: `${formatMoney(income)}${t("unit.perSec")}`,
     milestoneCount,
     summary,
@@ -395,7 +440,7 @@ function offlinePreview(state: SaveData, compute: Decimal): OfflineFeelPreviewVM
   return {
     moneyBefore: formatHeaderMoney(state.money),
     moneyAfter: formatHeaderMoney(preview.money),
-    computeLabel: `${t("feel.keepCompute")} ${formatBig(compute)}`,
+    computeLabel: `${t("feel.keepCompute")} ${formatDisplayedCompute(compute)}`,
     affordableAfterCount: actions.length,
     recommendedAfterLabel: actions[0]?.label ?? null,
   };
@@ -406,13 +451,14 @@ export function buildFeelViewModel(state: SaveData): FeelViewModel {
   const compute = baseCompute(state);
   const income = state.automation ? incomePerSecond(state) : new Decimal(0);
   const actions = buildAffordableActions(state);
-  const bottleneck = state.stage3?.entered && stage < 4 ? bottleneckAnalysis(state) : null;
+  const bottleneckResult = state.stage3?.entered && stage < 4 ? bottleneckAnalysis(state) : null;
+  const bottleneck = bottleneckResult?.id ? bottleneckResult : null;
   const s4Nodes = stage === 4 ? ownedStage4Nodes(state) : [];
   const s5Nodes = stage >= 5 ? ownedStage5Nodes(state) : [];
   return {
     computeTier: resolveComputeTier(compute, stage),
     computeLabel: stage >= 4 ? t("feel.computeLabel.base") : t("feel.computeLabel.total"),
-    computeValue: formatBig(compute),
+    computeValue: formatDisplayedCompute(compute),
     computeRaw: compute.toString(),
     incomeValue: `${formatMoney(income)}${t("unit.perSec")}`,
     incomeRaw: income.toString(),
@@ -428,7 +474,7 @@ export function buildFeelViewModel(state: SaveData): FeelViewModel {
         : null,
     activeProjectProgress01: projectProgress(state, stage),
     affordableActions: actions,
-    bottleneck: bottleneck
+    bottleneck: bottleneck?.id
       ? { id: bottleneck.id, name: bottleneck.name, efficiency: bottleneck.efficiency }
       : null,
     growthReview: buildGrowthReview(state, stage, compute, income),
@@ -440,7 +486,9 @@ const FEEDBACK_COMMANDS = [
   "acquire_model",
   "enable_automation",
   "train_model",
-  "research_model",
+  "upgrade_blueprint",
+  "expand_server_scale",
+  "allocate_talent",
   "buy_server",
   "buy_max_servers",
   "complete_stage2_settlement",
@@ -466,6 +514,9 @@ function feedbackAllowed(command: string): boolean {
 function milestoneHeadline(command: string): string {
   if (command === "acquire_model") return t("feedback.acquireModel");
   if (command === "enable_automation") return t("feedback.automation");
+  if (command.startsWith("upgrade_blueprint")) return t("feedback.blueprintUp");
+  if (command.startsWith("expand_server_scale")) return t("feedback.scaleUp");
+  if (command.startsWith("allocate_talent")) return t("feedback.talentUp");
   if (command === "buy_server" || command === "buy_max_servers") return t("feedback.serverFleet");
   if (command.startsWith("commission_room")) return t("feedback.roomOnline");
   if (command === "claim_core") return t("feedback.coreClaimed");

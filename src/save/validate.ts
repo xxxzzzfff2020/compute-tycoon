@@ -5,6 +5,7 @@ import {
   type ModelArchiveEntry,
   type ModelProgressState,
   type ModelResearchState,
+  type ChronicleState,
   type OfflineReward,
   type OrderState,
   type SaveData,
@@ -19,7 +20,7 @@ import {
   type SingularityState,
   type WorkshopState,
 } from "./types";
-import { MODEL_ARCHIVE_MAX_LEVEL, SERVERS } from "../data/content";
+import { MODEL_ARCHIVE_MAX_LEVEL, ORDERS, ORDER_QUEUE_CAP, SERVERS } from "../data/content";
 import { BLUEPRINTS } from "../data/stage3";
 import {
   isNonNegativeStoredBig,
@@ -28,6 +29,19 @@ import {
   type StoredBig,
 } from "../core/big";
 import Decimal from "decimal.js";
+import { normalizeGrowthState } from "../economy/incremental-growth";
+import { normalizeCompanyState } from "../economy/company-level";
+import {
+  SPONSOR_INCOME_ADS_PER_DAY,
+  SPONSOR_INCOME_FREE_CHARGES_PER_DAY,
+} from "../economy/sponsor";
+import { OFFLINE_AD_SLICE_LIMIT, OFFLINE_FREE_SECONDS, OFFLINE_MAX_SECONDS } from "./offline";
+import { normalizeOrderSlotAssignments } from "./order-slots";
+import {
+  migrateLegacyTrainingLevel,
+  MODEL_TRAINING_SCHEMA_VERSION,
+  normalizeTrainingLevel,
+} from "../economy/model-training";
 
 export type ValidationResult =
   | { ok: true; data: SaveData; repaired: boolean }
@@ -85,14 +99,61 @@ function isValidOfflineReward(r: unknown): r is OfflineReward {
 /** 旧版离线报价回填 CARD-04 回执字段（不丢弃已存在的待领取收益） */
 function normalizeOfflineReward(r: OfflineReward): OfflineReward {
   const x = r as unknown as Record<string, unknown>;
+  const rawElapsedSec = isNonNegative(x.rawElapsedSec) ? (x.rawElapsedSec as number) : r.elapsedSec;
+  // 只保留历史已经解锁的时长；未观看广告的额外容量不属于已获得收益。
+  const elapsedSec = Math.min(Math.max(0, r.elapsedSec), OFFLINE_MAX_SECONDS);
+  const eligibleSec = elapsedSec;
+  const storedMoney = clampStoredBig(x.money, 0);
+  const fallbackRate = elapsedSec > 0
+    ? toStoredBig(new Decimal(storedMoney).div(elapsedSec))
+    : 0;
+  // 旧档 claimed=true 表示整份已领取 → 回填 paidSec=elapsedSec；否则按部分领取语义从 0 起步。
+  const rawPaidSec = isNonNegative(x.paidSec) ? (x.paidSec as number) : (r.claimed ? elapsedSec : 0);
+  const paidSec = Math.min(Math.max(0, Math.floor(rawPaidSec)), elapsedSec);
   return {
     ...r,
-    money: clampStoredBig(x.money, 0),
-    rawElapsedSec: isNonNegative(x.rawElapsedSec) ? (x.rawElapsedSec as number) : r.elapsedSec,
-    capSec: isNonNegative(x.capSec) ? (x.capSec as number) : r.elapsedSec,
+    elapsedSec,
+    money: storedMoney,
+    rawElapsedSec,
+    capSec: Math.max(OFFLINE_FREE_SECONDS, elapsedSec),
+    eligibleSec,
+    adUnlocksUsed: Math.min(OFFLINE_AD_SLICE_LIMIT, Math.floor(clampNonNegative(x.adUnlocksUsed, 0))),
+    adUnlocksMax: 0,
+    moneyPerSec: clampStoredBig(x.moneyPerSec, fallbackRate),
+    paidSec,
+    claimed: paidSec >= elapsedSec,
     researchProgress: isNonNegative(x.researchProgress) ? (x.researchProgress as number) : 0,
     projectProgressDelta: isNonNegative(x.projectProgressDelta) ? (x.projectProgressDelta as number) : 0,
     projectName: typeof x.projectName === "string" ? (x.projectName as string) : null,
+  };
+}
+
+function normalizeChronicle(value: unknown, fallbackNowMs: number): ChronicleState {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rawMilestones = raw.milestones && typeof raw.milestones === "object"
+    ? raw.milestones as Record<string, unknown>
+    : {};
+  const milestones: ChronicleState["milestones"] = {};
+  for (const id of [
+    "first_model",
+    "first_server",
+    "first_iteration",
+    "earth_complete",
+    "stage4_entered",
+    "stage5_entered",
+    "dyson_complete",
+  ] as const) {
+    const time = rawMilestones[id];
+    if (isNonNegative(time)) milestones[id] = Math.floor(time);
+  }
+  return {
+    maxObservedDeviceAtMs: Math.max(
+      Math.floor(clampNonNegative(raw.maxObservedDeviceAtMs, fallbackNowMs)),
+      fallbackNowMs,
+    ),
+    clockAdjustmentCount: Math.floor(clampNonNegative(raw.clockAdjustmentCount, 0)),
+    lastClockAdjustmentAtMs: Math.floor(clampNonNegative(raw.lastClockAdjustmentAtMs, 0)),
+    milestones,
   };
 }
 
@@ -106,6 +167,11 @@ function isValidWorkshop(w: unknown): w is WorkshopState {
     isNonNegativeStoredBig(x.lifetimeRevenue) &&
     typeof x.firstServerAwarded === "boolean"
   );
+}
+
+function isValidCompany(value: unknown): boolean {
+  if (typeof value !== "object" || value === null) return false;
+  return isNonNegative((value as Record<string, unknown>).totalExperience);
 }
 
 function isValidModelResearch(r: unknown): r is ModelResearchState {
@@ -247,7 +313,9 @@ export function normalizeSave(input: unknown): SaveData | null {
     : isValidModelProgress(raw.modelProgress)
       ? {
           modelId: raw.modelProgress.modelId,
-          level: Math.max(1, Math.floor(raw.modelProgress.level)),
+          level: raw.schemaVersion < MODEL_TRAINING_SCHEMA_VERSION
+            ? migrateLegacyTrainingLevel(raw.modelProgress.level)
+            : normalizeTrainingLevel(raw.modelProgress.level),
           trainingCount: Math.floor(clampNonNegative(
             (raw.modelProgress as unknown as Record<string, unknown>).trainingCount,
             0
@@ -299,8 +367,34 @@ export function normalizeSave(input: unknown): SaveData | null {
   }
 
   const activeOrders: OrderState[] = Array.isArray(raw.activeOrders)
-    ? raw.activeOrders.filter(isValidOrder)
+    ? raw.activeOrders.filter(isValidOrder).map((order) => ({ ...order }))
     : [];
+  normalizeOrderSlotAssignments(activeOrders);
+
+  // 订单解锁/槽位是 v7 之后的可选增量字段：不提升 schema，保证旧正式档可读。
+  // Owner R2 口径：每个已解锁订单固定拥有 4 个免费并行槽位；旧档容量统一迁移为 4。
+  const knownOrderIds = new Set(ORDERS.map((order) => order.id));
+  const rawUnlocked = Array.isArray(raw.unlockedOrderIds)
+    ? [...new Set(raw.unlockedOrderIds.filter((id): id is string => typeof id === "string" && knownOrderIds.has(id)))]
+    : null;
+  const legacyWide = rawUnlocked == null && (
+    raw.automation === true
+    || activeOrders.some((order) => order.orderId !== ORDERS[0].id)
+    || activeOrders.length > 1
+  );
+  const unlockedOrderIds = rawUnlocked && rawUnlocked.length > 0
+    ? rawUnlocked
+    : (legacyWide ? ORDERS.map((order) => order.id) : [ORDERS[0].id]);
+  for (const active of activeOrders) {
+    if (knownOrderIds.has(active.orderId) && !unlockedOrderIds.includes(active.orderId)) {
+      unlockedOrderIds.push(active.orderId);
+    }
+  }
+  const orderSlotCapacity: Record<string, number> = {};
+  for (const order of ORDERS) {
+    if (!unlockedOrderIds.includes(order.id)) continue;
+    orderSlotCapacity[order.id] = ORDER_QUEUE_CAP;
+  }
 
   const pendingOfflineReward =
     raw.pendingOfflineReward == null
@@ -327,28 +421,21 @@ export function normalizeSave(input: unknown): SaveData | null {
     : { soundEnabled: true, notificationsEnabled: true };
 
   const rawMonetization = raw.monetization as Record<string, unknown> | null | undefined;
-  const rawPendingOffer = rawMonetization?.pendingOffer as Record<string, unknown> | null | undefined;
-  const pendingKind = rawPendingOffer?.kind;
   const rawSponsor = rawMonetization?.sponsor as Record<string, unknown> | null | undefined;
   const monetization: MonetizationState = {
     completedRewardEventIds: Array.isArray(rawMonetization?.completedRewardEventIds)
       ? [...new Set(rawMonetization.completedRewardEventIds.filter((id): id is string => typeof id === "string"))].slice(-64)
       : [],
-    pendingOffer: rawPendingOffer
-      && typeof rawPendingOffer.eventId === "string"
-      && (pendingKind === "offline_capacity" || pendingKind === "income_boost")
-      ? {
-          eventId: rawPendingOffer.eventId,
-          kind: pendingKind,
-          createdAtMs: Math.max(0, Math.floor(clampNonNegative(rawPendingOffer.createdAtMs, 0))),
-        }
-      : null,
+    // 历史待播放事件不是已获得奖励；读取或导入时直接清理，不恢复广告。
+    pendingOffer: null,
     sponsor: {
       dayKey: typeof rawSponsor?.dayKey === "string" ? rawSponsor.dayKey : "",
-      offlineAdsWatchedToday: Math.min(9, Math.floor(clampNonNegative(rawSponsor?.offlineAdsWatchedToday, 0))),
-      incomeFreeChargesUsedToday: Math.min(3, Math.floor(clampNonNegative(rawSponsor?.incomeFreeChargesUsedToday, 0))),
-      incomeAdsWatchedToday: Math.min(9, Math.floor(clampNonNegative(rawSponsor?.incomeAdsWatchedToday, 0))),
-      offlineCapacityBonusSec: Math.min(18 * 60 * 60, Math.floor(clampNonNegative(rawSponsor?.offlineCapacityBonusSec, 0))),
+      // v8：离线广告次数不再按日预充；历史值安全清零。
+      offlineAdsWatchedToday: 0,
+      incomeFreeChargesUsedToday: Math.min(SPONSOR_INCOME_FREE_CHARGES_PER_DAY, Math.floor(clampNonNegative(rawSponsor?.incomeFreeChargesUsedToday, 0))),
+      incomeAdsWatchedToday: Math.min(SPONSOR_INCOME_ADS_PER_DAY, Math.floor(clampNonNegative(rawSponsor?.incomeAdsWatchedToday, 0))),
+      // v8：旧预充容量不跨账号/跨会话继承；广告只对当前待领取回执生效。
+      offlineCapacityBonusSec: 0,
       incomeBoostUntilMs: Math.max(0, Math.floor(clampNonNegative(rawSponsor?.incomeBoostUntilMs, 0))),
       lastObservedNowMs: Math.max(0, Math.floor(clampNonNegative(rawSponsor?.lastObservedNowMs, raw.updatedAtMs))),
     },
@@ -529,6 +616,24 @@ export function normalizeSave(input: unknown): SaveData | null {
     ? 3
     : normalizedServerCount > 0 ? 2 : 1;
 
+  const company = normalizeCompanyState(raw.company, {
+    workshop,
+    technologyIterationCount: normalizedIterationCount,
+    singularity,
+  });
+
+  const growth = normalizeGrowthState(raw.growth, {
+    modelProgress,
+    modelArchive,
+    serverCount: normalizedServerCount,
+    workshop,
+    singularity,
+  });
+  const chronicle = normalizeChronicle(raw.chronicle, Math.max(
+    Math.floor(clampNonNegative(raw.updatedAtMs, 0)),
+    Math.floor(clampNonNegative(raw.createdAtMs, 0)),
+  ));
+
   return {
     schemaVersion: SAVE_SCHEMA_VERSION,
     saveId: raw.saveId,
@@ -543,6 +648,8 @@ export function normalizeSave(input: unknown): SaveData | null {
     automation: raw.automation === true,
     completedOrders: Math.floor(clampNonNegative(raw.completedOrders, 0)),
     activeOrders,
+    unlockedOrderIds,
+    orderSlotCapacity,
     rentalCompute: {
       active: (raw.rentalCompute as Record<string, unknown> | null)?.active === true,
       units: Math.floor(clampNonNegative((raw.rentalCompute as Record<string, unknown> | null)?.units, 0)),
@@ -553,6 +660,7 @@ export function normalizeSave(input: unknown): SaveData | null {
     },
     serverCount: normalizedServerCount,
     serverPower: normalizedServerPower,
+    growth,
     computeCenterLevel: 0,
     technologyIterationCount: normalizedIterationCount,
     permanentMultiplier: normalizedPermanentMultiplier,
@@ -562,11 +670,13 @@ export function normalizeSave(input: unknown): SaveData | null {
     incomeAtLastPrestige: clampStoredBig(raw.incomeAtLastPrestige, 0),
     lastTickAtMs: Math.max(0, Math.floor(clampNonNegative(raw.lastTickAtMs, 0))),
     workshop,
+    company,
     modelResearch,
     stage2: normalizedStage2,
     stage3: normalizedStage3,
     singularity,
     monetization,
+    chronicle,
     settings,
     createdAtMs: Math.max(0, Math.floor(clampNonNegative(raw.createdAtMs, 0))),
   };
@@ -584,6 +694,13 @@ export function validateSave(input: unknown): ValidationResult {
   if (!normalized) return { ok: false, reason: "corrupt" };
   const normalizedIterationCount = normalized.technologyIterationCount;
   const normalizedPermanentMultiplier = normalized.permanentMultiplier;
+  const rawActiveOrders = Array.isArray(raw.activeOrders)
+    ? raw.activeOrders.filter(isValidOrder)
+    : [];
+  const orderSlotsRepaired = rawActiveOrders.length !== normalized.activeOrders.length
+    || rawActiveOrders.some((order, index) => (
+      order.slotIndex !== normalized.activeOrders[index]?.slotIndex
+    ));
   // 记录是否发生过字段修复
   const repaired = raw.schemaVersion !== normalized.schemaVersion
     || raw.stage !== normalized.stage
@@ -591,7 +708,13 @@ export function validateSave(input: unknown): ValidationResult {
     || raw.automation !== normalized.automation
     || !isValidSettings(raw.settings)
     || raw.modelArchive == null
+    || raw.growth == null
     || raw.monetization == null
+    || raw.chronicle == null
+    || !isValidCompany(raw.company)
+    || !Array.isArray(raw.unlockedOrderIds)
+    || raw.orderSlotCapacity == null
+    || orderSlotsRepaired
     || (raw.singularity != null && !isValidSingularity(raw.singularity))
     || raw.technologyIterationCount !== normalizedIterationCount
     || raw.permanentMultiplier !== normalizedPermanentMultiplier

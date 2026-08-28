@@ -27,6 +27,18 @@ export interface LoadOutcome {
   message: string;
 }
 
+/**
+ * 尚未写入本机存储的完整重置候选。
+ *
+ * 与 `reset()` 的立即写盘不同，兼容事务候选只在
+ * `commitPreparedReset()` 时生效；本接口不访问远端服务。
+ */
+export interface PreparedResetOutcome {
+  ok: boolean;
+  data: SaveData;
+  error?: string;
+}
+
 export class SaveRepository {
   private storage: SaveStorage;
   private nowMs: () => number;
@@ -151,8 +163,8 @@ export class SaveRepository {
     return { ok: true, data: imported };
   }
 
-  /** 重置：二次确认由 UI 负责 */
-  reset(prepareReplacement?: PrepareReplacementSave): { ok: boolean; data: SaveData; error?: string } {
+  /** 准备完整重置，但绝不写入本机存储。 */
+  prepareReset(prepareReplacement?: PrepareReplacementSave): PreparedResetOutcome {
     const fresh = freshSaveData(this.nowMs());
     try {
       prepareReplacement?.(fresh as unknown as Record<string, unknown>);
@@ -163,6 +175,15 @@ export class SaveRepository {
     if (!validated.ok) {
       return { ok: false, data: fresh, error: "save_preparation_failed" };
     }
+    return { ok: true, data: validated.data };
+  }
+
+  /** 提交已准备并校验的完整重置候选。 */
+  commitPreparedReset(prepared: SaveData): PreparedResetOutcome {
+    const validated = validateSave(prepared);
+    if (!validated.ok) {
+      return { ok: false, data: prepared, error: "save_preparation_failed" };
+    }
     // 用户经过二次确认的显式重置允许替换未来版本存档。
     this.writesBlockedByFutureSchema = false;
     let persisted = false;
@@ -171,9 +192,16 @@ export class SaveRepository {
     } catch {
       persisted = false;
     }
-    if (!persisted) return { ok: false, data: fresh, error: "storage_write_failed" };
+    if (!persisted) return { ok: false, data: prepared, error: "storage_write_failed" };
     this.latest = validated.data;
     return { ok: true, data: validated.data };
+  }
+
+  /** 重置：二次确认由 UI 负责。非云档入口维持原有立即写盘语义。 */
+  reset(prepareReplacement?: PrepareReplacementSave): PreparedResetOutcome {
+    const prepared = this.prepareReset(prepareReplacement);
+    if (!prepared.ok) return prepared;
+    return this.commitPreparedReset(prepared.data);
   }
 
   static namespace(): string {

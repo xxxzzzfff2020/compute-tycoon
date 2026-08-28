@@ -4,6 +4,7 @@
 // 使用 jsdom + 开发加速（session.update 直接驱动，等效 dev=1&speed=high）
 import { describe, expect, it } from "vitest";
 import { JSDOM } from "jsdom";
+import Decimal from "decimal.js";
 import { GameSession } from "../../src/app/session";
 import { FakeClock } from "../unit/helpers";
 import { MemorySaveStorage } from "../../src/save/storage";
@@ -11,7 +12,12 @@ import { SaveRepository } from "../../src/save/repository";
 import { createAppShell } from "../../src/ui/render";
 import { ORDERS, SERVERS, PRESTIGE_TARGET_INCOME } from "../../src/data/content";
 import { FIRST_SERVER_WORKSHOP_LEVEL } from "../../src/economy/workshop";
+import { blueprintUpgradeCost } from "../../src/economy/incremental-growth";
+import { FLAGSHIP_PROJECTS } from "../../src/data/stage3";
 import { t } from "../../src/i18n";
+
+const flagshipProgressRequired = (projectId: string): number =>
+  FLAGSHIP_PROJECTS.find((project) => project.id === projectId)!.progressRequired;
 
 function setupDom() {
   const dom = new JSDOM("<!doctype html><html><body><div id=\"app\"></div></body></html>", {
@@ -48,11 +54,11 @@ describe("E2E full loop", () => {
     // 获取模型
     expect(session.acquireModel().ok).toBe(true);
 
-    // 接第一批订单（推荐订单 o1）
+    // 新合同：所有业务共享固定四格，第一批四个任务并行推进。
     for (let i = 0; i < 4; i++) {
       expect(session.acceptOrder(ORDERS[0].id).ok).toBe(true);
     }
-    // 推进时间完成订单（compute=1 → 15s/单）
+    // 推进时间完成订单（compute=1 → 四格均在 15s 左右完成）
     for (let t = 0; t < 80; t++) {
       clock.advance(1000);
       session.update(1);
@@ -75,7 +81,8 @@ describe("E2E full loop", () => {
       completed = session.getState().completedOrders;
     }
     expect(session.getState().completedOrders).toBeGreaterThanOrEqual(6);
-    expect(session.enableAutomation().ok).toBe(true);
+    // 自动经营现在由第一台自有服务器解锁；未取得服务器前不能开启。
+    expect(session.enableAutomation().ok).toBe(false);
 
     // 自动经营攒钱 → 取得第一台服务器（Stage 1 里程碑：等级 + 累计收入，不扣资金）
     const s1 = session.getState();
@@ -87,13 +94,16 @@ describe("E2E full loop", () => {
     expect(session.buyServer().ok).toBe(true);
     expect(session.getState().serverCount).toBe(1);
     expect(session.getState().money).toBe(moneyBeforeAward); // 不扣除当前资金
-    // 模型研发循环：订单/升级累积进度 → 100% 免费研发（不耗资金）
-    let research = session.getState().modelResearch!;
-    research.progress = 100;
-    session.save("research_full");
-    expect(session.researchModel().ok).toBe(true);
-    expect(session.getState().modelResearch!.progress).toBe(0);
-    expect(session.getState().ownedModelIds.length).toBeGreaterThanOrEqual(1);
+    expect(session.enableAutomation().ok).toBe(true);
+    // 蓝图仅保留资金升级：未拥有的蓝图由第一次 Lv.0→Lv.1 付费升级取得。
+    const voiceCost = blueprintUpgradeCost(session.getState(), "voice");
+    const blueprintState = session.getState();
+    blueprintState.money = voiceCost.plus(1_000).toNumber();
+    session.save("paid_blueprint");
+    expect(session.upgradeBlueprint("voice", 1).ok).toBe(true);
+    expect(session.getState().modelArchive.voice.level).toBe(1);
+    expect(session.getState().ownedModelIds).toContain("voice");
+    expect(new Decimal(session.getState().money).toFixed()).toBe("1000");
 
     // 订单表现三档：单笔（Stage1）→ 业务流水（服务器集群算力）→ 算力结算（8 台）
     expect(session.viewModel().orderDisplay.mode).toBe("single");
@@ -177,11 +187,12 @@ describe("E2E full loop", () => {
 
     // 旗舰工程 1：机房 1 解锁，启动 → 推进 → 手动领取（不自动领）
     expect(session.startFlagship("project_1").ok).toBe(true);
+    const p1ReadyProgress = flagshipProgressRequired("project_1") - 1;
     const projState = session.getState();
     projState.stage3 = {
       ...projState.stage3,
-      projectProgress: 499,
-      flagship: { activeId: "project_1", progress: 499, startedAtMs: 1, completedIds: [], pendingReward: null },
+      projectProgress: p1ReadyProgress,
+      flagship: { activeId: "project_1", progress: p1ReadyProgress, startedAtMs: 1, completedIds: [], pendingReward: null },
     };
     session.save("proj1_advance");
     for (let i = 0; i < 30; i++) {
@@ -215,11 +226,12 @@ describe("E2E full loop", () => {
 
     // 机房 2 投产 → 旗舰工程 2 解锁（全国推理服务网络）
     expect(session.startFlagship("project_2").ok).toBe(true);
+    const p2ReadyProgress = flagshipProgressRequired("project_2") - 1;
     const p2State = session.getState();
     p2State.stage3 = {
       ...p2State.stage3,
-      projectProgress: 3999,
-      flagship: { activeId: "project_2", progress: 3999, startedAtMs: 1, completedIds: ["project_1"], pendingReward: null },
+      projectProgress: p2ReadyProgress,
+      flagship: { activeId: "project_2", progress: p2ReadyProgress, startedAtMs: 1, completedIds: ["project_1"], pendingReward: null },
     };
     session.save("p2_advance");
     for (let i = 0; i < 30; i++) {
@@ -249,11 +261,12 @@ describe("E2E full loop", () => {
 
     // 最终旗舰工程 3：完成 → 解锁第一次技术迭代
     expect(session.startFlagship("project_3").ok).toBe(true);
+    const p3ReadyProgress = flagshipProgressRequired("project_3") - 1;
     const p3State = session.getState();
     p3State.stage3 = {
       ...p3State.stage3,
-      projectProgress: 14999,
-      flagship: { activeId: "project_3", progress: 14999, startedAtMs: 1, completedIds: ["project_1", "project_2"], pendingReward: null },
+      projectProgress: p3ReadyProgress,
+      flagship: { activeId: "project_3", progress: p3ReadyProgress, startedAtMs: 1, completedIds: ["project_1", "project_2"], pendingReward: null },
     };
     session.save("p3_advance");
     for (let i = 0; i < 30; i++) {

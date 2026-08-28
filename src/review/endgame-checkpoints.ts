@@ -11,7 +11,7 @@ import {
 import { STAGE4_NODES, STAGE4_FINAL_PROJECT } from "../economy/stage4";
 import { STAGE5_NODES, STAGE5_FINAL_PROJECT } from "../economy/stage5";
 import { freshSaveData } from "../save/storage";
-import type { SaveData } from "../save/types";
+import { SAVE_SCHEMA_VERSION, type SaveData } from "../save/types";
 import { validateSave } from "../save/validate";
 
 export const ENDGAME_REVIEW_STORAGE_PREFIX = "compute_tycoon_h5_endgame_review_v1";
@@ -324,7 +324,7 @@ function rawEndgameSave(id: EndgameReviewCheckpointId, nowMs: number): SaveData 
 export function endgameReviewInvariantIssues(state: SaveData, id: EndgameReviewCheckpointId): string[] {
   const issues: string[] = [];
   if (state.singularity?.mode !== "endgame") issues.push("not_endgame_mode");
-  if (state.schemaVersion !== 6) issues.push("schema_not_v6");
+  if (state.schemaVersion !== SAVE_SCHEMA_VERSION) issues.push("schema_not_current");
   if (state.technologyIterationCount > MAX_ITERATIONS) issues.push("iteration_over_cap");
   if (new Set(state.stage3.flagship.completedIds).size !== state.stage3.flagship.completedIds.length) {
     issues.push("duplicate_flagship_reward");

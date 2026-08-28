@@ -94,10 +94,16 @@ describe("stage2: business mix", () => {
     const s = makeState();
     acquireFirstModel(s);
     s.automation = true;
+    s.serverCount = 1;
+    s.unlockedOrderIds = ORDERS.map((order) => order.id);
+    s.orderSlotCapacity = Object.fromEntries(ORDERS.map((order) => [order.id, 4]));
     const n = automationAutoAccept(s, 0);
-    expect(n).toBeGreaterThan(0);
-    expect(s.activeOrders.length).toBeGreaterThan(0);
-    expect(s.activeOrders.length).toBeLessThanOrEqual(4);
+    expect(n).toBe(20);
+    expect(s.activeOrders).toHaveLength(20);
+    for (const order of ORDERS) {
+      expect(s.activeOrders.filter((active) => active.orderId === order.id)).toHaveLength(4);
+    }
+    expect(s.activeOrders.every((active) => ORDERS.some((order) => order.id === active.orderId))).toBe(true);
   });
 
   it("aggregate_income_matches_order_contributions", () => {
@@ -115,59 +121,25 @@ describe("stage2: business mix", () => {
   });
 });
 
-describe("stage2: model research", () => {
-  it("research_progress_from_orders", () => {
+describe("stage2: paid-only Blueprints", () => {
+  it("orders and workshop levels no longer grant free Blueprint progress", () => {
     const s = makeState();
     acquireFirstModel(s);
-    const def = ORDERS.find((o) => o.id === "o1")!;
-    addResearchFromOrder(s, def);
-    expect(s.modelResearch!.progress).toBeGreaterThan(0);
-    expect(s.modelResearch!.progress).toBeLessThanOrEqual(100);
-  });
-
-  it("research_progress_from_level", () => {
-    const s = makeState();
-    acquireFirstModel(s);
+    s.modelResearch.progress = 42;
+    addResearchFromOrder(s, ORDERS[0]);
     addResearchFromLevelUp(s);
-    expect(s.modelResearch!.progress).toBeGreaterThanOrEqual(12);
+    expect(s.modelResearch.progress).toBe(42);
   });
 
-  it("free_model_draw_at_full_progress", () => {
-    const s = makeState();
-    acquireFirstModel(s);
-    grantFirstServer(s); // 研发循环在 Stage 2（首服后）启用
-    s.modelResearch!.progress = 100;
-    expect(canResearchModel(s)).toBe(true);
-    const res = researchModel(s);
-    expect(res.ok).toBe(true);
-    expect(s.modelResearch!.progress).toBe(0); // 消耗后归零
-  });
-
-  it("research_does_not_cost_money", () => {
+  it("legacy full progress cannot trigger a free Blueprint level", () => {
     const s = makeState();
     acquireFirstModel(s);
     grantFirstServer(s);
-    s.money = 0;
-    s.modelResearch!.progress = 100;
-    const res = researchModel(s);
-    expect(res.ok).toBe(true);
-    expect(s.money).toBe(0);
-  });
-
-  it("duplicate_model_converts_to_experience", () => {
-    const s = makeState();
-    acquireFirstModel(s);
-    grantFirstServer(s);
-    s.modelResearch!.progress = 100;
-    // 当前模型 codex；强制抽到 codex（重复）
-    s.ownedModelIds = ["codex", "vision", "voice", "science"];
-    const beforeLevel = s.modelProgress!.level;
-    // 全部拥有时重复 → 等级+1
-    const res = researchModel(s);
-    expect(res.ok).toBe(true);
-    if (!res.isNew) {
-      expect(s.modelProgress!.level).toBeGreaterThanOrEqual(beforeLevel);
-    }
+    s.modelResearch.progress = 100;
+    const before = structuredClone(s);
+    expect(canResearchModel(s)).toBe(false);
+    expect(researchModel(s)).toMatchObject({ ok: false, error: "feature_removed" });
+    expect(s).toEqual(before);
   });
 
   it("model_passive_updates_income", () => {
@@ -179,16 +151,6 @@ describe("stage2: model research", () => {
     expect(modelCompute(s).gt(modelCompute({ ...s, modelProgress: { ...s.modelProgress!, level: before } }))).toBe(true);
   });
 
-  it("research_exactly_once_per_full_progress", () => {
-    const s = makeState();
-    acquireFirstModel(s);
-    grantFirstServer(s);
-    s.modelResearch!.progress = 100;
-    expect(researchModel(s).ok).toBe(true);
-    // 进度归零后不能再研发
-    expect(canResearchModel(s)).toBe(false);
-    expect(researchModel(s).ok).toBe(false);
-  });
 });
 
 describe("stage2: server expansion & stages", () => {
@@ -206,11 +168,8 @@ describe("stage2: server expansion & stages", () => {
   });
 
   it("server_price_progression", () => {
-    // 4 台起规模化成本回落，4→8 台单调递增
-    const c3 = SERVERS[2].cost;
-    const c4 = SERVERS[3].cost;
-    expect(c4).toBeLessThan(c3);
-    for (let i = 4; i < 8; i++) {
+    // 候选 E：第 2→8 台严格递增，没有第 4 台价格倒挂。
+    for (let i = 1; i < 8; i++) {
       expect(SERVERS[i].cost).toBeGreaterThan(SERVERS[i - 1].cost);
     }
   });

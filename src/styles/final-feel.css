@@ -7,6 +7,10 @@
   margin-bottom: 10px;
 }
 
+.final-feel-panel[hidden] {
+  display: none !important;
+}
+
 /* 组件用原生 hidden 控制未触发内容；显式 display 不能把它重新显示。 */
 .final-feel-panel [hidden] {
   display: none !important;
@@ -251,6 +255,11 @@
 .growth-feedback-detail { color: var(--muted); font-size: 11px; line-height: 1.45; }
 .growth-feedback[data-kind="bottleneck_released"] { border-color: var(--ok); }
 .growth-feedback[data-kind="milestone"] { border-color: var(--money); }
+/* 首局不为未来反馈提前占位；真实反馈到达时才渐进出现。 */
+.final-feel-panel .growth-feedback[hidden] {
+  display: none !important;
+  animation: none;
+}
 
 .investment-summary {
   display: grid;
@@ -260,6 +269,7 @@
   border-radius: 13px;
   background: rgba(16, 29, 55, 0.82);
 }
+.investment-summary[hidden] { display: none !important; }
 .investment-summary-header { display: grid; gap: 2px; }
 .investment-summary-title { color: var(--text); font-size: 13px; }
 .investment-summary-recommendation {
@@ -273,6 +283,7 @@
 .investment-summary-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 44px);
   gap: 6px;
 }
 .investment-action {
@@ -294,6 +305,27 @@
 }
 .investment-action:active { transform: scale(0.97); }
 .investment-action.became-affordable { animation: feel-affordable-edge 0.62s ease-out both; }
+.investment-action-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 只有即时反馈固定在 HUD 层；增长回顾留在正常文档流。 */
+.feel-hud-feedback {
+  position: fixed;
+  z-index: 32;
+  top: calc(env(safe-area-inset-top) + 142px);
+  left: 50%;
+  display: grid;
+  width: min(calc(100vw - 24px), 406px);
+  gap: 6px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+.feel-hud-feedback .growth-feedback {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
+}
 
 .growth-review-card {
   display: grid;
@@ -302,6 +334,7 @@
   border: 1px solid rgba(255, 209, 102, 0.32);
   border-radius: 13px;
   background: linear-gradient(145deg, rgba(52, 42, 42, 0.64), rgba(19, 29, 53, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .growth-review-kicker { color: var(--money); font-size: 10px; font-weight: 900; letter-spacing: 0.14em; }
 .growth-review-route { font-size: 13px; line-height: 1.35; }
@@ -379,7 +412,7 @@
   .compute-engine-visual { width: 76px; }
   .compute-ring-outer { width: 64px; height: 64px; }
   .compute-engine-value { font-size: 18px; }
-  .investment-summary-actions { grid-template-columns: 1fr; }
+  .investment-summary-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .investment-action { min-height: 44px; }
   .infra-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .infra-name { font-size: 12px; }
@@ -400,4 +433,64 @@
   .compute-core,
   .compute-orbit,
   .compute-particle { transform: translate(-50%, -50%); }
+}
+
+/*
+ * 全局图标卡片最终覆盖层。
+ * final-feel.css 在 main.css 之后加载，因此所有和卡片列数、尺寸相关的
+ * 最终合同都集中写在这里，避免旧的双列移动端规则重新把大图标挤回小图标。
+ */
+.app .talent-grid,
+.app .infra-grid,
+.app .stage4-nodes,
+.app .stage5-nodes {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app .growth-card,
+.app .talent-node,
+.app .model-catalog-card,
+.app .infra-card,
+.app .room-card,
+.app .flagship-card,
+.app .flagship-active,
+.app .stage4-node,
+.app .stage4-project,
+.app .stage5-node,
+.app .stage5-project {
+  min-width: 0;
+  min-height: 0;
+  padding: 13px;
+}
+
+.app .game-object-header {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 13px;
+  min-height: 78px;
+}
+
+.app .game-object-icon {
+  width: 72px;
+  height: 72px;
+}
+
+.app .game-object-glyph {
+  width: 57px;
+  height: 57px;
+  font-size: 57px;
+}
+
+@media (max-width: 350px) {
+  .app .infra-grid { grid-template-columns: minmax(0, 1fr); }
+  .app .game-object-header {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .app .game-object-icon { width: 64px; height: 64px; }
+  .app .game-object-glyph { width: 51px; height: 51px; font-size: 51px; }
+  .app .game-object-badge {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: -3px;
+  }
 }

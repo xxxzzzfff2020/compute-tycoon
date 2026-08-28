@@ -5,8 +5,54 @@ import { toStoredBig, type StoredBig } from "../core/big";
 export const SAVE_NAMESPACE = "compute_tycoon_h5_mvp_v1";
 /** 终局隔离 Review 命名空间（不触碰正式档与 Review v2 命名空间）。 */
 export const ENDGAME_SAVE_NAMESPACE = "compute_tycoon_h5_endgame_review_v1";
-export const SAVE_SCHEMA_VERSION = 6;
-export const MAX_SUPPORTED_SCHEMA_VERSION = 6;
+/**
+ * v9：共享模型训练从 20 级等价细分为 40 级；旧档按完成比例一次迁移，
+ * 满级处理能力与完整训练总费用保持不变。
+ */
+export const SAVE_SCHEMA_VERSION = 9;
+export const MAX_SUPPORTED_SCHEMA_VERSION = 9;
+
+export type TalentNodeId =
+  | "blueprint_power"
+  | "blueprint_efficiency"
+  | "blueprint_milestone"
+  | "scale_power"
+  | "scale_efficiency"
+  | "scale_milestone";
+
+/**
+ * CARD-01：暴富内核的永久/本轮成长事实源。
+ *
+ * - blueprintBaseLevels + legacyModelId 是 v6→v7 等价锚点，只用于保证迁移瞬间不跳数；
+ * - serverUnits 是当前轮规模，技术迭代时随服务器一起重置；
+ * - talents 是有限永久成长，资金与广告均不能购买。
+ */
+export interface IncrementalGrowthState {
+  blueprintBaseLevels: Record<string, number>;
+  legacyModelId: string | null;
+  serverUnits: Record<string, number>;
+  serverBaseUnits: Record<string, number>;
+  talent: {
+    highestWorkshopLevel: number;
+    claimedWorkshopLevels: number[];
+    claimedCoreIds: string[];
+    /** 负责人验收反馈：天赋点新来源为成就领取；旧工作室/核心记录仅作迁移兼容，不再继续发放。 */
+    claimedAchievementIds: string[];
+    /** 领取成就时记录的达成信息（时间/阶段/工作室等级），供个人历程展示；旧档由归一化回填。 */
+    achievementRecords: Record<string, AchievementRecord>;
+    pointsEarned: number;
+    allocations: Record<TalentNodeId, number>;
+  };
+}
+
+/** 单条成就的达成记录（领取时快照，时间只增不减）。 */
+export interface AchievementRecord {
+  achievedAtMs: number;
+  /** 达成时的有效阶段编号（1–5；4/5 对应地月/戴森纪元）。 */
+  stage: number;
+  /** 达成时的工作室等级。 */
+  workshopLevel: number;
+}
 
 export interface ModelProgressState {
   modelId: string;
@@ -33,9 +79,11 @@ export interface ModelArchiveEntry {
 export interface OrderState {
   orderId: string;
   startedAtMs: number;
+  /** 固定并行处理线编号；旧档缺失时按同订单当前顺序迁移为 0..3。 */
+  slotIndex?: number;
   /** 订单完成所需的剩余秒数（用于恢复） */
   remainingSec: number;
-  /** 0=处理中 1=可领取 2=已领取 */
+  /** 0=处理中；1/2 为旧版“待领取/已领取”状态，读取后会自动结算。 */
   status: 0 | 1 | 2;
 }
 
@@ -73,13 +121,27 @@ export interface Stage2State {
 export interface OfflineReward {
   startedAtMs: number;
   endedAtMs: number;
-  /** 有效结算秒数（= min(实际离线, 阶段上限)） */
+  /** 当前已解锁、可领取的离线秒数；新会话初始最多免费 2 小时。 */
   elapsedSec: number;
   /** 实际离线秒数（超出部分展示用） */
   rawElapsedSec: number;
-  /** 本阶段离线上限秒数 */
+  /** 单次离线会话最终最多可领取的秒数（新合同为 14 小时）。 */
   capSec: number;
+  /** 本次实际可被解锁的有效时长（min(实际离线, 14 小时)）。 */
+  eligibleSec: number;
+  /** 同一离线会话中已成功观看并发奖的扩容广告次数（0–6）。 */
+  adUnlocksUsed: number;
+  /** 同一离线会话允许的最大扩容广告次数（固定 6）。 */
+  adUnlocksMax: number;
+  /** 已含离线效率的每秒收入快照；广告扩容只能按这次离线快照补领，不能重算。 */
+  moneyPerSec: StoredBig;
   money: StoredBig;
+  /**
+   * 已实际领取入账的离线秒数（部分领取：先领免费 2 小时，广告扩容后可继续领）。
+   * 旧档 claimed=true 语义为整份已领，归一化时回填 paidSec=elapsedSec。
+   */
+  paidSec: number;
+  /** true 仅表示本会话已全部结算（无未领部分且广告也无法再扩容）。 */
   claimed: boolean;
   /** CARD-04 回归回执：离线期间获得研发进度（0-100 增量） */
   researchProgress: number;
@@ -103,14 +165,43 @@ export interface RewardedAdOfferState {
 export interface SponsorState {
   /** 北京时间自然日；只向前滚动，防设备时间回拨重复领取。 */
   dayKey: string;
+  /** 旧字段，仅兼容读取；离线广告额度现在归属于单次离线回执，不再按日累计。 */
   offlineAdsWatchedToday: number;
   incomeFreeChargesUsedToday: number;
   incomeAdsWatchedToday: number;
-  /** 充给下一次离线结算的额外容量，0–18小时。 */
+  /**
+   * 仅兼容历史存档的旧预充容量字段。v8 起离线广告只扩展当前待领取回执，
+   * 不跨回归会话保留，归一化后固定为 0。
+   */
   offlineCapacityBonusSec: number;
-  /** 收入×2的真实墙钟到期时间；最多保留未来24小时。 */
+  /** 收入×2的真实墙钟到期时间；最多保留未来12小时。 */
   incomeBoostUntilMs: number;
   lastObservedNowMs: number;
+}
+
+export type ChronicleMilestoneId =
+  | "first_model"
+  | "first_server"
+  | "first_iteration"
+  | "earth_complete"
+  | "stage4_entered"
+  | "stage5_entered"
+  | "dyson_complete";
+
+/**
+ * 银河历程册：只随当前账号云档同步，不向平台排行榜提交，也不用于反作弊裁决。
+ * 时间仅做“设备记录时间”展示；记录只增不减，活跃会话检测到明显跳变时做中性标注。
+ */
+export interface ChronicleState {
+  maxObservedDeviceAtMs: number;
+  clockAdjustmentCount: number;
+  lastClockAdjustmentAtMs: number;
+  milestones: Partial<Record<ChronicleMilestoneId, number>>;
+}
+
+/** 跨技术迭代与宇宙阶段永久累积的公司等级事实源。 */
+export interface CompanyState {
+  totalExperience: number;
 }
 
 /** 激励视频奖励账本：事件ID持久化，确保重试/刷新不会重复发奖。 */
@@ -134,9 +225,13 @@ export interface SaveData {
   /** 每个模型的永久图鉴等级与历史贡献。 */
   modelArchive: Record<string, ModelArchiveEntry>;
   automation: boolean;
-  /** 手动完成订单计数（解锁自动经营） */
+  /** 历史累计完成订单数；自动经营现由首台服务器解锁。 */
   completedOrders: number;
   activeOrders: OrderState[];
+  /** 已购买的订单类型；缺失时由存档迁移推断，避免破坏旧档。 */
+  unlockedOrderIds?: string[];
+  /** 每个已解锁订单的独立并行槽位；当前固定为 4，字段保留用于旧档迁移。 */
+  orderSlotCapacity?: Record<string, number>;
   rentalCompute: {
     active: boolean;
     /** 租赁算力单位（每台服务器等效） */
@@ -147,6 +242,8 @@ export interface SaveData {
   serverCount: number;
   /** 服务器总算力（各服务器 power 之和） */
   serverPower: StoredBig;
+  /** CARD-01：全局蓝图算力 × 服务器规模 × 有限天赋。 */
+  growth: IncrementalGrowthState;
   computeCenterLevel: number;
   technologyIterationCount: number;
   permanentMultiplier: number;
@@ -158,6 +255,8 @@ export interface SaveData {
   /** 离线开始锚点：上次结算时间 */
   lastTickAtMs: number;
   workshop: WorkshopState;
+  /** 永不因技术迭代重置的公司等级累计经验；旧档由迁移补齐。 */
+  company?: CompanyState;
   /** 模型研发循环状态 */
   modelResearch: ModelResearchState;
   /** Stage 2 集群里程碑 */
@@ -168,6 +267,8 @@ export interface SaveData {
   singularity: SingularityState | null;
   /** 仅包含可选激励视频的幂等奖励账本，不保存平台广告状态。 */
   monetization: MonetizationState;
+  /** 当前账号的本地/云同步银河历程册。 */
+  chronicle: ChronicleState;
   settings: SettingsState;
   /** 创建时间 */
   createdAtMs: number;

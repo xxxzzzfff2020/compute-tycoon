@@ -3,7 +3,7 @@ import { GameSession } from "../../src/app/session";
 import { buildReviewSave } from "../../src/review/checkpoints";
 import { SaveRepository } from "../../src/save/repository";
 import { MemorySaveStorage, freshSaveData, type SaveStorage } from "../../src/save/storage";
-import { MAX_SUPPORTED_SCHEMA_VERSION, type SaveData } from "../../src/save/types";
+import { MAX_SUPPORTED_SCHEMA_VERSION, SAVE_SCHEMA_VERSION, type SaveData } from "../../src/save/types";
 
 const NOW = 1_800_000_000_000;
 
@@ -71,7 +71,9 @@ describe("founder review deterministic hardening", () => {
         repository: new SaveRepository({ storage, nowMs: () => NOW }),
         clock: { now: () => NOW },
       });
-      expect(reloaded.hasPendingOffline()).toBe(false);
+      // 部分领取：报价常驻，但刷新不重复入账
+      expect(reloaded.hasPendingOffline()).toBe(true);
+      expect(reloaded.claimOffline().ok).toBe(false);
       expect(reloaded.getState().money).toBe(afterFirstClaim);
       expect(reloaded.getState().stage3.flagship.completedIds).toEqual(before.completedProjects);
       expect(reloaded.getState().technologyIterationCount).toBe(before.iterationCount);
@@ -89,7 +91,8 @@ describe("founder review deterministic hardening", () => {
       repository: new SaveRepository({ storage, nowMs: () => NOW - 2 * 60 * 60 * 1000 }),
       clock: { now: () => NOW - 2 * 60 * 60 * 1000 },
     });
-    expect(rolledBack.hasPendingOffline()).toBe(false);
+    expect(rolledBack.hasPendingOffline()).toBe(true);
+    expect(rolledBack.claimOffline().ok).toBe(false);
     expect(rolledBack.getState().money).toBe(money);
   });
 
@@ -99,7 +102,7 @@ describe("founder review deterministic hardening", () => {
     const repository = new SaveRepository({ storage, nowMs: () => NOW });
     const result = repository.load();
     expect(result.kind).toBe("corrupt_recreated");
-    expect(result.data.schemaVersion).toBe(6);
+    expect(result.data.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(result.data.money).toBe(0);
   });
 

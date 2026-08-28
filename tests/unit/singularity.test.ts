@@ -1,5 +1,6 @@
 // CARD-01：有限三次迭代与奇点核心（隔离终局命名空间）单元测试。
 import { describe, expect, it } from "vitest";
+import Decimal from "decimal.js";
 import { freshSaveData } from "../../src/save/storage";
 import { validateSave, normalizeSave } from "../../src/save/validate";
 import {
@@ -24,17 +25,50 @@ import {
   claimFlagshipReward,
   canStartFlagship,
   hasPendingFlagshipReward,
+  projectConstructionCost,
 } from "../../src/economy/stage3";
 import { canIterate, iterationRequirementsMet, applyFirstIteration } from "../../src/economy/stage3";
 import type { SaveData } from "../../src/save/types";
+import { ERA_PROJECTS, FLAGSHIP_PROJECTS } from "../../src/data/stage3";
 
 function now() {
   return 1_700_000_000_000;
 }
 
+describe("bounded era-project tuning", () => {
+  it("keeps the recalibrated R1 funding ladder isolated from later rounds", () => {
+    expect(FLAGSHIP_PROJECTS.map((project) => project.constructionCosts[0])).toEqual([
+      15_000_000_000,
+      180_000_000_000,
+      2_500_000_000_000,
+    ]);
+    expect(ERA_PROJECTS.find((project) => project.id === "project_r1")?.constructionCosts).toEqual([
+      6_000_000_000_000,
+      6_000_000_000_000,
+      6_000_000_000_000,
+    ]);
+    expect(FLAGSHIP_PROJECTS.map((project) => project.constructionCosts[1])).toEqual([
+      77_760_000_000,
+      210_600_000_000,
+      2_430_000_000_000,
+    ]);
+    expect(FLAGSHIP_PROJECTS.map((project) => project.constructionCosts[2])).toEqual([
+      92_400_000_000,
+      369_600_000_000,
+      3_696_000_000_000,
+    ]);
+  });
+
+  it("keeps the approved R2 and R3 progress requirements in the formal data source", () => {
+    expect(ERA_PROJECTS.find((project) => project.id === "project_r2")?.progressRequired).toBe(25_200);
+    expect(ERA_PROJECTS.find((project) => project.id === "project_r3")?.progressRequired).toBe(32_400);
+  });
+});
+
 /** 构造隔离终局档（R1 起点：三机房 + 旗舰 project_3 已完成） */
 function endgameState(): SaveData {
   const s = freshSaveData(now());
+  s.money = 1e30;
   s.singularity = {
     mode: "endgame",
     coresClaimed: [],
@@ -68,6 +102,8 @@ function endgameState(): SaveData {
 
 /** 完成 R1 时代工程：启动 project_r1 → 推进到完成 → 领取（不发放资金/研发） */
 function completeEraProject(s: SaveData, projectId: string): void {
+  const constructionCost = projectConstructionCost(s, projectId) ?? new Decimal(0);
+  if (new Decimal(s.money).lt(constructionCost)) s.money = constructionCost.mul(2).toNumber();
   expect(canStartFlagship(s, projectId)).toBe(true);
   expect(startFlagship(s, projectId).ok).toBe(true);
   // 时代工程速度 = 算力×0.001（cap 14/18），循环推进直到完成
@@ -260,6 +296,34 @@ describe("singularity: core state machine", () => {
     expect(currentRound(s)).toBe(2);
   });
 
+  it("keeps owned blueprints but resets their investment to Lv.1 on a new earth round", () => {
+    const s = endgameState();
+    s.ownedModelIds = ["codex", "vision"];
+    s.modelArchive = {
+      codex: {
+        modelId: "codex", level: 40, firstAcquiredAtMs: now(), researchCount: 9,
+        lifetimeTrainingCount: 0, lifetimeContribution: 0,
+      },
+      vision: {
+        modelId: "vision", level: 17, firstAcquiredAtMs: now(), researchCount: 0,
+        lifetimeTrainingCount: 0, lifetimeContribution: 0,
+      },
+    };
+    s.growth.blueprintBaseLevels.codex = 40;
+    s.growth.blueprintBaseLevels.vision = 17;
+
+    completeEraProject(s, "project_r1");
+    expect(claimCore(s).ok).toBe(true);
+    expect(applyEndgameIteration(s).ok).toBe(true);
+
+    expect(s.ownedModelIds).toEqual(["codex", "vision"]);
+    expect(s.modelArchive.codex.level).toBe(1);
+    expect(s.modelArchive.vision.level).toBe(1);
+    expect(s.modelArchive.codex.researchCount).toBe(9);
+    expect(s.growth.blueprintBaseLevels.codex).toBe(1);
+    expect(s.growth.blueprintBaseLevels.vision).toBe(1);
+  });
+
   it("R2 core then iteration2 → ×2.0; R3 core then reveal without reset", () => {
     const s = endgameState();
     completeEraProject(s, "project_r1");
@@ -306,7 +370,7 @@ describe("singularity: core state machine", () => {
         pendingReward: null,
       },
     };
-    s.money = 123_456_789;
+    s.money = (projectConstructionCost(s, "project_r3")?.toNumber() ?? 0) + 123_456_789;
     completeEraProject(s, "project_r3");
     expect(claimCore(s).ok).toBe(true);
     expect(singularityDisplay(s)).toBe("3/3");
@@ -374,6 +438,7 @@ describe("singularity: era project gates", () => {
     expect(canStartFlagship(s, "project_r2")).toBe(false);
     expect(applyEndgameIteration(s).ok).toBe(true);
     s.stage3 = structuredClone(endgameState().stage3);
+    s.money = 1e30;
     // 已进入 R2：只能启动 R2，不能重开 R1 或提前启动 R3。
     expect(canStartFlagship(s, "project_r1")).toBe(false);
     expect(canStartFlagship(s, "project_r2")).toBe(true);
@@ -389,6 +454,7 @@ describe("singularity: era project gates", () => {
     s.stage3.flagship = { activeId: null, progress: 0, startedAtMs: 0, completedIds: ["project_1", "project_2", "project_3", "project_r2"], pendingReward: null };
     s.singularity = { ...s.singularity!, coresClaimed: ["core_1", "core_2"] };
     s.technologyIterationCount = 2;
+    s.money = 1e30;
     expect(canStartFlagship(s, "project_r3")).toBe(true);
   });
 

@@ -2,19 +2,29 @@
 import Decimal from "decimal.js";
 import { toStoredBig } from "../core/big";
 import {
-  AUTOMATION_ORDER_CAP,
+  AUTOMATION_TOTAL_ORDER_CAP,
   AUTOMATION_UNLOCK_ORDERS,
   BASE_BUSINESS_MIX,
   CENTER_BASE_COST,
   CENTER_COST_GROWTH,
   MODEL_ARCHIVE_MAX_LEVEL,
+  MODEL_TRAINING_MAX_LEVEL,
   MODELS,
   ORDERS,
+  ORDER_QUEUE_EFFECTIVE_PARALLELISM,
+  ORDER_UNLOCK_COSTS,
+  ORDER_QUEUE_CAP,
+  ORDER_SLOT_SPEED_MULTIPLIERS,
   SERVER_CENTER_REQUIREMENT,
+  SERVER_ROUND_COST_MULTIPLIERS,
   SERVERS,
   type OrderDef,
 } from "../data/content";
-import type { SaveData } from "../save/types";
+import type { OrderState, SaveData } from "../save/types";
+import {
+  firstFreeOrderSlot,
+  normalizeOrderSlotAssignments,
+} from "../save/order-slots";
 import { sponsorIncomeMultiplier } from "./sponsor";
 import { businessMixForState, modelEffectMultipliers } from "./model-effects";
 import {
@@ -24,7 +34,6 @@ import {
   canIterate,
   iterationRequirementsMet,
   recordEra,
-  researchProgressMultiplier,
   syncArchitectureBlueprints,
   stage3IncomePerSecond,
   stage3TotalCompute,
@@ -50,8 +59,6 @@ import {
 } from "./stage5";
 import {
   addExperience,
-  addResearchFromLevelUp,
-  addResearchFromOrder,
   awardFirstServer,
   experienceToNextLevel,
   firstServerAwarded,
@@ -61,14 +68,31 @@ import {
   XP_AUTOMATION_UNLOCK,
   XP_FIRST_MODEL,
 } from "./workshop";
+import {
+  blueprintGrowthMultiplier,
+  effectiveServerPower,
+  registerBlueprintBaseline,
+  registerOwnedServerUnit,
+  resetServerScaleForIteration,
+  syncTalentPoints,
+} from "./incremental-growth";
+import { applyCompanyCosmicExperience } from "./company-level";
+import {
+  normalizeTrainingLevel,
+  trainingComputeMultiplier,
+  trainingCostAtLevel,
+} from "./model-training";
+export {
+  LEGACY_TRAINING_TOTAL_COST,
+  TRAIN_COMPUTE_GAIN,
+  TRAIN_COST_BASE,
+  TRAIN_COST_GROWTH,
+} from "./model-training";
 
 // ---------- 常数 ----------
 export const RENTAL_UNIT_COST_PER_SEC = 0.25; // 每单位租赁算力每秒成本
 export const RENTAL_UNIT_POWER = 1.0; // 每单位租赁算力处理能力
 export const RENTAL_DEFAULT_UNITS = 2;
-export const TRAIN_COST_BASE = 70; // 训练基础成本
-export const TRAIN_COST_GROWTH = 1.9; // 训练成本成长
-export const TRAIN_COMPUTE_GAIN = 0.10; // 每级训练处理能力提升（校准：避免训练显著加速首服）
 
 export interface ServerPurchaseDef {
   serverId: string;
@@ -104,16 +128,15 @@ export function nextServerDef(state: SaveData): ServerPurchaseDef | null {
 export function nextServerCost(state: SaveData): Decimal | null {
   const def = nextServerDef(state);
   if (!def) return null;
-  return new Decimal(def.cost);
+  const roundIndex = Math.min(2, Math.max(0, state.technologyIterationCount));
+  return new Decimal(def.cost).mul(SERVER_ROUND_COST_MULTIPLIERS[roundIndex]);
 }
 
 // ---------- 模型 ----------
 export function modelLevel(state: SaveData): number {
   if (!state.modelProgress) return 1;
-  const archiveLevel = state.modelArchive?.[state.modelProgress.modelId]?.level ?? 1;
-  const definition = MODELS.find((model) => model.id === state.modelProgress?.modelId);
-  const combined = Math.max(1, state.modelProgress.level) + Math.max(1, archiveLevel) - 1;
-  return definition ? Math.min(definition.maxLevel, combined) : combined;
+  if (!MODELS.some((model) => model.id === state.modelProgress?.modelId)) return 1;
+  return normalizeTrainingLevel(state.modelProgress.level);
 }
 
 function ensureModelArchiveEntry(state: SaveData, modelId: string, nowMs = Date.now()) {
@@ -148,28 +171,27 @@ export function modelBaseCompute(state: SaveData): number {
   return def.baseCompute;
 }
 
-/** 模型处理能力 = baseCompute * (1 + (level-1) * TRAIN_COMPUTE_GAIN) */
+/** 模型处理能力 = baseCompute × 共享训练倍率 × 模型/蓝图/科技倍率。 */
 export function modelCompute(state: SaveData): Decimal {
   const base = modelBaseCompute(state);
   if (base <= 0) return new Decimal(0);
   const level = Math.max(1, modelLevel(state));
   return new Decimal(base)
-    .mul(1 + (level - 1) * TRAIN_COMPUTE_GAIN)
+    .mul(trainingComputeMultiplier(level))
     .mul(modelEffectMultipliers(state).compute)
+    .mul(blueprintGrowthMultiplier(state))
     .mul(techPassiveMultipliers(state).compute);
 }
 
 export function trainCost(state: SaveData): Decimal {
-  const level = modelLevel(state);
-  const cost = new Decimal(TRAIN_COST_BASE).mul(new Decimal(TRAIN_COST_GROWTH).pow(level - 1));
-  return cost.floor();
+  return trainingCostAtLevel(modelLevel(state));
 }
 
 export function canTrain(state: SaveData): boolean {
   if (!state.modelProgress) return false;
   const def = MODELS.find((m) => m.id === state.modelProgress!.modelId);
   if (!def) return false;
-  if (modelLevel(state) >= def.maxLevel) return false;
+  if (modelLevel(state) >= MODEL_TRAINING_MAX_LEVEL) return false;
   return new Decimal(state.money).gte(trainCost(state));
 }
 
@@ -178,7 +200,7 @@ export function applyTrain(state: SaveData): { ok: boolean; error?: string; gain
   if (!state.modelProgress) return { ok: false, error: "no_model", gainedLevel: false };
   const def = MODELS.find((m) => m.id === state.modelProgress!.modelId);
   if (!def) return { ok: false, error: "no_model", gainedLevel: false };
-  if (modelLevel(state) >= def.maxLevel) return { ok: false, error: "max_level", gainedLevel: false };
+  if (modelLevel(state) >= MODEL_TRAINING_MAX_LEVEL) return { ok: false, error: "max_level", gainedLevel: false };
   const cost = trainCost(state);
   if (new Decimal(state.money).lt(cost)) return { ok: false, error: "insufficient_funds", gainedLevel: false };
   state.money = toStoredBig(new Decimal(state.money).minus(cost));
@@ -199,6 +221,7 @@ export function acquireFirstModel(
   state.modelProgress = { modelId, level: 1, trainingCount: 0 };
   if (!state.ownedModelIds.includes(modelId)) state.ownedModelIds.push(modelId);
   ensureModelArchiveEntry(state, modelId);
+  registerBlueprintBaseline(state, modelId);
   recordEra(state, "era_studio");
   addExperience(state, XP_FIRST_MODEL);
   return { ok: true, acquired: true };
@@ -214,9 +237,92 @@ export function orderNet(order: OrderDef): Decimal {
   return new Decimal(order.gross).mul(1 - order.rentalCostRatio);
 }
 
+/** 将旧扁平订单存档补齐为“每订单独立解锁、固定四个免费槽位”模型。 */
+export function ensureOrderAccess(state: SaveData): void {
+  normalizeOrderSlotAssignments(state.activeOrders);
+  const ids = ORDERS.map((order) => order.id);
+  const activeIds = new Set(state.activeOrders.map((order) => order.orderId));
+  const legacyWide = state.unlockedOrderIds == null && (
+    state.automation
+    || state.activeOrders.length > 1
+    || [...activeIds].some((id) => id !== ids[0])
+  );
+  if (!Array.isArray(state.unlockedOrderIds) || state.unlockedOrderIds.length === 0) {
+    state.unlockedOrderIds = legacyWide ? [...ids] : [ids[0]];
+  }
+  for (const id of activeIds) {
+    if (ids.includes(id) && !state.unlockedOrderIds.includes(id)) state.unlockedOrderIds.push(id);
+  }
+  if (!state.orderSlotCapacity) state.orderSlotCapacity = {};
+  for (const id of state.unlockedOrderIds) {
+    state.orderSlotCapacity[id] = ORDER_QUEUE_CAP;
+  }
+}
+
+export function isOrderUnlocked(state: SaveData, orderId: string): boolean {
+  ensureOrderAccess(state);
+  return state.unlockedOrderIds?.includes(orderId) ?? false;
+}
+
+export function orderSlotCapacity(state: SaveData, orderId: string): number {
+  ensureOrderAccess(state);
+  return state.orderSlotCapacity?.[orderId] ?? 0;
+}
+
+export function orderUnlockCost(orderId: string): Decimal {
+  return new Decimal(ORDER_UNLOCK_COSTS[orderId] ?? 0);
+}
+
+export function canUnlockOrder(state: SaveData, orderId: string): boolean {
+  if (!orderById(orderId) || !state.modelProgress || isOrderUnlocked(state, orderId)) return false;
+  return new Decimal(state.money).gte(orderUnlockCost(orderId));
+}
+
+export function unlockOrder(state: SaveData, orderId: string): { ok: boolean; error?: string } {
+  const order = orderById(orderId);
+  if (!order) return { ok: false, error: "unknown_order" };
+  ensureOrderAccess(state);
+  if (isOrderUnlocked(state, orderId)) return { ok: false, error: "order_unlocked" };
+  if (!state.modelProgress) return { ok: false, error: "no_model" };
+  const cost = orderUnlockCost(orderId);
+  if (new Decimal(state.money).lt(cost)) return { ok: false, error: "insufficient_funds" };
+  state.money = toStoredBig(new Decimal(state.money).minus(cost));
+  state.unlockedOrderIds!.push(orderId);
+  state.orderSlotCapacity![orderId] = ORDER_QUEUE_CAP;
+  return { ok: true };
+}
+
+export function canExpandOrderSlot(_state: SaveData, _orderId: string): boolean {
+  // 旧接口仅为存档/会话兼容保留；订单解锁时四格已全部免费开放。
+  return false;
+}
+
+export function expandOrderSlot(state: SaveData, orderId: string): { ok: boolean; error?: string } {
+  if (!orderById(orderId)) return { ok: false, error: "unknown_order" };
+  ensureOrderAccess(state);
+  if (!isOrderUnlocked(state, orderId)) return { ok: false, error: "order_locked" };
+  return { ok: false, error: "order_slots_already_max" };
+}
+
 export function canAcceptOrder(state: SaveData, orderId: string): boolean {
-  if (state.activeOrders.length >= AUTOMATION_ORDER_CAP) return false;
-  return orderById(orderId) != null;
+  if (!orderById(orderId) || !state.modelProgress || !isOrderUnlocked(state, orderId)) return false;
+  return orderQueueCount(state, orderId) < orderSlotCapacity(state, orderId)
+    && firstFreeOrderSlot(state.activeOrders, orderId) !== null;
+}
+
+/** 单条订单队列当前占用格数（兼容旧扁平 activeOrders 存档）。 */
+export function orderQueueCount(state: SaveData, orderId: string): number {
+  return state.activeOrders.filter((order) => order.orderId === orderId).length;
+}
+
+export function orderQueueReadyCount(state: SaveData, orderId: string): number {
+  return state.activeOrders.filter((order) => order.orderId === orderId && order.status === 1).length;
+}
+
+/** 队列位置从 0 开始；超出四槽容量的位置不获得处理速度。 */
+export function orderSlotSpeedMultiplier(position: number): number {
+  if (!Number.isInteger(position) || position < 0) return 0;
+  return ORDER_SLOT_SPEED_MULTIPLIERS[position] ?? 0;
 }
 
 export function orderEndsAtMs(order: OrderDef, startedAtMs: number): number {
@@ -229,9 +335,18 @@ export function acceptOrder(
   orderId: string,
   nowMs: number
 ): { ok: boolean; error?: string } {
-  if (state.activeOrders.length >= AUTOMATION_ORDER_CAP) {
+  if (!orderById(orderId)) {
+    return { ok: false, error: "unknown_order" };
+  }
+  ensureOrderAccess(state);
+  if (!isOrderUnlocked(state, orderId)) {
+    return { ok: false, error: "order_locked" };
+  }
+  if (orderQueueCount(state, orderId) >= orderSlotCapacity(state, orderId)) {
     return { ok: false, error: "order_slots_full" };
   }
+  const slotIndex = firstFreeOrderSlot(state.activeOrders, orderId);
+  if (slotIndex === null) return { ok: false, error: "order_slots_full" };
   const order = orderById(orderId);
   if (!order) return { ok: false, error: "unknown_order" };
   // 有模型才能接单
@@ -239,6 +354,7 @@ export function acceptOrder(
   state.activeOrders.push({
     orderId,
     startedAtMs: nowMs,
+    slotIndex,
     remainingSec: order.durationSec,
     status: 0,
   });
@@ -266,6 +382,12 @@ export function tick(
   }
   // CARD-03 Stage 5：戴森算力纪元专属路径（优先级高于 Stage 4）。
   if (stage5Entered(state)) {
+    const companyExperience = applyCompanyCosmicExperience(
+      state,
+      elapsedSec,
+      1,
+      workshopExperiencePerSecond(state).toNumber(),
+    );
     const s5Income = stage5IncomePerSecond(state, nowMs).mul(elapsedSec);
     advanceDyson(state, elapsedSec);
     state.singularity!.stage5 = {
@@ -282,11 +404,17 @@ export function tick(
       ));
       return { changed: true, income: s5Income, completedOrderIds: [], completedCount: 0 };
     }
-    return { changed: false, income: s5Income, completedOrderIds: [], completedCount: 0 };
+    return { changed: companyExperience > 0, income: s5Income, completedOrderIds: [], completedCount: 0 };
   }
   // CARD-02 Stage 4：地月算力网专属路径。地球订单/自动化/Stage 3 全部停止，
   // 只有“地月收入 + 地月一体化算力网推进”（重新减速，保留太空冷却节奏）。
   if (stage4Entered(state)) {
+    const companyExperience = applyCompanyCosmicExperience(
+      state,
+      elapsedSec,
+      1,
+      workshopExperiencePerSecond(state).toNumber(),
+    );
     const s4Income = stage4IncomePerSecond(state, nowMs).mul(elapsedSec);
     advanceFinalProject(state, elapsedSec);
     state.singularity!.stage4 = {
@@ -303,8 +431,9 @@ export function tick(
       ));
       return { changed: true, income: s4Income, completedOrderIds: [], completedCount: 0 };
     }
-    return { changed: false, income: s4Income, completedOrderIds: [], completedCount: 0 };
+    return { changed: companyExperience > 0, income: s4Income, completedOrderIds: [], completedCount: 0 };
   }
+  ensureOrderAccess(state);
   // 租赁成本：无自有服务器时，每秒按单位成本扣除（与订单是否完成无关）
   let rentalCost = new Decimal(0);
   if (state.serverCount === 0 && state.rentalCompute.active && state.rentalCompute.unitCostPerSec > 0) {
@@ -312,41 +441,84 @@ export function tick(
   }
   const completedOrderIds: string[] = [];
   let income = new Decimal(0);
-  const compute = modelCompute(state);
-  const serverPower = new Decimal(state.serverPower);
-  const speed = compute.mul(serverPower);
-  if (speed.gt(0)) {
-    for (const order of state.activeOrders) {
-      if (order.status !== 0) continue;
-      const def = orderById(order.orderId);
-      if (!def) continue;
-      // 消耗的真实进度
-      const progressSec = elapsedSec * speed.toNumber();
-      order.remainingSec -= progressSec;
-      if (order.remainingSec <= 0) {
-        // 完成（租赁成本由服务器免除与否决定）
-        order.status = 1;
-        completedOrderIds.push(order.orderId);
-        // 手动模式：订单完成按毛/净收入结算；
-        // 自动化模式：收入统一由 incomePerSecond（业务组合加权）按秒发放，
-        // 订单完成只提供经验/研发进度，避免双轨计费导致收入虚高。
-        if (!state.automation) {
-          const base = state.serverCount > 0 ? new Decimal(def.gross) : orderNet(def);
-          income = income.plus(
-            base
-              .mul(modelEffectMultipliers(state).income)
-              .mul(new Decimal(state.permanentMultiplier))
-          );
-        }
-        // 工作室经验：按订单毛收入折算（与倍率无关，避免倍率影响经验节奏）
-        addExperience(state, orderExperienceForState(state, def));
-        // 模型研发进度：订单完成累积（B 方案）
-        addResearchFromOrder(state, def);
+  const orderCountBefore = state.activeOrders.length;
+  if (modelCompute(state).mul(effectiveServerPower(state)).gt(0)) {
+    const completeFreshOrder = (order: OrderState, def: OrderDef): void => {
+      completedOrderIds.push(order.orderId);
+      // 手动模式：订单完成按毛/净收入结算；自动模式由持续收入统一结算。
+      if (!state.automation) {
+        const base = state.serverCount > 0 ? new Decimal(def.gross) : orderNet(def);
+        income = income.plus(
+          base
+            .mul(modelEffectMultipliers(state).income)
+            .mul(new Decimal(state.permanentMultiplier)),
+        );
       }
+      addExperience(state, orderExperienceForState(state, def));
+    };
+
+    // 旧档可能留有 status=1 的“待领取”项：自动移除但不重复发奖；未知订单保留。
+    state.activeOrders = state.activeOrders.filter((current) => (
+      current.status === 0 || !orderById(current.orderId)
+    ));
+
+    // 四条固定处理线按 100%/50%/25%/12.5% 同时推进。每次推进到最近的完成事件：
+    // 手动模式只释放完成槽；自动模式在原槽立即续接同类新订单。其余任务永不前移，
+    // 因此四条线会形成 1×/2×/4×/8× 的真实错落周期，满载吞吐仍为 1.875。
+    let remainingWallSec = elapsedSec;
+    let completedInLoop = 0;
+    while (remainingWallSec > 1e-9 && completedInLoop < AUTOMATION_TOTAL_ORDER_CAP) {
+      const speed = modelCompute(state).mul(effectiveServerPower(state)).toNumber();
+      if (!Number.isFinite(speed) || speed <= 0) break;
+
+      const taskRates = new Map<OrderState, number>();
+      let timeToNextCompletion = Number.POSITIVE_INFINITY;
+      for (const current of state.activeOrders) {
+        const def = orderById(current.orderId);
+        if (!def || current.status !== 0) continue;
+        const rate = speed * orderSlotSpeedMultiplier(current.slotIndex ?? -1);
+        if (rate <= 0) continue;
+        taskRates.set(current, rate);
+        timeToNextCompletion = Math.min(
+          timeToNextCompletion,
+          Math.max(0, current.remainingSec) / rate,
+        );
+      }
+      if (!Number.isFinite(timeToNextCompletion)) break;
+
+      const stepSec = Math.min(remainingWallSec, timeToNextCompletion);
+      for (const [current, rate] of taskRates) {
+        current.remainingSec = Math.max(0, current.remainingSec - stepSec * rate);
+      }
+      remainingWallSec = Math.max(0, remainingWallSec - stepSec);
+
+      const completed = state.activeOrders.filter((current) => (
+        current.status === 0
+        && !!orderById(current.orderId)
+        && current.remainingSec <= 1e-9
+      ));
+      if (completed.length === 0) break;
+      const completedSet = new Set<OrderState>();
+      for (const current of completed) {
+        const def = orderById(current.orderId);
+        if (!def) continue;
+        completeFreshOrder(current, def);
+        if (state.automation) {
+          current.startedAtMs = Math.max(0, nowMs - remainingWallSec * 1000);
+          current.remainingSec = def.durationSec;
+          current.status = 0;
+        } else {
+          completedSet.add(current);
+        }
+      }
+      if (completedSet.size > 0) {
+        state.activeOrders = state.activeOrders.filter((current) => !completedSet.has(current));
+      }
+      completedInLoop += completed.length;
     }
   }
   // 自动经营：模型部署后持续入账（永久倍率/算力中心倍率在此生效）
-  if (state.automation) {
+  if (state.automation && state.serverCount >= 1) {
     const auto = incomePerSecond(state, nowMs).mul(elapsedSec);
     income = income.plus(auto);
   }
@@ -368,10 +540,12 @@ export function tick(
       new Decimal(state.stage3.peakStats.totalRequests)
         .plus(totalCompute.mul(elapsedSec).div(12).floor()),
     );
-    // 研发速度被动（科技档案）在 workshop 中已按 progress 累积，此处无需额外处理
   }
   const netIncome = income.minus(rentalCost);
-  const changed = completedOrderIds.length > 0 || netIncome.gt(0) || rentalCost.gt(0);
+  const changed = completedOrderIds.length > 0
+    || state.activeOrders.length !== orderCountBefore
+    || netIncome.gt(0)
+    || rentalCost.gt(0);
   if (changed) {
     state.completedOrders += completedOrderIds.length;
     // 收入记账按订单毛/净收入累计；资金按净额入账（租赁成本内扣）
@@ -401,20 +575,35 @@ export function claimOrder(state: SaveData, orderIndex: number): { ok: boolean; 
   return { ok: true };
 }
 
+/** 领取某一类订单队列中已经完成的任务，兼容旧扁平 activeOrders 存档。 */
+export function claimOrderQueue(state: SaveData, orderId: string): { ok: boolean; error?: string } {
+  if (!orderById(orderId)) return { ok: false, error: "unknown_order" };
+  const readyIndexes: number[] = [];
+  state.activeOrders.forEach((order, index) => {
+    if (order.orderId === orderId && order.status === 1) readyIndexes.push(index);
+  });
+  if (readyIndexes.length === 0) return { ok: false, error: "no_ready_order" };
+  for (let i = readyIndexes.length - 1; i >= 0; i -= 1) {
+    claimOrder(state, readyIndexes[i]);
+  }
+  return { ok: true };
+}
+
 /** 自动经营解锁阈值：首轮 6 单；技术迭代后 3 单 */
 export function automationUnlockThreshold(state: SaveData): number {
   return state.technologyIterationCount > 0 ? 3 : AUTOMATION_UNLOCK_ORDERS;
 }
 
 export function automationUnlocked(state: SaveData): boolean {
-  return state.automation || state.completedOrders >= automationUnlockThreshold(state);
+  // 新合同：首台自有服务器就是自动经营的唯一解锁门槛；不再要求先手动刷满订单数。
+  return state.serverCount >= 1;
 }
 
 /** 开启自动经营（幂等） */
 export function enableAutomation(state: SaveData): { ok: boolean; error?: string } {
   if (state.automation) return { ok: true };
-  if (state.completedOrders < automationUnlockThreshold(state)) {
-    return { ok: false, error: "not_unlocked" };
+  if (state.serverCount < 1) {
+    return { ok: false, error: "first_server_required" };
   }
   state.automation = true;
   addExperience(state, XP_AUTOMATION_UNLOCK);
@@ -440,14 +629,20 @@ export function pickAutoOrderId(state: SaveData): string {
   return mix[0].orderId;
 }
 
-/** 自动经营按业务组合接单（填满空槽） */
+/** 自动经营按业务组合接单（填满每个已解锁订单自己的四个空槽）。 */
 export function automationAutoAccept(state: SaveData, nowMs: number): number {
-  if (!state.automation) return 0;
+  if (!state.automation || state.serverCount < 1) return 0;
+  ensureOrderAccess(state);
   let accepted = 0;
-  while (state.activeOrders.length < AUTOMATION_ORDER_CAP) {
-    const candidate = pickAutoOrderId(state);
+  while (state.activeOrders.length < AUTOMATION_TOTAL_ORDER_CAP) {
+    const preferredId = pickAutoOrderId(state);
+    const candidate = canAcceptOrder(state, preferredId)
+      ? preferredId
+      : ORDERS.find((order) => canAcceptOrder(state, order.id))?.id;
+    if (!candidate) break;
+    const countBefore = state.activeOrders.length;
     const res = acceptOrder(state, candidate, nowMs);
-    if (!res.ok) break;
+    if (!res.ok || state.activeOrders.length <= countBefore) break;
     accepted += 1;
   }
   return accepted;
@@ -458,7 +653,7 @@ export type OrderDisplayMode = "single" | "flow" | "compute";
 /** 处理速率（单/秒）：以推荐订单 12s 为基准，speed / 12 */
 export function ordersPerSecond(state: SaveData): number {
   const compute = modelCompute(state);
-  const speed = compute.mul(new Decimal(state.serverPower));
+  const speed = compute.mul(effectiveServerPower(state));
   return speed.div(12).toNumber();
 }
 
@@ -492,13 +687,10 @@ export function enableRental(state: SaveData): { ok: boolean; error?: string } {
   return { ok: true };
 }
 
-// ---------- 模型研发（B 方案：进度满 100 免费研发一次） ----------
-export function canResearchModel(state: SaveData): boolean {
-  if (!state.modelProgress) return false;
-  // 模型研发循环在 Stage 2 启用（获得第一台服务器后）；Stage 1 不抽卡，保持首服节奏
-  if (state.serverCount < 1) return false;
-  if ((state.modelResearch?.progress ?? 0) < 100) return false;
-  return MODELS.some((model) => (state.modelArchive?.[model.id]?.level ?? 0) < MODEL_ARCHIVE_MAX_LEVEL);
+// ---------- 旧免费研发兼容边界 ----------
+/** 免费研发已下线；蓝图只允许通过付费定向升级。 */
+export function canResearchModel(_state: SaveData): boolean {
+  return false;
 }
 
 export interface ResearchResult {
@@ -510,149 +702,21 @@ export interface ResearchResult {
   gainedLevel: number;
   archiveLevelBefore: number;
   archiveLevelAfter: number;
-  /** 候选满足三项不回退合同并成为新的当前主力。 */
+  /** v7全局蓝图不再切换主力；字段只为旧回执兼容，恒为 false。 */
   switched?: boolean;
 }
 
-interface ResearchCoreMetrics {
-  level: number;
-  compute: Decimal;
-  income: Decimal;
-}
-
-function researchCoreMetrics(state: SaveData): ResearchCoreMetrics {
+/** @deprecated 免费研发已下线；保留失败回执避免旧客户端调用改写存档。 */
+export function researchModel(_state: SaveData): ResearchResult {
   return {
-    level: modelLevel(state),
-    compute: modelCompute(state),
-    income: incomePerSecond(state),
-  };
-}
-
-function isNonRegressingResearch(candidate: ResearchCoreMetrics, before: ResearchCoreMetrics): boolean {
-  return candidate.level >= before.level
-    && candidate.compute.gte(before.compute)
-    && candidate.income.gte(before.income)
-    && (candidate.level > before.level
-      || candidate.compute.gt(before.compute)
-      || candidate.income.gt(before.income));
-}
-
-function rememberTrainingFacts(state: SaveData, modelId: string, trainingCount: number): void {
-  const archive = ensureModelArchiveEntry(state, modelId);
-  archive.lifetimeTrainingCount = Math.max(archive.lifetimeTrainingCount, trainingCount);
-}
-
-/**
- * 研发新模型：先把研发结果写入图鉴，再用同一落库状态投影候选。
- * 候选三项指标全部不回退且至少一项提高才切换；否则保留旧主力，
- * 研发后的全局收藏算力成长仍保证旧主力不回退。
- */
-export function researchModel(state: SaveData): ResearchResult {
-  if (!canResearchModel(state)) {
-    const complete = MODELS.every((model) => (state.modelArchive?.[model.id]?.level ?? 0) >= MODEL_ARCHIVE_MAX_LEVEL);
-    return {
-      ok: false,
-      error: complete ? "archive_complete" : "progress_not_full",
-      modelId: "",
-      isNew: false,
-      gainedLevel: 0,
-      archiveLevelBefore: 0,
-      archiveLevelAfter: 0,
-      switched: false,
-    };
-  }
-  const current = state.modelProgress;
-  if (!current) {
-    return {
-      ok: false,
-      error: "no_model",
-      modelId: "",
-      isNew: false,
-      gainedLevel: 0,
-      archiveLevelBefore: 0,
-      archiveLevelAfter: 0,
-      switched: false,
-    };
-  }
-  const beforeState = structuredClone(state);
-  const beforeMetrics = researchCoreMetrics(state);
-  const activeModelId = current.modelId;
-  const currentModelIndex = MODELS.findIndex((model) => model.id === current.modelId);
-  const drawCount = state.modelResearch?.stage2Draws ?? 0;
-  // 候选只由稳定模型顺序、当前模型身份和已持久化研发次数决定。
-  // 偏移 2 保持首轮 codex→voice、voice→distill；研发次数负责后续轮转。
-  const firstCandidateIndex = (Math.max(0, currentModelIndex) + drawCount + 2) % MODELS.length;
-  const hasNonCurrentCandidate = MODELS.some((model) => (
-    model.id !== current.modelId
-    && (state.modelArchive?.[model.id]?.level ?? 0) < MODEL_ARCHIVE_MAX_LEVEL
-  ));
-  let picked: (typeof MODELS)[number] | undefined;
-  for (let offset = 0; offset < MODELS.length; offset += 1) {
-    const candidate = MODELS[(firstCandidateIndex + offset) % MODELS.length];
-    if ((state.modelArchive?.[candidate.id]?.level ?? 0) >= MODEL_ARCHIVE_MAX_LEVEL) continue;
-    if (candidate.id === current.modelId && hasNonCurrentCandidate) continue;
-    picked = candidate;
-    break;
-  }
-  if (!picked) {
-    return {
-      ok: false,
-      error: "archive_complete",
-      modelId: "",
-      isNew: false,
-      gainedLevel: 0,
-      archiveLevelBefore: 0,
-      archiveLevelAfter: 0,
-      switched: false,
-    };
-  }
-  const alreadyOwned = state.ownedModelIds.includes(picked.id);
-  const archiveBefore = state.modelArchive?.[picked.id]?.level ?? 0;
-  if (state.modelResearch) {
-    state.modelResearch.progress = 0;
-    state.modelResearch.stage2Draws += 1;
-  }
-  if (!alreadyOwned) state.ownedModelIds.push(picked.id);
-  const archive = ensureModelArchiveEntry(state, picked.id);
-  if (archiveBefore <= 0) {
-    archive.level = 1;
-    archive.researchCount = Math.min(MODEL_ARCHIVE_MAX_LEVEL, Math.max(1, archive.researchCount));
-  } else {
-    archive.researchCount = Math.min(MODEL_ARCHIVE_MAX_LEVEL, archive.researchCount + 1);
-    archive.level = Math.min(MODEL_ARCHIVE_MAX_LEVEL, archive.level + 1);
-  }
-  const archiveAfter = archive.level;
-
-  const candidateState = structuredClone(state);
-  candidateState.modelProgress = { modelId: picked.id, level: 1, trainingCount: 0 };
-  const candidateMetrics = researchCoreMetrics(candidateState);
-  const shouldSwitch = picked.id !== activeModelId && isNonRegressingResearch(candidateMetrics, beforeMetrics);
-  if (shouldSwitch) {
-    rememberTrainingFacts(state, activeModelId, current.trainingCount);
-    state.modelProgress = candidateState.modelProgress;
-  }
-  const afterMetrics = researchCoreMetrics(state);
-  if (!isNonRegressingResearch(afterMetrics, beforeMetrics)) {
-    Object.assign(state, beforeState);
-    return {
-      ok: false,
-      error: "research_growth_unavailable",
-      modelId: picked.id,
-      isNew: !alreadyOwned,
-      gainedLevel: 0,
-      archiveLevelBefore: archiveBefore,
-      archiveLevelAfter: archiveAfter,
-      switched: false,
-    };
-  }
-  return {
-    ok: true,
-    modelId: picked.id,
-    isNew: !alreadyOwned,
-    gainedLevel: archiveAfter - archiveBefore,
-    archiveLevelBefore: archiveBefore,
-    archiveLevelAfter: archiveAfter,
-    switched: shouldSwitch,
+    ok: false,
+    error: "feature_removed",
+    modelId: "",
+    isNew: false,
+    gainedLevel: 0,
+    archiveLevelBefore: 0,
+    archiveLevelAfter: 0,
+    switched: false,
   };
 }
 
@@ -683,7 +747,8 @@ export function canBuyServer(state: SaveData): boolean {
   if (index === 1) {
     return firstServerMilestoneMet(state) && !firstServerAwarded(state);
   }
-  return new Decimal(state.money).gte(def.cost);
+  const cost = nextServerCost(state);
+  return cost != null && new Decimal(state.money).gte(cost);
 }
 
 export function buyServer(state: SaveData): { ok: boolean; error?: string } {
@@ -698,11 +763,13 @@ export function buyServer(state: SaveData): { ok: boolean; error?: string } {
   }
   const def = nextServerDef(state);
   if (!def) return { ok: false, error: "no_server" };
-  const cost = new Decimal(def.cost);
+  const cost = nextServerCost(state);
+  if (!cost) return { ok: false, error: "no_server" };
   if (new Decimal(state.money).lt(cost)) return { ok: false, error: "insufficient_funds" };
   state.money = toStoredBig(new Decimal(state.money).minus(cost));
   state.serverCount += 1;
   state.serverPower = toStoredBig(new Decimal(state.serverPower).plus(def.power));
+  registerOwnedServerUnit(state, def.serverId);
   syncArchitectureBlueprints(state);
   // 购买服务器后停止租赁
   state.rentalCompute = { active: false, units: 0, unitCostPerSec: 0 };
@@ -734,33 +801,71 @@ export function canBuyMaxServers(state: SaveData): boolean {
 }
 
 /** 在线业务组合对应的研发进度/秒；离线只累积进度，不自动触发研发。 */
-export function modelResearchProgressPerSecond(state: SaveData): Decimal {
+export function modelResearchProgressPerSecond(_state: SaveData): Decimal {
+  return new Decimal(0);
+}
+
+export function applyOfflineResearchProgress(_state: SaveData, _elapsedSec: number): number {
+  return 0;
+}
+
+/**
+ * 自动经营离线时的工作室经验速率。
+ *
+ * 与在线四槽订单完全使用同一业务组合、处理速度与订单经验公式；离线只把
+ * 大量确定性完成事件聚合成一次经验入账，不自动购买、不自动研发，也不会
+ * 额外生成一套“挂机经验”货币。
+ */
+export function workshopExperiencePerSecond(state: SaveData): Decimal {
   if (!state.automation || !state.modelProgress || state.serverCount < 1) return new Decimal(0);
   const mix = businessMixForState(state);
   const totalShare = mix.reduce((sum, item) => sum + item.share, 0);
-  const speed = modelCompute(state).mul(state.serverPower);
+  if (totalShare <= 0) return new Decimal(0);
+  const speed = modelCompute(state).mul(effectiveServerPower(state));
   let weighted = new Decimal(0);
   for (const item of mix) {
     const order = orderById(item.orderId);
     if (!order) continue;
-    const progressPerCompletion = new Decimal(order.gross).mul(0.0008);
     weighted = weighted.plus(
-      progressPerCompletion.mul(speed).div(order.durationSec).mul(item.share)
+      new Decimal(orderExperienceForState(state, order))
+        .mul(speed)
+        .div(order.durationSec)
+        .mul(item.share),
     );
   }
-  return weighted.div(totalShare).mul(AUTOMATION_ORDER_CAP).mul(researchProgressMultiplier(state));
+  return weighted.div(totalShare).mul(ORDER_QUEUE_EFFECTIVE_PARALLELISM);
 }
 
-export function applyOfflineResearchProgress(state: SaveData, elapsedSec: number): number {
+/**
+ * 离线跨过工作室等级门槛时，同步触发一次性天赋点来源。
+ * 返回实际入账的整数经验；重复结算由离线报价幂等门禁阻止。
+ */
+export function applyOfflineWorkshopExperience(state: SaveData, elapsedSec: number): number {
   if (!Number.isFinite(elapsedSec) || elapsedSec <= 0) return 0;
-  const before = state.modelResearch?.progress ?? 0;
-  const gain = modelResearchProgressPerSecond(state).mul(elapsedSec).toNumber();
-  if (gain <= 0) return 0;
-  state.modelResearch = {
-    ...state.modelResearch,
-    progress: Math.min(100, before + gain),
-  };
-  return state.modelResearch.progress - before;
+  if (stage4Entered(state)) return 0;
+  // 首版的离线工作室经验只负责补齐有限天赋来源（最高门槛 Lv310）。
+  // 在线经营仍可继续提高展示等级；这里避免终局大数算力一次离线制造
+  // 数百万次 while 升级并冻结手机主线程。
+  if (!state.workshop || state.workshop.level >= 310) return 0;
+  const gained = workshopExperiencePerSecond(state).mul(elapsedSec).floor();
+  if (gained.lte(0)) return 0;
+  let xpToLastTalent = Math.max(0, state.workshop.experienceToNextLevel - state.workshop.experience);
+  for (let level = state.workshop.level + 1; level < 310; level += 1) {
+    xpToLastTalent += experienceToNextLevel(level);
+  }
+  const safeXp = Math.min(xpToLastTalent, gained.toNumber());
+  addExperience(state, safeXp);
+  return safeXp;
+}
+
+/** 宇宙阶段离线公司经验沿用 75% 离线效率；地球阶段由工作室经验同源入账。 */
+export function applyOfflineCompanyExperience(state: SaveData, elapsedSec: number): number {
+  return applyCompanyCosmicExperience(
+    state,
+    elapsedSec,
+    0.75,
+    workshopExperiencePerSecond(state).toNumber(),
+  );
 }
 
 // ---------- 算力中心 ----------
@@ -797,8 +902,9 @@ export function businessMixNetPerSec(state: SaveData): Decimal {
 }
 
 /** 每秒自动收入 = 业务组合加权净收入/秒 × 并行槽位 × 处理速度倍率 × 永久倍率。
- *  自动经营保持 4 槽并行满负荷，每槽按 orderNet/durationSec 产出，
- *  因此基础吞吐 = businessMixNetPerSec × AUTOMATION_ORDER_CAP；
+ *  自动经营保持 4 槽并行满负荷，四个位置按 100%/50%/25%/12.5% 产出，
+ *  因此单队列有效并行吞吐为 1.875；五条队列只扩展玩家可见的排队操作面，
+ *  避免本次信息架构调整把既有 Stage1～5 数值曲线整体放大五倍；
  *  处理速度倍率（compute × serverPower）直接换算为吞吐倍率。
  *  自动化模式下订单完成不再单独结算（收入统一按此基准发放，见 tick），
  *  保证"聚合收入 = 各订单贡献之和"且不与订单结算双轨叠加。 */
@@ -811,9 +917,9 @@ export function incomePerSecond(state: SaveData, nowMs = Date.now()): Decimal {
   // Stage 3：算力中心收入模式（基础自动收入 × 有效效率 × 中心/机房倍率 × 蓝图/科技/红利）
   else if (state.stage3?.entered) income = stage3IncomePerSecond(state, nowMs);
   else {
-    const baseNetPerSec = businessMixNetPerSec(state).mul(AUTOMATION_ORDER_CAP);
+    const baseNetPerSec = businessMixNetPerSec(state).mul(ORDER_QUEUE_EFFECTIVE_PARALLELISM);
     const compute = modelCompute(state);
-    const serverPower = new Decimal(state.serverPower);
+    const serverPower = effectiveServerPower(state);
     const permanent = new Decimal(state.permanentMultiplier);
     const archiveIncome = techPassiveMultipliers(state).income;
     const modelEffects = modelEffectMultipliers(state);
@@ -833,7 +939,7 @@ export function incomePerSecond(state: SaveData, nowMs = Date.now()): Decimal {
 
 /** 自动经营每秒收入（仅在自动化开启时） */
 export function automationIncomePerSec(state: SaveData): Decimal {
-  if (!state.automation) return new Decimal(0);
+  if (!state.automation || state.serverCount < 1) return new Decimal(0);
   return incomePerSecond(state);
 }
 

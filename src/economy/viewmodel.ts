@@ -1,8 +1,31 @@
 // ViewModel：UI 只读快照。所有命令经 GameSession 执行，UI 不直接改状态。
 import Decimal from "decimal.js";
 import {
-  AUTOMATION_ORDER_CAP,
+  BLUEPRINT_LEVEL_MILESTONES,
+  SERVER_SCALE_MILESTONES,
+  TALENT_NODES,
+  TALENT_NODE_MAX_LEVEL,
+  blueprintGrowthMultiplier,
+  blueprintUpgradeRatio,
+  blueprintUpgradeCost,
+  effectiveServerPower,
+  ensureGrowthState,
+  quoteBlueprintLevels,
+  quoteServerScaleUnits,
+  recommendedBlueprintId,
+  serverScaleMultiplier,
+  serverScaleUpgradeRatio,
+  serverScaleUnitCost,
+  syncTalentPoints,
+  talentPointsAvailable,
+  talentPointsSpent,
+} from "./incremental-growth";
+import { ACHIEVEMENT_TALENT_POINTS, ACHIEVEMENTS, claimableAchievementCount, evaluateAchievements } from "./achievements";
+import {
   MODEL_ARCHIVE_MAX_LEVEL,
+  MODEL_TRAINING_MAX_LEVEL,
+  ORDER_QUEUE_EFFECTIVE_PARALLELISM,
+  ORDER_QUEUE_CAP,
   MODELS,
   ORDERS,
   SERVER_CENTER_REQUIREMENT,
@@ -32,7 +55,10 @@ import {
   flagshipRewardMultiplier,
   hasPendingFlagshipReward,
   infraLevel,
+  infrastructureReadiness,
+  infrastructureUpgradeCost,
   iterationSummary,
+  projectConstructionCost,
   roomCount,
   roomRequirementsMet,
   stage3EntryMet,
@@ -92,16 +118,16 @@ import {
   MACHINE_ROOMS,
   TECH_ARCHIVES,
   ERAS,
-  infraUpgradeCost,
   projectById,
   roomById,
 } from "../data/stage3";
 import { formatBig, formatHeaderMoney, formatLiveMoney, formatMoney, formatTime } from "../core/big";
-import { t } from "../i18n";
+import { formatPercent, t } from "../i18n";
 import {
   automationIncomePerSec,
   automationUnlockThreshold,
   automationUnlocked,
+  canAcceptOrder,
   canBuyServer,
   canBuyMaxServers,
   canEnableRental,
@@ -111,6 +137,8 @@ import {
   currentStage,
   enableAutomation,
   incomePerSecond,
+  ensureOrderAccess,
+  isOrderUnlocked,
   modelCompute,
   modelLevel,
   nextServerCost,
@@ -118,6 +146,8 @@ import {
   orderById,
   orderDisplayMode,
   orderNet,
+  orderSlotCapacity,
+  orderUnlockCost,
   ordersPerSecond,
   prestigePreview,
   rentalCostPerSec,
@@ -126,18 +156,43 @@ import {
   trainCost,
   type OrderDisplayMode,
 } from "./engine";
-import type { OfflineReward, SaveData } from "../save/types";
+import type { ChronicleMilestoneId, OfflineReward, SaveData } from "../save/types";
 import { businessMixForState, modelEffectMultipliers, modelRoleEffectText } from "./model-effects";
 import {
   incomeBoostRemainingSeconds,
-  offlineCapacitySeconds,
   SPONSOR_INCOME_ADS_PER_DAY,
   SPONSOR_INCOME_FREE_CHARGES_PER_DAY,
   SPONSOR_INCOME_MAX_REMAINING_SECONDS,
-  SPONSOR_OFFLINE_ADS_PER_DAY,
-  SPONSOR_OFFLINE_MAX_SECONDS,
 } from "./sponsor";
+import {
+  OFFLINE_AD_SLICE_LIMIT,
+  OFFLINE_MAX_SECONDS,
+  offlineAdExpansionAvailable,
+  offlineRemainingSec,
+  offlineRewardSettled,
+} from "../save/offline";
 import { buildFeelViewModel, type FeelViewModel } from "./feel";
+import { CHRONICLE_MILESTONE_IDS } from "./chronicle";
+import { companyLevelProgress } from "./company-level";
+import { isOrderSlotIndex } from "../save/order-slots";
+
+/** 只改变玩家看到的算力单位，所有经济计算仍使用原始值。 */
+function formatDisplayedCompute(value: Decimal.Value): string {
+  return formatBig(new Decimal(value).mul(1000));
+}
+
+function orderTaskProgress(remainingSec: number, durationSec: number): number {
+  return Math.min(1, Math.max(0, 1 - remainingSec / Math.max(1, durationSec)));
+}
+
+/**
+ * 订单标签与进度条共用同一真实进度源。
+ * 处理中最多展示 99%，避免取整后在订单结算前提前显示 100%。
+ */
+function orderProgressLabel(progress: number, completed: boolean): string {
+  const wholePercent = completed ? 100 : Math.min(99, Math.floor(progress * 100));
+  return formatPercent(wholePercent / 100);
+}
 
 export interface OrderRowVM {
   order: OrderDef;
@@ -145,7 +200,16 @@ export interface OrderRowVM {
   rentalCost: string;
   gross: string;
   canAccept: boolean;
+  queueCount: number;
+  readyCount: number;
+  queueCapacity: number;
   recommended: boolean;
+  unlocked: boolean;
+  canUnlock: boolean;
+  unlockCost: string;
+  canExpandSlot: boolean;
+  nextSlotCost: string;
+  tasks: Array<{ progress: number; progressLabel: string } | null>;
 }
 
 export interface ActiveOrderVM {
@@ -155,7 +219,7 @@ export interface ActiveOrderVM {
   icon: string;
   status: "processing" | "ready" | "claimed";
   progress: number;
-  remainingLabel: string;
+  progressLabel: string;
 }
 
 export interface ModelVM {
@@ -165,6 +229,8 @@ export interface ModelVM {
   icon: string;
   level: number;
   maxLevel: number;
+  blueprintLevel: number;
+  blueprintMaxLevel: number;
   compute: string;
   trainCost: string;
   canTrain: boolean;
@@ -177,6 +243,10 @@ export interface ModelArchiveVM {
   id: string;
   name: string;
   icon: string;
+  /** 模型职责描述；即使未解锁也展示，帮助玩家理解未来价值。 */
+  description: string;
+  /** 未解锁时展示的条件 i18n key。 */
+  unlockHint: string;
   owned: boolean;
   current: boolean;
   archiveLevel: number;
@@ -212,6 +282,8 @@ export interface ServerVM {
   canBuy: boolean;
   batchUnlocked: boolean;
   canBuyMax: boolean;
+  buyMaxCount: number;
+  buyMaxCost: string;
   servers: Array<{ index: number; name: string; owned: boolean; power: number; cost: string }>;
   /** 阶段进度：1 自有算力 / 3 初级集群 / 5 规模化 / 8 算力中心 */
   phase: "none" | "own" | "cluster" | "scale" | "center";
@@ -248,12 +320,28 @@ export interface PrestigeVM {
 
 export interface OfflineVM {
   hasPending: boolean;
+  /** 剩余未领取资金（已解锁但未入账部分）。 */
   money: string;
+  /** 已领取入账时长。 */
+  paidLabel: string;
+  /** 剩余可领时长（0 表示已领完）。 */
+  remainingLabel: string;
+  /** 本次会话是否已全部结算（无未领部分且广告也无法再扩容）。 */
+  allSettled: boolean;
+  /** 是否仍可通过广告扩容（免费部分领取后仍可继续）。 */
+  canWatchOfflineAd: boolean;
+  /** 当前已解锁且尚未领取的完整离线收益。 */
+  canClaim: boolean;
   elapsedLabel: string;
   /** CARD-04 回归回执：本次离线实际时长（超出部分未计入展示） */
   rawElapsedLabel: string;
   /** CARD-04 回归回执：本阶段离线上限 */
   capLabel: string;
+  /** 本次真实离线中还能通过广告补领到的有效上限。 */
+  eligibleLabel: string;
+  /** 已在本回归会话中完成的扩容广告次数。 */
+  adUnlocksUsed: number;
+  adUnlocksMax: number;
   /** CARD-04 回归回执：超出未计入时长（0 显示空） */
   excessLabel: string;
   /** CARD-04 回归回执：离线研发进度增量（0-100） */
@@ -266,7 +354,14 @@ export interface OfflineVM {
 
 export interface SponsorVM {
   pendingAdKind: "offline_capacity" | "income_boost" | null;
+  /** 当前仍可观看的广告次数（按两类权益的剩余额度合计）。 */
+  availableAdCount: number;
+  /** 是否有一笔尚未结算的离线回归；无回归时离线扩容入口必须保持不可用。 */
+  offlineReturnReady: boolean;
+  /** 当前待领取回执的已解锁时长。 */
   offlineCapacityLabel: string;
+  /** 本次离线可领取的有效总时长。 */
+  offlineEligibleLabel: string;
   offlineCapacityProgress: number;
   offlineAdsUsed: number;
   offlineAdsMax: number;
@@ -303,6 +398,65 @@ export interface ResearchVM {
   drawsInStage2: number;
 }
 
+export interface IncrementalGrowthVM {
+  blueprintMultiplier: string;
+  scaleMultiplier: string;
+  totalMultiplier: string;
+  recommendedBlueprintId: string | null;
+  blueprints: Array<{
+    id: string;
+    name: string;
+    owned: boolean;
+    level: number;
+    maxLevel: number;
+    nextCost: string;
+    canBuy: boolean;
+    tenCount: number;
+    tenCost: string;
+    maxCount: number;
+    maxCost: string;
+    projectedCompute: string;
+    projectedIncome: string;
+    nextMilestone: number | null;
+    milestoneProgress: number;
+  }>;
+  selectedServerId: string | null;
+  serverLines: Array<{
+    id: string;
+    index: number;
+    name: string;
+    owned: boolean;
+    units: number;
+    nextCost: string;
+    canBuy: boolean;
+    tenCount: number;
+    tenCost: string;
+    maxCount: number;
+    maxCost: string;
+    projectedCompute: string;
+    projectedIncome: string;
+    nextMilestone: number | null;
+    milestoneProgress: number;
+  }>;
+  talent: {
+    earned: number;
+    spent: number;
+    available: number;
+    /** 荣誉馆当前可领取的成就数（新天赋点来源）。 */
+    claimableAchievements: number;
+    nodes: Array<{
+      id: import("../save/types").TalentNodeId;
+      branch: "blueprint" | "scale";
+      tier: number;
+      nameKey: string;
+      descriptionKey: string;
+      level: number;
+      maxLevel: number;
+      canAllocate: boolean;
+    }>;
+  };
+}
+
 export interface Stage2SettlementVM {
   shown: boolean;
   serverCount: number;
@@ -334,18 +488,29 @@ export interface ViewModel {
     nextServerCount: number | null;
     nextBlueprintName: string | null;
   };
+  company: {
+    level: number;
+    experience: number;
+    experienceToNextLevel: number;
+    progress: number;
+    title: string;
+  };
   model: ModelVM;
   modelArchive: ModelArchiveVM[];
   growthHistory: GrowthHistoryVM;
   legendaryArchive: LegendaryArchiveVM | null;
   achievements: AchievementVM[];
   research: ResearchVM;
+  growth: IncrementalGrowthVM;
   orderDisplay: OrderDisplayVM;
   orders: OrderRowVM[];
+  /** 所有已解锁订单独立四格中的空余槽位总数。 */
+  orderEmptySlotCount: number;
   activeOrders: ActiveOrderVM[];
   canAcceptAnyOrder: boolean;
   automationUnlocked: boolean;
   automationEnabled: boolean;
+  automationReadyCount: number;
   automationCompletedOrders: number;
   automationThreshold: number;
   workshop: {
@@ -388,6 +553,7 @@ export interface ViewModel {
   stage5: Stage5VM;
   offline: OfflineVM;
   sponsor: SponsorVM;
+  chronicle: ChronicleVM;
   /** 下一个主按钮 */
   primaryAction: { id: string; label: string; enabled: boolean } | null;
   pendingOfflineMoney: string;
@@ -401,16 +567,40 @@ export interface AchievementVM {
   description: string;
   achieved: boolean;
   achievedAtMs: number;
+  /** CARD-03：达成时快照的阶段编号（1–5；0=旧档无记录）。 */
+  stage: number;
+  /** CARD-03：达成时快照的工作室等级（0=旧档无记录）。 */
+  workshopLevel: number;
+  /** 负责人验收反馈：已达成后可在荣誉馆手动领取天赋点。 */
+  claimed: boolean;
+  claimable: boolean;
+  talentPoints: number;
+}
+
+/**
+ * 银河历程册只读展示：与当前账号的云档一起保存，但绝不提交到平台排行榜。
+ * 所有时间均已在会话层按“只增不减”规则冻结，页面只负责解释该事实。
+ */
+export interface ChronicleVM {
+  cumulativeIncome: string;
+  stageLabel: string;
+  workshopLevel: number;
+  clockAdjustmentCount: number;
+  lastClockAdjustmentAtMs: number;
+  milestones: Array<{
+    id: ChronicleMilestoneId;
+    achievedAtMs: number;
+  }>;
 }
 
 function buildOrderDisplay(state: SaveData): OrderDisplayVM {
   const mode = orderDisplayMode(state);
   const compute = modelCompute(state);
-  const serverPower = new Decimal(state.serverPower);
+  const serverPower = effectiveServerPower(state);
   const permanent = new Decimal(state.permanentMultiplier);
   const ops = ordersPerSecond(state);
   const mix = businessMixForState(state);
-  // 业务流水聚合：与引擎相同，先按订单时长换算每秒贡献，再乘 4 槽与真实倍率。
+  // 业务流水聚合与四槽位置速度共用 1.875 的有效并行系数。
   const totalShare = mix.reduce((acc, m) => acc + m.share, 0);
   let grossPerSlotSec = new Decimal(0);
   let netPerSlotSec = new Decimal(0);
@@ -423,7 +613,7 @@ function buildOrderDisplay(state: SaveData): OrderDisplayVM {
   }
   const modelEffects = modelEffectMultipliers(state);
   const incomeMult = permanent
-    .mul(AUTOMATION_ORDER_CAP)
+    .mul(ORDER_QUEUE_EFFECTIVE_PARALLELISM)
     .mul(architectureMultiplier(state))
     .mul(techPassiveMultipliers(state).income)
     .mul(modelEffects.income)
@@ -433,7 +623,7 @@ function buildOrderDisplay(state: SaveData): OrderDisplayVM {
   const cost = gross.minus(net);
   const summaryText =
     mode === "compute"
-      ? t("order.summaryCompute", { ops: ops.toFixed(1), income: formatMoney(net), total: formatBig(compute.mul(serverPower)) })
+      ? t("order.summaryCompute", { ops: ops.toFixed(1), income: formatMoney(net), total: formatDisplayedCompute(compute.mul(serverPower)) })
       : mode === "flow"
         ? t("order.summaryFlow", { ops: ops.toFixed(1), income: formatMoney(net) })
         : t("order.summarySingle", { ops: ops.toFixed(2) });
@@ -443,13 +633,16 @@ function buildOrderDisplay(state: SaveData): OrderDisplayVM {
     grossPerSec: formatMoney(gross),
     costPerSec: formatMoney(cost),
     netPerSec: formatMoney(net),
-    totalCompute: formatBig(compute.mul(serverPower)),
+    totalCompute: formatDisplayedCompute(compute.mul(serverPower)),
     recentIncomeLabel: "",
     summaryText,
   };
 }
 
 export function buildViewModel(state: SaveData): ViewModel {
+  ensureGrowthState(state);
+  syncTalentPoints(state);
+  ensureOrderAccess(state);
   const s5EnteredTop = stage5Entered(state);
   const s4Entered = stage4Entered(state);
   // CARD-03：Stage 5 身份跃迁（银河算力大亨）优先级最高。
@@ -461,6 +654,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       : stageLabel(stage, stage3Gateway(state));
   // CARD-02：Stage 4 身份跃迁（地月算力运营商）——地球 stage 1-3 全部归入“地球纪元”。
   const compute = modelCompute(state);
+  const company = companyLevelProgress(state);
   // 顶部显示真实正在发生的自动收入；未开启自动经营时不展示潜在产能为收入。
   const ips = state.automation ? incomePerSecond(state) : new Decimal(0);
   const gateway = stage3Gateway(state);
@@ -470,15 +664,17 @@ export function buildViewModel(state: SaveData): ViewModel {
   const modelDef = state.modelProgress
     ? MODELS.find((m) => m.id === state.modelProgress!.modelId)
     : null;
-  const modelAtMaxLevel = modelDef != null && modelLevel(state) >= modelDef.maxLevel;
+  const modelAtMaxLevel = modelDef != null && modelLevel(state) >= MODEL_TRAINING_MAX_LEVEL;
   const model: ModelVM = {
     id: modelDef?.id ?? null,
     acquired: state.modelProgress != null,
     name: modelDef?.name ? t(modelDef.name) : t("model.notAcquired"),
     icon: modelDef?.icon ?? "❓",
     level: modelLevel(state),
-    maxLevel: modelDef?.maxLevel ?? 0,
-    compute: formatBig(compute),
+    maxLevel: modelDef ? MODEL_TRAINING_MAX_LEVEL : 0,
+    blueprintLevel: modelDef ? state.modelArchive?.[modelDef.id]?.level ?? 0 : 0,
+    blueprintMaxLevel: MODEL_ARCHIVE_MAX_LEVEL,
+    compute: formatDisplayedCompute(compute),
     trainCost: state.modelProgress && !modelAtMaxLevel ? formatMoney(trainCost(state)) : "-",
     canTrain: canTrain(state),
     atMaxLevel: modelAtMaxLevel,
@@ -491,6 +687,8 @@ export function buildViewModel(state: SaveData): ViewModel {
       id: definition.id,
       name: definition.name,
       icon: definition.icon,
+      description: definition.desc,
+      unlockHint: definition.id === "codex" ? "model.unlock.initial" : "model.unlock.research",
       owned: archived != null,
       current: state.modelProgress?.modelId === definition.id,
       archiveLevel: archived?.level ?? 0,
@@ -503,24 +701,142 @@ export function buildViewModel(state: SaveData): ViewModel {
     };
   });
 
+  const nextMilestone = (value: number, milestones: readonly number[]): number | null =>
+    milestones.find((threshold) => threshold > value) ?? null;
+  const milestoneProgress = (value: number, milestones: readonly number[]): number => {
+    const next = nextMilestone(value, milestones);
+    if (next == null) return 1;
+    const previous = [...milestones].reverse().find((threshold) => threshold <= value) ?? 0;
+    return Math.min(1, Math.max(0, (value - previous) / Math.max(1, next - previous)));
+  };
+  const growthState = state.growth;
+  const recommendedId = recommendedBlueprintId(state);
+  const blueprintMult = blueprintGrowthMultiplier(state);
+  const scaleMult = serverScaleMultiplier(state);
+  const availablePoints = talentPointsAvailable(state);
+  const spentPoints = talentPointsSpent(state);
+  const totalComputeNow = state.stage3?.entered
+    ? stage3TotalCompute(state)
+    : compute.mul(effectiveServerPower(state));
+  const incomeNow = state.automation ? incomePerSecond(state) : new Decimal(0);
+  const growth: IncrementalGrowthVM = {
+    blueprintMultiplier: `×${blueprintMult.toFixed(2)}`,
+    scaleMultiplier: `×${scaleMult.toFixed(2)}`,
+    totalMultiplier: `×${blueprintMult.mul(scaleMult).toFixed(2)}`,
+    recommendedBlueprintId: recommendedId,
+    blueprints: MODELS.map((definition) => {
+      const level = state.modelArchive?.[definition.id]?.level ?? 0;
+      // 首款模型获得后，尚未收录的蓝图也可从 Lv.0 开始付费投入。
+      const cost = state.modelProgress && level < MODEL_ARCHIVE_MAX_LEVEL
+        ? blueprintUpgradeCost(state, definition.id)
+        : null;
+      const previewRatio = blueprintUpgradeRatio(state, definition.id, 1);
+      const tenQuote = quoteBlueprintLevels(state, definition.id, 10);
+      const maxQuote = quoteBlueprintLevels(state, definition.id, "max");
+      return {
+        id: definition.id,
+        name: definition.name,
+        owned: level > 0,
+        level,
+        maxLevel: MODEL_ARCHIVE_MAX_LEVEL,
+        nextCost: cost ? formatMoney(cost) : "—",
+        canBuy: cost != null && new Decimal(state.money).gte(cost),
+        tenCount: tenQuote.count,
+        tenCost: formatMoney(tenQuote.total),
+        maxCount: maxQuote.count,
+        maxCost: formatMoney(maxQuote.total),
+        projectedCompute: formatDisplayedCompute(totalComputeNow.mul(previewRatio)),
+        projectedIncome: formatMoney(incomeNow.mul(previewRatio)),
+        nextMilestone: nextMilestone(level, BLUEPRINT_LEVEL_MILESTONES),
+        milestoneProgress: milestoneProgress(level, BLUEPRINT_LEVEL_MILESTONES),
+      };
+    }),
+    selectedServerId: state.serverCount > 0 ? SERVERS[Math.max(0, state.serverCount - 1)]?.id ?? null : null,
+    serverLines: SERVERS.map((server) => {
+      const units = growthState.serverUnits[server.id] ?? 0;
+      const owned = state.serverCount >= server.index;
+      const cost = owned ? serverScaleUnitCost(state, server.id) : null;
+      const previewRatio = serverScaleUpgradeRatio(state, server.id, 1);
+      const tenQuote = quoteServerScaleUnits(state, server.id, 10);
+      const maxQuote = quoteServerScaleUnits(state, server.id, "max");
+      return {
+        id: server.id,
+        index: server.index,
+        name: server.name,
+        owned,
+        units,
+        nextCost: cost ? formatMoney(cost) : "—",
+        canBuy: cost != null && new Decimal(state.money).gte(cost),
+        tenCount: tenQuote.count,
+        tenCost: formatMoney(tenQuote.total),
+        maxCount: maxQuote.count,
+        maxCost: formatMoney(maxQuote.total),
+        projectedCompute: formatDisplayedCompute(totalComputeNow.mul(previewRatio)),
+        projectedIncome: formatMoney(incomeNow.mul(previewRatio)),
+        nextMilestone: nextMilestone(units, SERVER_SCALE_MILESTONES),
+        milestoneProgress: milestoneProgress(units, SERVER_SCALE_MILESTONES),
+      };
+    }),
+    talent: {
+      earned: growthState.talent.pointsEarned,
+      spent: spentPoints,
+      available: availablePoints,
+      claimableAchievements: claimableAchievementCount(state),
+      nodes: TALENT_NODES.map((node) => {
+        const level = growthState.talent.allocations[node.id] ?? 0;
+        const previous = node.tier > 1
+          ? TALENT_NODES.find((candidate) => candidate.branch === node.branch && candidate.tier === node.tier - 1)
+          : null;
+        return {
+          ...node,
+          level,
+          maxLevel: TALENT_NODE_MAX_LEVEL,
+          canAllocate: availablePoints > 0
+            && level < TALENT_NODE_MAX_LEVEL
+            && (!previous || growthState.talent.allocations[previous.id] >= TALENT_NODE_MAX_LEVEL),
+        };
+      }),
+    },
+  };
+
   // 订单
   const orders: OrderRowVM[] = ORDERS.map((order) => {
     const net = orderNet(order);
     const rentalCost = new Decimal(order.gross).mul(order.rentalCostRatio);
+    const unlocked = isOrderUnlocked(state, order.id);
+    const queued = state.activeOrders.filter((active) => active.orderId === order.id);
+    const tasks: OrderRowVM["tasks"] = Array.from({ length: ORDER_QUEUE_CAP }, () => null);
+    for (const active of queued) {
+      if (!isOrderSlotIndex(active.slotIndex)) continue;
+      const progress = orderTaskProgress(active.remainingSec, order.durationSec);
+      tasks[active.slotIndex] = {
+        progress,
+        progressLabel: orderProgressLabel(progress, active.status !== 0),
+      };
+    }
     return {
       order,
       netIncome: formatMoney(net),
       rentalCost: formatMoney(rentalCost),
       gross: formatMoney(order.gross),
-      canAccept: state.activeOrders.length < 4 && state.modelProgress != null,
+      canAccept: canAcceptOrder(state, order.id),
+      queueCount: queued.length,
+      readyCount: queued.filter((active) => active.status === 1).length,
+      queueCapacity: unlocked ? orderSlotCapacity(state, order.id) : ORDER_QUEUE_CAP,
       recommended: order.recommended,
+      unlocked,
+      canUnlock: !unlocked && !!state.modelProgress && new Decimal(state.money).gte(orderUnlockCost(order.id)),
+      unlockCost: formatMoney(orderUnlockCost(order.id)),
+      canExpandSlot: false,
+      nextSlotCost: "—",
+      tasks,
     };
   });
 
   const activeOrders: ActiveOrderVM[] = state.activeOrders.map((o, i) => {
     const def = orderById(o.orderId);
     const total = def ? def.durationSec : 1;
-    const progress = Math.min(1, Math.max(0, 1 - o.remainingSec / total));
+    const progress = orderTaskProgress(o.remainingSec, total);
     return {
       orderIndex: i,
       orderId: o.orderId,
@@ -528,9 +844,14 @@ export function buildViewModel(state: SaveData): ViewModel {
       icon: def?.icon ?? "📋",
       status: o.status === 0 ? "processing" : "ready",
       progress,
-      remainingLabel: o.status === 1 ? t("order.ready") : formatTime(Math.ceil(o.remainingSec)),
+      progressLabel: orderProgressLabel(progress, o.status !== 0),
     };
   });
+  const orderEmptySlotCount = state.modelProgress
+    ? orders.reduce((total, order) => total + (order.unlocked
+      ? Math.max(0, order.queueCapacity - order.queueCount)
+      : 0), 0)
+    : 0;
 
   // 服务器
   const nextDef = nextServerDef(state);
@@ -547,6 +868,16 @@ export function buildViewModel(state: SaveData): ViewModel {
     : phase === "cluster" ? t("server.phase.cluster")
     : phase === "own" ? t("server.phase.own")
     : t("server.phase.none");
+  let serverBatchRemaining = new Decimal(state.money);
+  let serverBatchCost = new Decimal(0);
+  let serverBatchCount = 0;
+  for (const candidate of SERVERS.slice(state.serverCount)) {
+    const candidateCost = new Decimal(candidate.cost);
+    if (serverBatchRemaining.lt(candidateCost)) break;
+    serverBatchRemaining = serverBatchRemaining.minus(candidateCost);
+    serverBatchCost = serverBatchCost.plus(candidateCost);
+    serverBatchCount += 1;
+  }
   const server: ServerVM = {
     ownedCount: state.serverCount,
     maxCount: MAX_SERVERS,
@@ -555,6 +886,8 @@ export function buildViewModel(state: SaveData): ViewModel {
     canBuy: canBuyServer(state),
     batchUnlocked: batchPurchaseUnlocked(state) || state.technologyIterationCount > 0,
     canBuyMax: canBuyMaxServers(state),
+    buyMaxCount: serverBatchCount,
+    buyMaxCost: formatMoney(serverBatchCost),
     servers: SERVERS.map((s) => ({
       index: s.index,
       name: s.name,
@@ -599,10 +932,12 @@ export function buildViewModel(state: SaveData): ViewModel {
   const singularity: SingularityVM = {
     active: endgameMode(state),
     label: singularityDisplay(state),
+    coreCount: Math.min(3, claimedCoreIds.size),
     round,
     coreClaimable,
     iterationReady: canEndgameIterate(state),
     spacePlanRevealed: state.singularity?.spacePlanRevealed === true,
+    spacePlanRevealedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0,
     spacePlanStarted: state.singularity?.spacePlanStarted === true,
   };
 
@@ -611,6 +946,23 @@ export function buildViewModel(state: SaveData): ViewModel {
   const s4Progress = state.singularity?.stage4?.projectProgress ?? 0;
   const s4Pending = hasPendingFinalReward(state);
   const s4Completed = (state.singularity?.stage4?.completedProjectIds ?? []).includes(STAGE4_FINAL_PROJECT_ID);
+  const s4OwnedForQuote = new Set(s4Nodes);
+  let s4BatchRemaining = new Decimal(state.money);
+  let s4BatchCost = new Decimal(0);
+  let s4BatchCount = 0;
+  if (batchPurchaseUnlocked(state)) {
+    for (let index = 0; index < STAGE4_NODES.length; index += 1) {
+      const node = STAGE4_NODES[index];
+      if (node.cost <= 0 || s4OwnedForQuote.has(node.id)) continue;
+      if (index <= 0 || !s4OwnedForQuote.has(STAGE4_NODES[index - 1].id)) break;
+      const cost = new Decimal(node.cost);
+      if (s4BatchRemaining.lt(cost)) break;
+      s4BatchRemaining = s4BatchRemaining.minus(cost);
+      s4BatchCost = s4BatchCost.plus(cost);
+      s4BatchCount += 1;
+      s4OwnedForQuote.add(node.id);
+    }
+  }
   const stage4: Stage4VM = {
     active: s4Entered,
     entered: s4Entered,
@@ -629,11 +981,14 @@ export function buildViewModel(state: SaveData): ViewModel {
     ownedNodeCount: s4Nodes.length,
     batchUnlocked: batchPurchaseUnlocked(state),
     canBuyMaxNodes: batchPurchaseUnlocked(state) && STAGE4_NODES.some((n) => canBuyNode(state, n.id)),
+    batchCount: s4BatchCount,
+    batchCost: formatMoney(s4BatchCost),
     incomePerSec: formatMoney(s4Entered ? stage4IncomePerSecond(state) : new Decimal(0)) + t("unit.perSec"),
     nodeMult: s4Entered ? `×${nodeIncomeMultiplier(state).toFixed(2)}` : "",
     finalProject: {
       name: STAGE4_FINAL_PROJECT.name,
       icon: STAGE4_FINAL_PROJECT.icon,
+      constructionCost: formatMoney(STAGE4_FINAL_PROJECT.constructionCost),
       progressLabel: s4Active
         ? `${Math.min(100, Math.floor((s4Progress / STAGE4_FINAL_PROJECT.progressRequired) * 100))}%`
         : s4Completed
@@ -645,7 +1000,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       active: s4Active,
       pendingReward: s4Pending,
       completed: s4Completed,
-      rewardText: t("common.rewardText", { label: "stage4.rewardLabel" }),
+      rewardText: t("common.rewardText", { label: t("stage4.rewardLabel") }),
     },
   };
 
@@ -675,6 +1030,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     finalProject: {
       name: STAGE5_FINAL_PROJECT.name,
       icon: STAGE5_FINAL_PROJECT.icon,
+      constructionCost: formatMoney(STAGE5_FINAL_PROJECT.constructionCost),
       progressLabel: s5Active
         ? `${Math.min(100, Math.floor((s5Progress / STAGE5_FINAL_PROJECT.progressRequired) * 100))}%`
         : s5Completed
@@ -686,7 +1042,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       active: s5Active,
       pendingReward: s5Pending,
       completed: s5Completed,
-      rewardText: t("common.rewardText", { label: "stage5.rewardLabel" }),
+      rewardText: t("common.rewardText", { label: t("stage5.rewardLabel") }),
     },
     storyCompleted: state.singularity?.stage5?.storyCompleted === true,
     perpetualActive: perpetualActive(state),
@@ -695,41 +1051,50 @@ export function buildViewModel(state: SaveData): ViewModel {
   const legendaryArchive: LegendaryArchiveVM | null = endgameMode(state) && state.singularity?.stage5?.legendaryArchive
     ? {
         completedAtMs: state.singularity.stage5.legendaryArchive.completedAtMs,
-        maxCompute: formatBig(state.singularity.stage5.legendaryArchive.maxCompute),
+        maxCompute: formatDisplayedCompute(state.singularity.stage5.legendaryArchive.maxCompute),
         maxIncome: formatMoney(state.singularity.stage5.legendaryArchive.maxIncome),
         reachedEra: state.singularity.stage5.legendaryArchive.reachedEra,
       }
     : null;
-  const firstModelAt = Object.values(state.modelArchive).reduce(
-    (min, entry) => entry.firstAcquiredAtMs > 0 ? Math.min(min, entry.firstAcquiredAtMs) : min,
-    Number.POSITIVE_INFINITY,
-  );
-  const achievements: AchievementVM[] = [
-    { id: "first_model", name: "ach.firstModel.name", description: "ach.firstModel.desc", achieved: state.ownedModelIds.length > 0, achievedAtMs: Number.isFinite(firstModelAt) ? firstModelAt : 0 },
-    { id: "first_order", name: "ach.firstOrder.name", description: "ach.firstOrder.desc", achieved: state.completedOrders > 0 || new Decimal(state.lifetimeIncome).gt(0), achievedAtMs: 0 },
-    { id: "first_server", name: "ach.firstServer.name", description: "ach.firstServer.desc", achieved: state.workshop.firstServerAwarded || state.serverCount > 0, achievedAtMs: 0 },
-    { id: "eight_servers", name: "ach.eightServers.name", description: "ach.eightServers.desc", achieved: state.serverCount >= 8 || state.stage2.settlementShown, achievedAtMs: state.stage2.completedAtMs },
-    { id: "first_room", name: "ach.firstRoom.name", description: "ach.firstRoom.desc", achieved: state.stage3?.entered === true, achievedAtMs: state.stage3.enteredAtMs },
-    { id: "r1", name: "ach.r1.name", description: "ach.r1.desc", achieved: claimedCoreIds.has("core_1"), achievedAtMs: 0 },
-    { id: "r2", name: "ach.r2.name", description: "ach.r2.desc", achieved: claimedCoreIds.has("core_2"), achievedAtMs: 0 },
-    { id: "r3", name: "ach.r3.name", description: "ach.r3.desc", achieved: claimedCoreIds.has("core_3"), achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
-    { id: "three_cores", name: "ach.threeCores.name", description: "ach.threeCores.desc", achieved: claimedCoreIds.size >= 3, achievedAtMs: state.singularity?.spacePlanRevealedAtMs ?? 0 },
-    { id: "stage4", name: "ach.stage4.name", description: "ach.stage4.desc", achieved: s4Entered, achievedAtMs: state.singularity?.stage4?.enteredAtMs ?? 0 },
-    { id: "four_lunar_nodes", name: "ach.fourLunarNodes.name", description: "ach.fourLunarNodes.desc", achieved: s4Nodes.length >= STAGE4_NODES.length, achievedAtMs: 0 },
-    { id: "stage5", name: "ach.stage5.name", description: "ach.stage5.desc", achieved: s5Entered, achievedAtMs: state.singularity?.stage5?.enteredAtMs ?? 0 },
-    { id: "dyson", name: "ach.dyson.name", description: "ach.dyson.desc", achieved: perpetualActive(state), achievedAtMs: state.singularity?.stage5?.legendaryArchive?.completedAtMs ?? 0 },
-    { id: "compute_scale", name: "ach.computeScale.name", description: "ach.computeScale.desc", achieved: stage3TotalCompute(state).gte(1e6), achievedAtMs: 0 },
-    { id: "income_scale", name: "ach.incomeScale.name", description: "ach.incomeScale.desc", achieved: new Decimal(state.highestIncomePerSecond).gte(1e9), achievedAtMs: 0 },
-  ];
+  // 负责人验收反馈：成就改为荣誉馆手动领取，每个成就 +1 天赋点。
+  const claimedAchievementIds = new Set(state.growth.talent.claimedAchievementIds);
+  const achievementRecords = state.growth.talent.achievementRecords ?? {};
+  const evaluatedAchievements = evaluateAchievements(state);
+  const achievements: AchievementVM[] = ACHIEVEMENTS.map((definition) => {
+    const status = evaluatedAchievements.find((item) => item.id === definition.id)!;
+    const claimed = claimedAchievementIds.has(definition.id);
+    // CARD-03：达成记录（领取时快照）；旧档缺失时回退到当前状态与判定时间。
+    const record = achievementRecords[definition.id];
+    return {
+      id: definition.id,
+      name: definition.nameKey,
+      description: definition.descriptionKey,
+      achieved: status.achieved,
+      achievedAtMs: record?.achievedAtMs ?? status.achievedAtMs,
+      stage: record?.stage ?? 0,
+      workshopLevel: record?.workshopLevel ?? 0,
+      claimed,
+      claimable: status.achieved && !claimed,
+      talentPoints: ACHIEVEMENT_TALENT_POINTS,
+    };
+  });
 
-  const offline: OfflineVM = state.pendingOfflineReward && !state.pendingOfflineReward.claimed
+  const offline: OfflineVM = state.pendingOfflineReward
     ? buildOfflineVM(state.pendingOfflineReward)
     : {
         hasPending: false,
         money: "",
+        paidLabel: "",
+        remainingLabel: "",
+        allSettled: false,
+        canWatchOfflineAd: false,
+        canClaim: false,
         elapsedLabel: "",
         rawElapsedLabel: "",
-        capLabel: "",
+      capLabel: "",
+      eligibleLabel: "",
+      adUnlocksUsed: 0,
+      adUnlocksMax: OFFLINE_AD_SLICE_LIMIT,
         excessLabel: "",
         researchProgress: 0,
         projectProgressDelta: 0,
@@ -739,13 +1104,33 @@ export function buildViewModel(state: SaveData): ViewModel {
   function buildOfflineVM(reward: OfflineReward): OfflineVM {
     const rawSec = Math.max(0, reward.rawElapsedSec ?? reward.elapsedSec);
     const capSec = Math.max(0, reward.capSec ?? reward.elapsedSec);
+    const eligibleSec = Math.min(capSec, Math.max(reward.elapsedSec, reward.eligibleSec ?? reward.elapsedSec));
     const excessSec = Math.max(0, rawSec - capSec);
+    const unlocked = Math.min(eligibleSec, reward.elapsedSec);
+    const paidSec = Math.min(unlocked, Math.max(0, Math.floor(reward.paidSec ?? 0)));
+    const remainingSec = Math.max(0, unlocked - paidSec);
+    const allSettled = offlineRewardSettled(reward);
+    const rate = Number(reward.moneyPerSec) > 0
+      ? new Decimal(reward.moneyPerSec)
+      : reward.elapsedSec > 0
+        ? new Decimal(reward.money).div(reward.elapsedSec)
+        : new Decimal(0);
+    const remainingMoney = formatMoney(rate.mul(remainingSec));
+    const maxAds = Math.max(0, reward.adUnlocksMax ?? OFFLINE_AD_SLICE_LIMIT);
     return {
       hasPending: true,
-      money: formatMoney(reward.money),
+      money: remainingMoney,
+      paidLabel: formatTime(paidSec),
+      remainingLabel: formatTime(remainingSec),
+      allSettled,
+      canWatchOfflineAd: false,
+      canClaim: !allSettled && remainingSec > 0,
       elapsedLabel: formatTime(reward.elapsedSec),
       rawElapsedLabel: formatTime(rawSec),
       capLabel: formatTime(capSec),
+      eligibleLabel: formatTime(eligibleSec),
+      adUnlocksUsed: Math.max(0, reward.adUnlocksUsed ?? 0),
+      adUnlocksMax: maxAds,
       excessLabel: excessSec > 0 ? formatTime(excessSec) : "",
       researchProgress: Math.max(0, reward.researchProgress ?? 0),
       projectProgressDelta: Math.max(0, reward.projectProgressDelta ?? 0),
@@ -756,6 +1141,13 @@ export function buildViewModel(state: SaveData): ViewModel {
   // ---------- Stage 3 / 档案馆 ----------
   const stage3Entered = state.stage3?.entered === true;
   const bottleneck = bottleneckAnalysis(state);
+  const infrastructureInsights = new Map(
+    bottleneck.candidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const maximumInfrastructureGain = bottleneck.candidates.reduce(
+    (maximum, candidate) => Decimal.max(maximum, candidate.gain),
+    new Decimal(0),
+  );
   const eff = effectiveEfficiency(state);
   const compute3 = stage3TotalCompute(state);
   const roomsOwned = roomCount(state);
@@ -786,6 +1178,8 @@ export function buildViewModel(state: SaveData): ViewModel {
 
   const infrastructure: InfrastructureVM[] = INFRASTRUCTURES.map((d) => {
     const lvl = infraLevel(state, d.id);
+    const readiness = infrastructureReadiness(state, d.id);
+    const insight = infrastructureInsights.get(d.id);
     let detail = "";
     if (d.id === "storage") {
       const preview = structuredClone(state);
@@ -798,10 +1192,19 @@ export function buildViewModel(state: SaveData): ViewModel {
       icon: d.icon,
       level: lvl,
       maxLevel: 10,
-      upgradeCost: formatMoney(infraUpgradeCost(d.id, lvl)),
+      upgradeCost: formatMoney(infrastructureUpgradeCost(state, d.id, lvl)),
       canUpgrade: canUpgradeInfrastructure(state, d.id),
       desc: d.desc,
       detail,
+      nextRequirement: readiness.nextRequirement,
+      isBottleneck: bottleneck.id === d.id,
+      pressure: insight && maximumInfrastructureGain.gt(0)
+        ? Math.min(1, Math.max(0, insight.gain.div(maximumInfrastructureGain).toNumber()))
+        : 0,
+      projectedIncomeGain: insight
+        ? formatMoney(insight.gain) + t("unit.perSec")
+        : formatMoney(0) + t("unit.perSec"),
+      hasImmediateIncomeGain: insight?.gain.gt(0) ?? false,
     };
   });
 
@@ -813,6 +1216,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       scaleName: r.scaleName,
       commissioned: owned,
       requirementsMet: roomRequirementsMet(state, r.index),
+      canCommission: canCommissionRoom(state, r.index),
       requirements: r.requires,
     };
   });
@@ -831,9 +1235,10 @@ export function buildViewModel(state: SaveData): ViewModel {
       : flagshipRewardMultiplier(state, p.id);
     const requirements: string[] = [
       `${t("stage3.reqRooms")} ${roomsOwned}/${p.requiresRooms}`,
-      `${t("stage3.reqCompute")} ${formatBig(compute3)}/${formatBig(p.requiresCompute)}`,
+      `${t("stage3.reqCompute")} ${formatDisplayedCompute(compute3)}/${formatDisplayedCompute(p.requiresCompute)}`,
       `${t("stage3.reqOptical")} Lv.${infraLevel(state, "optical")}/Lv.${p.requiresOptical ?? 0}`,
       `${t("stage3.reqStorage")} Lv.${infraLevel(state, "storage")}/Lv.${p.requiresStorage}`,
+      `${t("stage3.constructionCost")} ${formatMoney(projectConstructionCost(state, p.id) ?? 0)}`,
     ];
     if (p.id === "project_2") {
       requirements.push(`${t("stage3.reqPrereq")}「${t("flagship.1.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_1") ? t("common.done") : t("stage3.notDone")}`);
@@ -852,10 +1257,11 @@ export function buildViewModel(state: SaveData): ViewModel {
       progress: active ? (state.stage3?.flagship?.progress ?? 0) : 0,
       progressLabel: active ? `${Math.min(100, Math.floor(((state.stage3?.flagship?.progress ?? 0) / p.progressRequired) * 100))}%` : "",
       progressRequired: p.progressRequired,
-      totalCompute: formatBig(compute3),
+      totalCompute: formatDisplayedCompute(compute3),
       pendingRewardId: pendingForThisProject ? p.id : null,
       pendingRewardName: pendingForThisProject ? p.name : null,
-      rewardText: `${t("stage3.rewardMoney")} ${formatMoney(new Decimal(p.reward.money).mul(rewardMultiplier).floor())}（${t("stage3.rewardStorage")} ×${rewardMultiplier.toFixed(2)}） · ${t("stage3.rewardResearch")} +${p.reward.researchProgress}`,
+      rewardText: `${t("stage3.rewardMoney")} ${formatMoney(new Decimal(p.reward.money).mul(rewardMultiplier).floor())}（${t("stage3.rewardStorage")} ×${rewardMultiplier.toFixed(2)}）`,
+      constructionCost: formatMoney(projectConstructionCost(state, p.id) ?? 0),
       requirementsText: requirements.join(" · "),
     };
   });
@@ -871,6 +1277,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       const requirements = [
         `${t("stage3.reqRooms")} ${roomsOwned}/3`,
         `${t("stage3.reqPrereq")}「${t("flagship.3.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_3") ? t("common.done") : t("stage3.notDone")}`,
+        `${t("stage3.constructionCost")} ${formatMoney(projectConstructionCost(state, eraDef.id) ?? 0)}`,
       ];
       if (previousCore) requirements.push(`${t("stage3.reqCore")} ${claimedCoreIds.has(previousCore) ? t("stage3.obtained") : t("stage3.notObtained")}`);
       flagship.push({
@@ -885,10 +1292,11 @@ export function buildViewModel(state: SaveData): ViewModel {
         progress: active ? (state.stage3?.flagship?.progress ?? 0) : 0,
         progressLabel: active ? `${Math.min(100, Math.floor(((state.stage3?.flagship?.progress ?? 0) / eraDef.progressRequired) * 100))}%` : "",
         progressRequired: eraDef.progressRequired,
-        totalCompute: formatBig(compute3),
+        totalCompute: formatDisplayedCompute(compute3),
         pendingRewardId: pendingForThisProject ? eraDef.id : null,
         pendingRewardName: pendingForThisProject ? eraDef.name : null,
         rewardText: `${t("stage3.roundReward")}${t("common.colon")}${round} / 3`,
+        constructionCost: formatMoney(projectConstructionCost(state, eraDef.id) ?? 0),
         requirementsText: requirements.join(" · "),
       });
     }
@@ -938,7 +1346,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       projectedIncomeGain: formatMoney(bottleneck.projectedIncomeGain) + t("unit.perSec"),
     },
     effectiveEfficiency: eff,
-    totalCompute: formatBig(compute3),
+        totalCompute: formatDisplayedCompute(compute3),
     incomePerSec: formatMoney(stage3Entered ? stage3IncomePerSecond(state) : new Decimal(0)) + t("unit.perSec"),
     commissionBonusActive: (state.stage3?.commissionBonusUntilMs ?? 0) > Date.now(),
     commissionBonusRemaining: (state.stage3?.commissionBonusUntilMs ?? 0) > Date.now()
@@ -1014,18 +1422,30 @@ export function buildViewModel(state: SaveData): ViewModel {
 
   const nowMs = Date.now();
   const sponsorState = state.monetization.sponsor;
-  const offlineCapacity = offlineCapacitySeconds(state);
+  const pendingOffline = state.pendingOfflineReward && !offlineRewardSettled(state.pendingOfflineReward)
+    ? state.pendingOfflineReward
+    : null;
+  const offlinePaidSec = pendingOffline
+    ? Math.min(pendingOffline.elapsedSec, Math.max(0, Math.floor(pendingOffline.paidSec ?? 0)))
+    : 2 * 60 * 60;
+  const offlineEligible = pendingOffline
+    ? Math.min(OFFLINE_MAX_SECONDS, Math.max(pendingOffline.elapsedSec, pendingOffline.eligibleSec ?? pendingOffline.elapsedSec))
+    : 0;
+  const offlineAdsUsed = pendingOffline?.adUnlocksUsed ?? 0;
+  const offlineAdsMax = pendingOffline?.adUnlocksMax ?? OFFLINE_AD_SLICE_LIMIT;
   const incomeRemaining = incomeBoostRemainingSeconds(state, nowMs);
+  const canWatchOfflineAd = false;
+  const canWatchIncomeAd = false;
   const sponsor: SponsorVM = {
-    pendingAdKind: state.monetization.pendingOffer?.kind ?? null,
-    offlineCapacityLabel: formatTime(offlineCapacity),
-    offlineCapacityProgress: Math.min(1, offlineCapacity / SPONSOR_OFFLINE_MAX_SECONDS),
-    offlineAdsUsed: sponsorState.offlineAdsWatchedToday,
-    offlineAdsMax: SPONSOR_OFFLINE_ADS_PER_DAY,
-    canWatchOfflineAd:
-      state.monetization.pendingOffer == null
-      && sponsorState.offlineAdsWatchedToday < SPONSOR_OFFLINE_ADS_PER_DAY
-      && offlineCapacity < SPONSOR_OFFLINE_MAX_SECONDS,
+    pendingAdKind: null,
+    availableAdCount: 0,
+    offlineReturnReady: pendingOffline !== null,
+    offlineCapacityLabel: formatTime(offlinePaidSec),
+    offlineEligibleLabel: formatTime(offlineEligible),
+    offlineCapacityProgress: pendingOffline ? Math.min(1, offlinePaidSec / Math.max(1, offlineEligible)) : 0,
+    offlineAdsUsed,
+    offlineAdsMax,
+    canWatchOfflineAd,
     incomeBoostRemainingLabel: formatTime(incomeRemaining),
     incomeBoostProgress: Math.min(1, incomeRemaining / SPONSOR_INCOME_MAX_REMAINING_SECONDS),
     incomeFreeUsed: sponsorState.incomeFreeChargesUsedToday,
@@ -1035,11 +1455,19 @@ export function buildViewModel(state: SaveData): ViewModel {
     canClaimFreeIncome:
       sponsorState.incomeFreeChargesUsedToday < SPONSOR_INCOME_FREE_CHARGES_PER_DAY
       && incomeRemaining < SPONSOR_INCOME_MAX_REMAINING_SECONDS,
-    canWatchIncomeAd:
-      state.monetization.pendingOffer == null
-      && sponsorState.incomeAdsWatchedToday < SPONSOR_INCOME_ADS_PER_DAY
-      && incomeRemaining < SPONSOR_INCOME_MAX_REMAINING_SECONDS,
+    canWatchIncomeAd,
     incomeBoostActive: incomeRemaining > 0,
+  };
+  const chronicle: ChronicleVM = {
+    cumulativeIncome: formatMoney(state.lifetimeIncome),
+    stageLabel: stageLabelValue,
+    workshopLevel: state.workshop?.level ?? 1,
+    clockAdjustmentCount: Math.max(0, Math.floor(state.chronicle?.clockAdjustmentCount ?? 0)),
+    lastClockAdjustmentAtMs: Math.max(0, Math.floor(state.chronicle?.lastClockAdjustmentAtMs ?? 0)),
+    milestones: CHRONICLE_MILESTONE_IDS.map((id) => ({
+      id,
+      achievedAtMs: Math.max(0, Math.floor(state.chronicle?.milestones[id] ?? 0)),
+    })),
   };
 
   // 主按钮
@@ -1097,7 +1525,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     moneyRaw: new Decimal(state.money),
     incomePerSec: formatMoney(ips) + t("unit.perSec"),
     lifetimeIncome: formatMoney(state.lifetimeIncome),
-    compute: formatBig(stage3Entered ? compute3 : compute.mul(state.serverPower)),
+    compute: formatDisplayedCompute(stage3Entered ? compute3 : compute.mul(effectiveServerPower(state))),
     permanentMultiplier: "×" + formatBig(state.permanentMultiplier),
     iterationCount: state.technologyIterationCount,
     architecture: {
@@ -1107,6 +1535,13 @@ export function buildViewModel(state: SaveData): ViewModel {
       nextServerCount: nextArchitectureServerCount,
       nextBlueprintName: nextArchitectureName,
     },
+    company: {
+      level: company.level,
+      experience: Math.floor(company.experience),
+      experienceToNextLevel: Math.ceil(company.experienceToNextLevel),
+      progress: company.progress,
+      title: company.titleKey,
+    },
     model,
     modelArchive,
     growthHistory,
@@ -1115,18 +1550,21 @@ export function buildViewModel(state: SaveData): ViewModel {
     research: {
       progress: state.modelResearch?.progress ?? 0,
       progressLabel: archiveComplete
-        ? "模型蓝图已完成"
+        ? t("model.archiveComplete")
         : `${Math.floor(state.modelResearch?.progress ?? 0)} / 100`,
       canResearch: canResearchModel(state),
       archiveComplete,
       drawsInStage2: state.modelResearch?.stage2Draws ?? 0,
     },
+    growth,
     orderDisplay: buildOrderDisplay(state),
     orders,
+    orderEmptySlotCount,
     activeOrders,
-    canAcceptAnyOrder: state.modelProgress != null && state.activeOrders.length < 4,
+    canAcceptAnyOrder: state.modelProgress != null && orders.some((order) => order.canAccept),
     automationUnlocked: automationUnlocked(state),
-    automationEnabled: state.automation,
+    automationEnabled: state.automation && state.serverCount > 0,
+    automationReadyCount: state.activeOrders.filter((order) => order.status === 1).length,
     automationCompletedOrders: state.completedOrders,
     automationThreshold: automationUnlockThreshold(state),
     workshop: buildWorkshopVM(state),
@@ -1142,7 +1580,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       shown: state.stage2?.settlementShown ?? false,
       serverCount: state.serverCount,
       modelCount: state.ownedModelIds.length,
-      totalCompute: formatBig(compute.mul(new Decimal(state.serverPower))),
+      totalCompute: formatDisplayedCompute(compute.mul(effectiveServerPower(state))),
       incomePerSec: formatMoney(ips) + t("unit.perSec"),
       stageIncome: formatMoney(new Decimal(state.lifetimeIncome).minus(state.incomeAtLastPrestige || 0)),
       completedAtMs: state.stage2?.completedAtMs ?? 0,
@@ -1155,6 +1593,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     stage5,
     offline,
     sponsor,
+    chronicle,
     primaryAction,
     pendingOfflineMoney: offline.hasPending ? offline.money : "",
     feel: buildFeelViewModel(state),
@@ -1168,7 +1607,9 @@ function buildWorkshopVM(state: SaveData): ViewModel["workshop"] {
     level: ws.level,
     experience: ws.experience,
     experienceToNextLevel: ws.experienceToNextLevel,
-    lifetimeRevenue: formatMoney(lifetimeRevenue(state)),
+    // 旧存档可能在 workshop 冗余字段中留下较早值；顶部累计营业额必须以主账本为准，
+    // 并在两个来源同时存在时取较大值，避免回归后显示倒退或像是“消失”。
+    lifetimeRevenue: formatMoney(Decimal.max(lifetimeRevenue(state), new Decimal(state.lifetimeIncome))),
     firstServer: {
       levelCurrent: fp.levelCurrent,
       levelTarget: fp.levelTarget,
@@ -1194,8 +1635,8 @@ function buildTrainPreview(state: SaveData): ViewModel["trainPreview"] {
   const after = incomePerSecond(preview);
   return {
     canTrain: true,
-    computeNow: formatBig(computeNow),
-    computeAfter: formatBig(computeAfter),
+    computeNow: formatDisplayedCompute(computeNow),
+    computeAfter: formatDisplayedCompute(computeAfter),
     incomeNow: formatMoney(now),
     incomeAfter: formatMoney(after),
     cost: formatMoney(cost),
@@ -1214,6 +1655,11 @@ export interface InfrastructureVM {
   canUpgrade: boolean;
   desc: string;
   detail: string;
+  nextRequirement: number | null;
+  isBottleneck: boolean;
+  pressure: number;
+  projectedIncomeGain: string;
+  hasImmediateIncomeGain: boolean;
 }
 
 export interface MachineRoomVM {
@@ -1222,6 +1668,7 @@ export interface MachineRoomVM {
   scaleName: string;
   commissioned: boolean;
   requirementsMet: boolean;
+  canCommission: boolean;
   requirements: { power: number; computeCards: number; optical: number; storage: number };
 }
 
@@ -1241,6 +1688,7 @@ export interface FlagshipVM {
   pendingRewardId: string | null;
   pendingRewardName: string | null;
   rewardText: string;
+  constructionCost: string;
   requirementsText: string;
 }
 
@@ -1314,10 +1762,13 @@ export interface IterationVM {
 export interface SingularityVM {
   active: boolean;
   label: string | null;
+  /** 已实际领取的奇点核心数量；庆典不得再用等级冒充。 */
+  coreCount: number;
   round: number | null;
   coreClaimable: boolean;
   iterationReady: boolean;
   spacePlanRevealed: boolean;
+  spacePlanRevealedAtMs: number;
   spacePlanStarted: boolean;
 }
 
@@ -1340,11 +1791,14 @@ export interface Stage4VM {
   ownedNodeCount: number;
   batchUnlocked: boolean;
   canBuyMaxNodes: boolean;
+  batchCount: number;
+  batchCost: string;
   incomePerSec: string;
   nodeMult: string;
   finalProject: {
     name: string;
     icon: string;
+    constructionCost: string;
     progressLabel: string;
     canStart: boolean;
     active: boolean;
@@ -1374,6 +1828,7 @@ export interface Stage5VM {
   finalProject: {
     name: string;
     icon: string;
+    constructionCost: string;
     progressLabel: string;
     canStart: boolean;
     active: boolean;

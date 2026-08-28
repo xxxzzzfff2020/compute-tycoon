@@ -5,8 +5,8 @@ import {
   buyMaxServers,
   buyServer,
   incomePerSecond,
-  researchModel,
 } from "../../src/economy/engine";
+import { buyBlueprintLevels } from "../../src/economy/incremental-growth";
 import {
   applyFirstIteration,
   architectureUnlockedCount,
@@ -91,13 +91,13 @@ describe("Codex intake bounded repair", () => {
     const state = freshSaveData(1);
     acquireFirstModel(state, "codex");
     grantFirstServer(state);
-    state.ownedModelIds = ["codex", "vision", "voice", "science"];
-    state.modelResearch.progress = 100;
-    const draw = researchModel(state);
-    expect(draw.ok).toBe(true);
-    expect(draw.isNew).toBe(false);
-    expect(state.modelArchive[draw.modelId].level).toBe(1);
-    expect(state.modelProgress?.modelId).toBe(draw.modelId);
+    state.money = 1e12;
+    const upgrade = buyBlueprintLevels(state, "distill", 1);
+    expect(upgrade.ok).toBe(true);
+    expect(state.modelArchive.distill.level).toBe(1);
+    expect(state.ownedModelIds).toContain("distill");
+    // 付费蓝图升级是永久全局成长，不替换开局训练基座。
+    expect(state.modelProgress?.modelId).toBe("codex");
     const archiveBefore = structuredClone(state.modelArchive);
     const ownedBefore = [...state.ownedModelIds];
     makeIterationReady(state);
@@ -128,7 +128,7 @@ describe("Codex intake bounded repair", () => {
     acquireFirstModel(state);
     grantFirstServer(state);
     state.technologyIterationCount = 1;
-    state.money = 75_000 + 220_000;
+    state.money = (75_000 + 220_000) * 60;
     const result = buyMaxServers(state);
     expect(result).toEqual({ ok: true, bought: 2 });
     expect(state.serverCount).toBe(3);
@@ -147,7 +147,7 @@ describe("Codex intake bounded repair", () => {
     expect(incomePerSecond(state).gt(before)).toBe(true);
   });
 
-  it("boot settlement advances research and flagship progress without auto-claim", () => {
+  it("boot settlement advances flagship progress without restoring free research", () => {
     const now = 1_700_000_000_000;
     const state = freshSaveData(now);
     acquireFirstModel(state);
@@ -174,7 +174,7 @@ describe("Codex intake bounded repair", () => {
     const clock = new FakeClock();
     const repository = new SaveRepository({ storage, nowMs: () => clock.now() });
     const session = new GameSession({ repository, clock });
-    expect(session.getState().modelResearch.progress).toBeGreaterThan(0);
+    expect(session.getState().modelResearch.progress).toBe(0);
     expect(session.getState().stage3.projectProgress).toBeGreaterThan(0);
     expect(session.getState().modelResearch.stage2Draws).toBe(0);
     expect(session.getState().ownedModelIds).toEqual(["codex"]);

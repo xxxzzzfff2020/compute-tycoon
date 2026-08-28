@@ -9,11 +9,13 @@ import {
   settleOfflineReward,
   hasPendingOfflineReward,
   offlineCapSeconds,
-  OFFLINE_STAGE4_CAP_SECONDS,
-  OFFLINE_STAGE5_CAP_SECONDS,
+  offlineRemainingSec,
+  OFFLINE_FREE_SECONDS,
+  OFFLINE_MAX_SECONDS,
+  unlockOfflineRewardSlice,
 } from "../../src/save/offline";
 import { incomePerSecond } from "../../src/economy/engine";
-import { startStage5, stage5Entered, startFinalProject, advanceFinalProject } from "../../src/economy/stage5";
+import { startStage5, stage5Entered, startFinalProject, advanceFinalProject, STAGE5_FINAL_PROJECT, STAGE5_NODES } from "../../src/economy/stage5";
 import { startSpacePlan, startFinalProject as startS4Final, stage4Entered } from "../../src/economy/stage4";
 import { makeSession } from "./helpers";
 import type { SaveData } from "../../src/save/types";
@@ -76,6 +78,8 @@ function stage5State(): SaveData {
   };
   startStage5(s, now());
   expect(stage5Entered(s)).toBe(true);
+  s.singularity!.stage5!.nodes = STAGE5_NODES.map((node) => node.id);
+  s.money = STAGE5_FINAL_PROJECT.constructionCost;
   return s;
 }
 
@@ -84,15 +88,15 @@ const calculator = { incomePerSecond };
 describe("CARD-04: receipt snapshot fields", () => {
   it("session boot settle fills elapsed/raw/cap/excess/money/project", () => {
     const s = stage5State();
-    s.lastTickAtMs = now() - 10 * 60 * 60 * 1000; // 10h 离线（基础上限 6h）
+    s.lastTickAtMs = now() - 10 * 60 * 60 * 1000; // 10h 离线；首次报价只免费结算 2h
     startFinalProject(s); // 戴森球进行中
     const { session } = makeSession({ initial: { ...s } as Partial<SaveData> });
     expect(session.hasPendingOffline()).toBe(true);
     // 回执写入存档快照
     const reward = session.getState().pendingOfflineReward!;
-    expect(reward.elapsedSec).toBe(6 * 60 * 60);
+    expect(reward.elapsedSec).toBe(OFFLINE_FREE_SECONDS);
     expect(reward.rawElapsedSec).toBe(10 * 60 * 60);
-    expect(reward.capSec).toBe(6 * 60 * 60);
+    expect(reward.capSec).toBe(OFFLINE_FREE_SECONDS);
     expect(reward.projectName).toBe("stage5.dysonSphere");
     expect(reward.projectProgressDelta).toBeGreaterThan(0);
     expect(reward.money).toBeGreaterThan(0);
@@ -104,7 +108,7 @@ describe("CARD-04: receipt snapshot fields", () => {
     settleOfflineReward(s, now(), calculator);
     const n = normalizeSave(structuredClone(s));
     expect(n?.pendingOfflineReward?.rawElapsedSec).toBe(2 * 60 * 60);
-    expect(n?.pendingOfflineReward?.capSec).toBe(OFFLINE_STAGE5_CAP_SECONDS);
+    expect(n?.pendingOfflineReward?.capSec).toBe(OFFLINE_FREE_SECONDS);
     // 旧版报价（无新字段）回填默认值
     const legacy = freshSaveData(now());
     legacy.pendingOfflineReward = {
@@ -121,38 +125,27 @@ describe("CARD-04: receipt snapshot fields", () => {
   });
 });
 
-describe("sponsor offline cap boundaries", () => {
-  it("stage4 cap is 6h; before/exact/after/excess", () => {
-    const s = stage4State();
-    // 恰好上限前 1 秒
-    s.lastTickAtMs = now() - (OFFLINE_STAGE4_CAP_SECONDS - 1) * 1000;
-    let q = settleOfflineReward(s, now(), calculator);
-    expect(q!.elapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS - 1);
-    expect(s.pendingOfflineReward!.rawElapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS - 1);
-    // 领取后再次离线：恰好上限
-    claimOfflineReward(s, now(), calculator);
-    s.lastTickAtMs = now();
-    s.lastTickAtMs = now() - OFFLINE_STAGE4_CAP_SECONDS * 1000;
-    q = settleOfflineReward(s, now(), calculator);
-    expect(q!.elapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS);
-    expect(q!.rawElapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS);
-    // 上限后 1 秒
-    claimOfflineReward(s, now(), calculator);
-    s.lastTickAtMs = now() - (OFFLINE_STAGE4_CAP_SECONDS + 1) * 1000;
-    q = settleOfflineReward(s, now(), calculator);
-    expect(q!.elapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS);
-    expect(q!.rawElapsedSec).toBe(OFFLINE_STAGE4_CAP_SECONDS + 1);
-    expect(s.pendingOfflineReward!.capSec).toBe(OFFLINE_STAGE4_CAP_SECONDS);
+describe("single-player offline receipt boundaries", () => {
+  it.each([["stage4", stage4State], ["stage5", stage5State]] as const)("%s retains the free 2h cap at all legacy ad boundaries", (_stage, makeState) => {
+    for (const seconds of [OFFLINE_MAX_SECONDS - 1, OFFLINE_MAX_SECONDS, OFFLINE_MAX_SECONDS + 1]) {
+      const s = makeState();
+      s.lastTickAtMs = now() - seconds * 1000;
+      const quote = settleOfflineReward(s, now(), calculator)!;
+      expect(quote.elapsedSec).toBe(OFFLINE_FREE_SECONDS);
+      expect(quote.eligibleSec).toBe(OFFLINE_FREE_SECONDS);
+      expect(quote.capSec).toBe(OFFLINE_FREE_SECONDS);
+      expect(quote.rawElapsedSec).toBe(seconds);
+      expect(quote.adUnlocksMax).toBe(0);
+      expect(unlockOfflineRewardSlice(s)).toEqual({ ok: false, error: "ads_disabled" });
+    }
   });
 
-  it("stage5 uses the same 6h base cap", () => {
+  it("stage5 does not auto-claim or enter perpetual growth during a long absence", () => {
     const s = stage5State();
-    s.lastTickAtMs = now() - 2 * OFFLINE_STAGE5_CAP_SECONDS * 1000;
-    const q = settleOfflineReward(s, now(), calculator);
-    expect(q!.elapsedSec).toBe(OFFLINE_STAGE5_CAP_SECONDS);
-    expect(q!.rawElapsedSec).toBe(2 * OFFLINE_STAGE5_CAP_SECONDS);
-    expect(q!.money.gt(0)).toBe(true);
-    // 离线不自动领核心/迭代/进阶段
+    s.lastTickAtMs = now() - 2 * OFFLINE_MAX_SECONDS * 1000;
+    const q = settleOfflineReward(s, now(), calculator)!;
+    expect(q.elapsedSec).toBe(OFFLINE_FREE_SECONDS);
+    expect(q.money.gt(0)).toBe(true);
     expect(s.singularity?.stage5?.storyCompleted).toBe(false);
     expect(s.singularity?.perpetual).toBeNull();
   });
@@ -177,7 +170,10 @@ describe("CARD-04: exactly-once & rollback", () => {
       if (r.claimed) claimedCount += 1;
     }
     expect(claimedCount).toBe(1);
-    expect(hasPendingOfflineReward(s)).toBe(false);
+    // 部分领取：报价常驻直至下一次结算替换；剩余为 0 且重复领取不会入账
+    expect(hasPendingOfflineReward(s)).toBe(true);
+    expect(offlineRemainingSec(s.pendingOfflineReward!)).toBe(0);
+    expect(claimOfflineReward(s, now(), calculator).claimed).toBe(false);
   });
 
   it("rollback produces no negative/duplicate interval", () => {
@@ -190,7 +186,8 @@ describe("CARD-04: exactly-once & rollback", () => {
     const rollback = firstNow - 60_000;
     expect(settleOfflineReward(s, rollback, calculator)).toBeNull();
     expect(s.money).toBe(moneyAfter);
-    expect(hasPendingOfflineReward(s)).toBe(false);
+    expect(hasPendingOfflineReward(s)).toBe(true);
+    expect(offlineRemainingSec(s.pendingOfflineReward!)).toBe(0);
   });
 
   it("does not auto-advance stage on offline (stage4)", () => {

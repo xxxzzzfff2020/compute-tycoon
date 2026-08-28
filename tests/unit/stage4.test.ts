@@ -1,5 +1,6 @@
 // CARD-02：宇宙惊喜事件与 Stage 4 地月算力网（隔离终局命名空间）单元测试。
 import { describe, expect, it } from "vitest";
+import Decimal from "decimal.js";
 import { freshSaveData } from "../../src/save/storage";
 import { normalizeSave } from "../../src/save/validate";
 import {
@@ -16,9 +17,12 @@ import {
   hasPendingFinalReward,
   claimFinalProjectReward,
   buyVerifiedNodes,
+  STAGE4_FINAL_PROJECT,
   STAGE4_NODES,
   STAGE4_FINAL_PROJECT_ID,
+  STAGE4_ENTRY_INCOME_PER_SECOND,
 } from "../../src/economy/stage4";
+import { stage3IncomePerSecond } from "../../src/economy/stage3";
 import { tick } from "../../src/economy/engine";
 import {
   OFFLINE_STAGE4_CAP_SECONDS,
@@ -137,6 +141,21 @@ describe("stage4: nodes", () => {
 });
 
 describe("stage4: income & final project", () => {
+  it("normalizes the first paid node to 10 minutes, then restores earth-scaled income", () => {
+    const s = revealedState();
+    s.permanentMultiplier = 1000;
+    startSpacePlan(s, now());
+
+    expect(stage4IncomePerSecond(s, now()).toNumber()).toBe(STAGE4_ENTRY_INCOME_PER_SECOND);
+    expect(STAGE4_NODES[1].cost / STAGE4_ENTRY_INCOME_PER_SECOND).toBe(10 * 60);
+
+    s.money = STAGE4_NODES[1].cost;
+    expect(buyNode(s, STAGE4_NODES[1].id).ok).toBe(true);
+    const earthFinal = Decimal.max(stage3IncomePerSecond(s, now()), 1e8);
+    const expected = earthFinal.mul(0.3).mul(nodeIncomeMultiplier(s));
+    expect(stage4IncomePerSecond(s, now()).toNumber()).toBeCloseTo(expected.toNumber(), 6);
+  });
+
   it("tick credits stage4 income and advances final project", () => {
     const s = revealedState();
     startSpacePlan(s, now());
@@ -153,7 +172,8 @@ describe("stage4: income & final project", () => {
     const s = revealedState();
     startSpacePlan(s, now());
     expect(canStartFinalProject(s)).toBe(false);
-    s.money = STAGE4_NODES.slice(1).reduce((sum, node) => sum + node.cost, 0);
+    s.money = STAGE4_NODES.slice(1).reduce((sum, node) => sum + node.cost, 0)
+      + STAGE4_FINAL_PROJECT.constructionCost + 1_000_000;
     expect(buyVerifiedNodes(s).ok).toBe(true);
     expect(canStartFinalProject(s)).toBe(true);
     expect(startFinalProject(s).ok).toBe(true);
@@ -181,36 +201,37 @@ describe("stage4: income & final project", () => {
 });
 
 describe("stage4: offline cap & exactly-once", () => {
-  it("stage4 offline cap is 6h with 75% efficiency (A table)", () => {
+  it("stage4 retains the original free 2h cap with 75% efficiency", () => {
     const s = revealedState();
     startSpacePlan(s, now());
     expect(offlineCapSeconds(s)).toBe(OFFLINE_STAGE4_CAP_SECONDS);
     expect(offlineEfficiency(s)).toBe(OFFLINE_STAGE4_EFFICIENCY);
-    expect(OFFLINE_STAGE4_CAP_SECONDS).toBe(6 * 60 * 60);
+    expect(OFFLINE_STAGE4_CAP_SECONDS).toBe(2 * 60 * 60);
   });
 });
 
 describe("stage4: offline settlement exactly-once", () => {
   it("settle produces one quote; claim once; refresh does not duplicate", async () => {
-    const { settleOfflineReward, claimOfflineReward, hasPendingOfflineReward } = await import("../../src/save/offline");
+    const { settleOfflineReward, claimOfflineReward, hasPendingOfflineReward, offlineRemainingSec } = await import("../../src/save/offline");
     const { incomePerSecond } = await import("../../src/economy/engine");
     const s = revealedState();
     startSpacePlan(s, now());
-    // 模拟离线 10 小时（> 6h 上限）
+    // 模拟离线 10 小时：首次报价只给免费 2 小时，广告可在同一回归补领。
     s.lastTickAtMs = now() - 10 * 60 * 60 * 1000;
     const q1 = settleOfflineReward(s, now(), { incomePerSecond });
     expect(q1).not.toBeNull();
-    expect(q1!.elapsedSec).toBe(6 * 60 * 60); // 截断到上限
+    expect(q1!.elapsedSec).toBe(2 * 60 * 60);
     expect(hasPendingOfflineReward(s)).toBe(true);
     // 再次结算不重复
     const q2 = settleOfflineReward(s, now(), { incomePerSecond });
     expect(q2).toBeNull();
-    // 领取一次；再领失败
+    // 领取一次；再领失败（部分领取：报价仍在，但剩余为 0）
     const c1 = claimOfflineReward(s, now(), { incomePerSecond });
     expect(c1.claimed).toBe(true);
     const c2 = claimOfflineReward(s, now(), { incomePerSecond });
     expect(c2.claimed).toBe(false);
-    expect(hasPendingOfflineReward(s)).toBe(false);
+    expect(hasPendingOfflineReward(s)).toBe(true);
+    expect(offlineRemainingSec(s.pendingOfflineReward!)).toBe(0);
   });
 });
 

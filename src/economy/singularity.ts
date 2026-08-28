@@ -6,7 +6,14 @@ import type { SaveData, SingularityState } from "../save/types";
 import { ENDGAME_SAVE_NAMESPACE } from "../save/types";
 import { FLAGSHIP_PROJECTS } from "../data/stage3";
 import { MODELS } from "../data/content";
+import { normalizeTrainingLevel, trainingComputeMultiplier } from "./model-training";
 import { roomCount } from "./stage3";
+import {
+  effectiveServerPower,
+  resetBlueprintInvestmentForIteration,
+  resetServerScaleForIteration,
+  syncTalentPoints,
+} from "./incremental-growth";
 
 // ---------- 常数 ----------
 export const MAX_ITERATIONS = 3;
@@ -134,6 +141,7 @@ export function claimCore(state: SaveData): { ok: boolean; error?: string } {
     ...(state.singularity as SingularityState),
     coresClaimed: [...(state.singularity?.coresClaimed ?? []), coreId],
   };
+  syncTalentPoints(state);
   return { ok: true };
 }
 
@@ -172,9 +180,10 @@ export function applyEndgameIteration(state: SaveData): { ok: boolean; error?: s
     return { ok: true };
   }
 
-  // R1/R2：重置地球进度，保留档案馆/图鉴/蓝图/科技/纪元/存档身份。
+  // R1/R2：重置地球进度，保留档案馆/图鉴/蓝图所有权/科技/纪元/存档身份。
   const keepOwnedModels = [...state.ownedModelIds];
   const keepArchive = structuredClone(state.modelArchive);
+  const keepGrowth = structuredClone(state.growth);
   const keepBlueprint = state.stage3?.blueprint
     ? { owned: [...state.stage3.blueprint.owned], active: null, levels: Object.fromEntries(state.stage3.blueprint.owned.map((id) => [id, 1])), chosenMilestones: [] }
     : { owned: [], active: null, levels: {}, chosenMilestones: [] };
@@ -218,12 +227,14 @@ export function applyEndgameIteration(state: SaveData): { ok: boolean; error?: s
     projectProgress: 0,
     peakStats: { peakCompute: 0, peakIncomePerSec: 0, totalRequests: 0 },
   };
-
   state.technologyIterationCount = nextCount;
   state.permanentMultiplier = nextMult;
   state.lifetimeIncome = keepLifetimeIncome;
   state.ownedModelIds = keepOwnedModels;
   state.modelArchive = keepArchive;
+  state.growth = keepGrowth;
+  resetBlueprintInvestmentForIteration(state);
+  resetServerScaleForIteration(state);
   state.saveId = keepSaveId;
   state.settings = keepSettings;
   state.incomeAtLastPrestige = state.lifetimeIncome;
@@ -287,7 +298,7 @@ export function eraProjectProgressPerSec(state: SaveData): Decimal {
 
 function stage3TotalComputeSafe(state: SaveData): Decimal {
   // 复用现有 Stage 3 总算力公式（无循环依赖：仅从 stage3 导入 roomCount）。
-  const base = new Decimal(state.serverPower).mul(modelComputeFactorSafe(state));
+  const base = effectiveServerPower(state).mul(modelComputeFactorSafe(state));
   const cards = new Decimal(1).plus((state.stage3?.infrastructure?.computeCards ?? 0) * 0.25);
   let roomMult = new Decimal(1);
   for (const r of state.stage3?.machineRooms ?? []) {
@@ -300,9 +311,8 @@ function modelComputeFactorSafe(state: SaveData): Decimal {
   if (!state.modelProgress) return new Decimal(1);
   const def = MODELS.find((m) => m.id === state.modelProgress!.modelId);
   if (!def) return new Decimal(1);
-  const archiveLevel = state.modelArchive?.[state.modelProgress.modelId]?.level ?? 1;
-  const effectiveLevel = Math.min(def.maxLevel, Math.max(1, state.modelProgress.level) + Math.max(1, archiveLevel) - 1);
-  return new Decimal(def.baseCompute).mul(1 + (effectiveLevel - 1) * 0.1);
+  const trainingLevel = normalizeTrainingLevel(state.modelProgress.level);
+  return new Decimal(def.baseCompute).mul(trainingComputeMultiplier(trainingLevel));
 }
 
 function roomComputeMult(index: number): Decimal {

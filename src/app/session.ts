@@ -2,7 +2,7 @@
 import Decimal from "decimal.js";
 import { toStoredBig } from "../core/big";
 import { OffsetClock, type Clock } from "../core/time";
-import { MODEL_ARCHIVE_MAX_LEVEL, MODELS } from "../data/content";
+import { noteChronicleClockAdjustment, recordChronicleMilestones } from "../economy/chronicle";
 import { ERA_PROJECTS, FLAGSHIP_PROJECTS } from "../data/stage3";
 import {
   acceptOrder,
@@ -10,11 +10,16 @@ import {
   applyPrestige,
   applyTrain,
   automationAutoAccept,
+  applyOfflineCompanyExperience,
   applyOfflineResearchProgress,
+  applyOfflineWorkshopExperience,
   buyServer,
   buyMaxServers,
   canPrestige,
   claimOrder,
+  claimOrderQueue,
+  expandOrderSlot,
+  unlockOrder,
   completeStage2Settlement,
   creditModelContribution,
   enableAutomation,
@@ -22,7 +27,6 @@ import {
   incomePerSecond,
   modelCompute,
   modelLevel,
-  researchModel,
   tick,
   upgradeCenter,
 } from "../economy/engine";
@@ -69,7 +73,6 @@ import type { SaveRepository } from "../save/repository";
 import {
   claimOfflineReward,
   hasPendingOfflineReward,
-  offlineCapSeconds,
   settleOfflineReward,
   type OfflineQuote,
 } from "../save/offline";
@@ -79,11 +82,18 @@ import { buildViewModel, type ViewModel } from "../economy/viewmodel";
 import {
   claimFreeIncomeCharge,
   expirePendingSponsorAd,
-  grantSponsorAd,
   normalizeSponsorDay,
-  prepareSponsorAd,
   type SponsorAdKind,
 } from "../economy/sponsor";
+import {
+  allocateTalent,
+  buyBlueprintLevels,
+  buyRecommendedBlueprint,
+  buyServerScaleUnits,
+  claimAchievement,
+  resetTalents,
+} from "../economy/incremental-growth";
+import type { TalentNodeId } from "../save/types";
 
 export const AUTOSAVE_INTERVAL_SEC = 15;
 
@@ -92,7 +102,7 @@ export interface SessionOptions {
   clock?: Clock;
   onChanged?: () => void;
   onSave?: (result: { ok: boolean; reason: string }) => void;
-  /** 每完成一个订单（含自动领取）回调一次 */
+  /** 每完成一个订单（包括玩家领取自动经营结果）回调一次 */
   onOrderCompleted?: (info: { orderId: string; count: number }) => void;
   autosaveIntervalSec?: number;
 }
@@ -133,14 +143,6 @@ export interface ResearchReceipt {
   conclusion: string;
 }
 
-function formatResearchMetric(value: Decimal): string {
-  return value.toFixed(4).replace(/\.?(0+)$/, "");
-}
-
-function modelName(modelId: string): string {
-  return MODELS.find((model) => model.id === modelId)?.name ?? modelId;
-}
-
 function architectureReceipt(before: SaveData, after: SaveData): ArchitectureReceipt | undefined {
   const beforeCount = architectureUnlockedCount(before);
   const afterCount = architectureUnlockedCount(after);
@@ -164,6 +166,8 @@ export class GameSession {
   private elapsedSinceSave = 0;
   private lastTickMs: number;
   private log: string[] = [];
+  /** 云优先完整重置期间尚未落盘的新档；存在时冻结游戏，避免旧档重新上传。 */
+  private pendingReset: SaveData | null = null;
 
   constructor(options: SessionOptions) {
     this.repository = options.repository;
@@ -175,8 +179,10 @@ export class GameSession {
     const load = this.repository.load();
     this.state = load.data;
     syncArchitectureBlueprints(this.state);
-    this.lastTickMs = this.clock.now();
-    if (expirePendingSponsorAd(this.state, this.clock.now())) {
+    const now = this.clock.now();
+    this.lastTickMs = now;
+    const chronicleChanged = this.captureChronicle(now);
+    if (expirePendingSponsorAd(this.state, now) || chronicleChanged) {
       const saved = this.repository.save(this.state);
       if (saved.ok) this.state = saved.saved;
     }
@@ -197,8 +203,20 @@ export class GameSession {
     this.onChanged?.();
   }
 
+  /** 让账号历程随每次实际持久化前的游戏状态写入，不依赖本地 UI 记录。 */
+  private captureChronicle(nowMs: number): boolean {
+    let changed = recordChronicleMilestones(this.state, nowMs);
+    if (this.clock.consumeRollback?.()) {
+      changed = noteChronicleClockAdjustment(this.state, nowMs) || changed;
+    }
+    return changed;
+  }
+
   /** 每帧驱动 */
   update(dtSec: number): void {
+    // 云档完整重置采用“远端成功后再落本机”的事务语义。请求期间若仍推进
+    // Tick/自动保存，旧档可能在新云档落地后被重新排队上传。
+    if (this.pendingReset) return;
     if (!Number.isFinite(dtSec) || dtSec <= 0) return;
     const now = this.clock.now();
     // 调用方传入精确 rAF delta；隔离验收可在入口处安全缩放该 delta。
@@ -221,19 +239,9 @@ export class GameSession {
           count: result.completedOrderIds.length,
         });
       }
-      // 自动领取可领取订单（领取即移除槽位，倒序遍历避免索引漂移）
-      if (this.state.automation) {
-        for (let i = this.state.activeOrders.length - 1; i >= 0; i--) {
-          if (this.state.activeOrders[i].status === 1) {
-            claimOrder(this.state, i);
-          }
-        }
-        // 自动领取后同帧补满槽位：新订单留到下一帧才推进，经济结果不变，
-        // 但渲染层不会观察到 4→3→4 的短暂缺口。
-        const refilled = automationAutoAccept(this.state, now);
-        if (refilled > 0) changed = true;
-      }
+      // 订单完成后由引擎立即自动结算并释放本订单队列格；自动经营会在下一帧补入后续任务。
     }
+    if (this.captureChronicle(now)) changed = true;
 
     // 自动保存
     this.elapsedSinceSave += dtSec;
@@ -251,19 +259,20 @@ export class GameSession {
   private settleOfflineAtBoot(): void {
     const now = this.clock.now();
     const hadPending = hasPendingOfflineReward(this.state);
-    const elapsedSec = !hadPending && now > this.state.lastTickAtMs
-      ? Math.min((now - this.state.lastTickAtMs) / 1000, offlineCapSeconds(this.state))
-      : 0;
     const quote = settleOfflineReward(this.state, now, {
       incomePerSecond: (s) => incomePerSecond(s),
     }, (s, q) => {
-      // 回调在快照写入前执行：填充回执并应用侧效。
-      this.applyOfflineSideEffects(s, q, elapsedSec);
+      // 回调在快照写入前执行：首次免费 2h 的回执与侧效同源。
+      // 广告后续只补领本次离线收入，不重放研发/工程推进。
+      this.applyOfflineSideEffects(s, q, q.elapsedSec);
     });
     // 无资金报价时（income=0）：仍按同一有效时长推进研发/工程（不产生回执）。
     let sideEffectChanged = false;
-    if (!quote && elapsedSec >= 5) {
-      sideEffectChanged = this.applyOfflineSideEffects(this.state, null, elapsedSec);
+    const freeElapsedSec = !hadPending && now > this.state.lastTickAtMs
+      ? Math.min((now - this.state.lastTickAtMs) / 1000, 2 * 60 * 60)
+      : 0;
+    if (!quote && freeElapsedSec >= 5) {
+      sideEffectChanged = this.applyOfflineSideEffects(this.state, null, freeElapsedSec);
     }
     if (quote) {
       this.log.push(`离线收益 ${quote.elapsedSec}秒 ¥${quote.money.toFixed(0)} 待领取`);
@@ -282,6 +291,11 @@ export class GameSession {
     if (applyOfflineResearchProgress(state, elapsedSec) > 0) changed = true;
     const researchDelta = Math.max(0, (state.modelResearch?.progress ?? 0) - researchBefore);
     if (quote) quote.researchProgress = researchDelta;
+
+    // 工作室经验与在线四槽订单使用同一速率。离线跨过等级门槛时，
+    // addExperience 会同步发放一次性天赋点；不会自动替玩家分配天赋。
+    if (applyOfflineWorkshopExperience(state, elapsedSec) > 0) changed = true;
+    if (applyOfflineCompanyExperience(state, elapsedSec) > 0) changed = true;
 
     // 工程推进：识别当前激活工程并计算进度增量（不自动购节点/领奖/迭代/进新阶段）。
     let projectName: string | null = null;
@@ -329,6 +343,7 @@ export class GameSession {
 
   // ---------- 命令 ----------
   private commit(mutator: () => { ok: boolean; error?: string }): CommandResult {
+    if (this.pendingReset) return { ok: false, error: "reset_in_progress" };
     const before = structuredClone(this.state);
     const result = mutator();
     if (!result.ok) {
@@ -336,6 +351,7 @@ export class GameSession {
       this.state = before;
       return result;
     }
+    this.captureChronicle(this.clock.now());
     const saved = this.repository.save(this.state);
     if (!saved.ok) {
       this.state = before;
@@ -367,6 +383,18 @@ export class GameSession {
 
   claimOrder(orderIndex: number): CommandResult {
     return this.commit(() => claimOrder(this.state, orderIndex));
+  }
+
+  claimOrderQueue(orderId: string): CommandResult {
+    return this.commit(() => claimOrderQueue(this.state, orderId));
+  }
+
+  unlockOrder(orderId: string): CommandResult {
+    return this.commit(() => unlockOrder(this.state, orderId));
+  }
+
+  expandOrderSlot(orderId: string): CommandResult {
+    return this.commit(() => expandOrderSlot(this.state, orderId));
   }
 
   trainModel(): CommandResult {
@@ -401,57 +429,40 @@ export class GameSession {
   }
 
   researchModel(): CommandResult {
-    const beforeState = structuredClone(this.state);
-    const beforeModelId = beforeState.modelProgress?.modelId ?? "";
-    const beforeLevel = modelLevel(beforeState);
-    const beforeCompute = modelCompute(beforeState);
-    const beforeIncome = incomePerSecond(beforeState);
-    let resultModelId = "";
-    let switched = false;
-    let archiveLevelBefore = 0;
-    let archiveLevelAfter = 0;
-    const result = this.commit(() => {
-      const r = researchModel(this.state);
-      if (!r.ok) return { ok: false, error: r.error };
-      resultModelId = r.modelId;
-      switched = r.switched === true;
-      archiveLevelBefore = r.archiveLevelBefore;
-      archiveLevelAfter = r.archiveLevelAfter;
-      return { ok: true };
+    return { ok: false, error: "feature_removed" };
+  }
+
+  upgradeBlueprint(modelId: string, quantity: number | "max" = 1): CommandResult {
+    return this.commit(() => {
+      const result = buyBlueprintLevels(this.state, modelId, quantity);
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
     });
-    if (!result.ok) return result;
-    const after = this.state;
-    const receipt: ResearchReceipt = {
-      oldModelId: beforeModelId,
-      oldModelName: modelName(beforeModelId),
-      resultModelId,
-      resultModelName: modelName(resultModelId),
-      levelBefore: beforeLevel,
-      levelAfter: modelLevel(after),
-      archiveLevelBefore,
-      archiveLevelAfter,
-      archiveLevelDelta: archiveLevelAfter - archiveLevelBefore,
-      computeBefore: formatResearchMetric(beforeCompute),
-      computeAfter: formatResearchMetric(modelCompute(after)),
-      computeDelta: formatResearchMetric(modelCompute(after).minus(beforeCompute)),
-      incomeBefore: formatResearchMetric(beforeIncome),
-      incomeAfter: formatResearchMetric(incomePerSecond(after)),
-      incomeDelta: formatResearchMetric(incomePerSecond(after).minus(beforeIncome)),
-      switched,
-      switchReason: switched
-        ? "receipt.reason.switched"
-        : resultModelId === beforeModelId
-          ? "receipt.reason.upgraded"
-          : "receipt.reason.kept",
-      conclusion: switched ? "receipt.conclusion.switched" : "receipt.conclusion.kept",
-    };
-    return {
-      ...result,
-      researchReceipt: receipt,
-      ...(this.state.monetization.pendingOffer
-        ? { rewardedAdOffer: structuredClone(this.state.monetization.pendingOffer) }
-        : {}),
-    };
+  }
+
+  upgradeRecommendedBlueprint(quantity: number | "max" = 1): CommandResult {
+    return this.commit(() => {
+      const result = buyRecommendedBlueprint(this.state, quantity);
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    });
+  }
+
+  expandServerScale(serverId: string, quantity: number | "max" = 1): CommandResult {
+    return this.commit(() => {
+      const result = buyServerScaleUnits(this.state, serverId, quantity);
+      return result.ok ? { ok: true } : { ok: false, error: result.error };
+    });
+  }
+
+  allocateTalent(id: TalentNodeId): CommandResult {
+    return this.commit(() => allocateTalent(this.state, id));
+  }
+
+  claimAchievement(id: string): CommandResult {
+    return this.commit(() => claimAchievement(this.state, id));
+  }
+
+  resetTalents(): CommandResult {
+    return this.commit(() => resetTalents(this.state));
   }
 
   completeStage2Settlement(): CommandResult {
@@ -549,6 +560,7 @@ export class GameSession {
       return { ok: false, error: "no_offline_reward" };
     }
     creditModelContribution(this.state, res.money);
+    this.captureChronicle(this.clock.now());
     const saved = this.repository.save(this.state);
     if (!saved.ok) {
       this.state = before;
@@ -566,46 +578,21 @@ export class GameSession {
     return this.commit(() => claimFreeIncomeCharge(this.state, this.clock.now()));
   }
 
-  prepareSponsorAd(kind: SponsorAdKind): CommandResult {
-    const before = structuredClone(this.state);
-    const prepared = prepareSponsorAd(this.state, kind, this.clock.now());
-    if (!prepared.ok || !prepared.offer) {
-      this.state = before;
-      return { ok: false, error: prepared.error ?? "ad_offer_invalid" };
-    }
-    const saved = this.repository.save(this.state);
-    if (!saved.ok) {
-      this.state = before;
-      return { ok: false, error: "save_failed" };
-    }
-    this.state = saved.saved;
-    this.onSave?.({ ok: true, reason: "sponsor_ad_prepare" });
-    this.emitChanged();
-    return { ok: true, rewardedAdOffer: structuredClone(prepared.offer) };
+  prepareSponsorAd(_kind: SponsorAdKind): CommandResult {
+    return { ok: false, error: "ads_disabled" };
   }
 
   pendingRewardedAdOffer(): RewardedAdOfferState | null {
-    return this.state.monetization.pendingOffer
-      ? structuredClone(this.state.monetization.pendingOffer)
-      : null;
+    return null;
   }
 
-  cancelPendingSponsorAd(eventId: string): CommandResult {
-    if (this.state.monetization.pendingOffer?.eventId !== eventId) return { ok: false, error: "ad_offer_missing" };
-    return this.commit(() => {
-      this.state.monetization.pendingOffer = null;
-      return { ok: true };
-    });
+  cancelPendingSponsorAd(_eventId: string): CommandResult {
+    return { ok: false, error: "ads_disabled" };
   }
 
-  /** 完整观看平台激励视频后发放赞助充能；事件ID持久化，重复回调/刷新不会重复发放。 */
-  grantRewardedAd(eventId: string): CommandResult {
-    const offer = this.state.monetization.pendingOffer;
-    if (!offer || offer.eventId !== eventId) return { ok: false, error: "ad_offer_missing" };
-    if (this.state.monetization.completedRewardEventIds.includes(eventId)) {
-      return { ok: false, error: "ad_reward_already_granted" };
-    }
-    return this.commit(() => grantSponsorAd(this.state, eventId, this.clock.now()));
+  /** 单机版拒绝所有广告回调，包含从旧存档恢复的事件。 */
+  grantRewardedAd(_eventId: string): CommandResult {
+    return { ok: false, error: "ads_disabled" };
   }
 
   hasPendingOffline(): boolean {
@@ -613,10 +600,13 @@ export class GameSession {
   }
 
   save(reason = "manual"): { ok: boolean; error?: string } {
-    normalizeSponsorDay(this.state, this.clock.now());
+    if (this.pendingReset) return { ok: false, error: "reset_in_progress" };
+    const now = this.clock.now();
+    normalizeSponsorDay(this.state, now);
+    this.captureChronicle(now);
     // 在线游玩写盘时推进离线锚点：只有真正长时间未写盘（重开）才结算离线收益
-    if (this.state.lastTickAtMs < this.clock.now()) {
-      this.state.lastTickAtMs = this.clock.now();
+    if (this.state.lastTickAtMs < now) {
+      this.state.lastTickAtMs = now;
     }
     const result = this.repository.save(this.state);
     if (result.ok) {
@@ -633,6 +623,7 @@ export class GameSession {
   }
 
   importJson(text: string): { ok: boolean; error?: string } {
+    if (this.pendingReset) return { ok: false, error: "reset_in_progress" };
     const res = this.repository.importJson(text, prepareEndgameReplacementSave);
     if (!res.ok) return { ok: false, error: res.error };
     this.state = res.data!;
@@ -642,12 +633,48 @@ export class GameSession {
   }
 
   reset(): CommandResult {
+    if (this.pendingReset) return { ok: false, error: "reset_in_progress" };
     const result = this.repository.reset(prepareEndgameReplacementSave);
     if (!result.ok) return { ok: false, error: result.error ?? "storage_write_failed" };
     this.state = result.data;
     this.lastTickMs = this.clock.now();
     this.emitChanged();
     return { ok: true };
+  }
+
+  /**
+   * 准备完整重置但保留当前本机档不变，显式提交后才落盘。
+   * 此兼容事务接口不访问任何账号或远端服务。
+   */
+  beginResetTransaction(): { ok: boolean; saveJson?: string; error?: string } {
+    if (this.pendingReset) return { ok: false, error: "reset_in_progress" };
+    const prepared = this.repository.prepareReset(prepareEndgameReplacementSave);
+    if (!prepared.ok) return { ok: false, error: prepared.error ?? "save_preparation_failed" };
+    this.pendingReset = prepared.data;
+    return { ok: true, saveJson: this.repository.exportJson(prepared.data) };
+  }
+
+  /** 把同一份候选新档提交到本机并恢复会话。 */
+  commitResetTransaction(): CommandResult {
+    if (!this.pendingReset) return { ok: false, error: "reset_not_prepared" };
+    const result = this.repository.commitPreparedReset(this.pendingReset);
+    if (!result.ok) return { ok: false, error: result.error ?? "storage_write_failed" };
+    this.state = result.data;
+    this.pendingReset = null;
+    this.lastTickMs = this.clock.now();
+    this.elapsedSinceSave = 0;
+    this.onSave?.({ ok: true, reason: "reset" });
+    this.emitChanged();
+    return { ok: true };
+  }
+
+  /** 放弃重置并释放锁；旧档从未被写入或替换。 */
+  cancelResetTransaction(): void {
+    this.pendingReset = null;
+  }
+
+  resetTransactionPending(): boolean {
+    return this.pendingReset !== null;
   }
 
   getLog(): string[] {

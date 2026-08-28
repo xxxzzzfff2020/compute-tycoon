@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-review/
 dist-platform-review/
+dist-release/
 *.local
 .DS_Store
 store-materials/

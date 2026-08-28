@@ -8,19 +8,31 @@ import {
   applyTrain,
   automationUnlocked,
   buyServer,
+  canTrain,
   canUpgradeCenter,
   canPrestige,
   centerUpgradeCost,
   enableAutomation,
   enableRental,
   incomePerSecond,
+  LEGACY_TRAINING_TOTAL_COST,
   modelCompute,
+  modelLevel,
+  orderSlotSpeedMultiplier,
   orderNet,
   prestigePreview,
+  tick,
   trainCost,
   upgradeCenter,
 } from "../../src/economy/engine";
-import { ORDERS, SERVERS, PRESTIGE_TARGET_INCOME } from "../../src/data/content";
+import {
+  MODEL_TRAINING_MAX_LEVEL,
+  ORDERS,
+  ORDER_QUEUE_EFFECTIVE_PARALLELISM,
+  PRESTIGE_TARGET_INCOME,
+  SERVERS,
+} from "../../src/data/content";
+import { effectiveServerPower } from "../../src/economy/incremental-growth";
 
 function makeState() {
   return freshSaveData(1_700_000_000_000);
@@ -60,6 +72,40 @@ describe("engine: model", () => {
     expect(res.ok).toBe(false);
     expect(s.modelProgress?.level).toBe(1);
   });
+
+  it("keeps model training independent when the matching Blueprint is maxed", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    s.modelArchive.codex.level = 40;
+    s.money = 10_000;
+
+    expect(modelLevel(s)).toBe(1);
+    expect(trainCost(s).toNumber()).toBe(35);
+    expect(canTrain(s)).toBe(true);
+
+    expect(applyTrain(s).ok).toBe(true);
+    expect(s.modelProgress?.level).toBe(2);
+    expect(s.modelArchive.codex.level).toBe(40);
+  });
+
+  it("splits shared training into 40 levels without changing full-path spend or max compute", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    s.money = "1e30";
+    const initialCompute = modelCompute(s);
+    let spent = new Decimal(0);
+
+    while (canTrain(s)) {
+      const cost = trainCost(s);
+      expect(cost.gt(0)).toBe(true);
+      expect(applyTrain(s).ok).toBe(true);
+      spent = spent.plus(cost);
+    }
+
+    expect(modelLevel(s)).toBe(MODEL_TRAINING_MAX_LEVEL);
+    expect(spent.eq(LEGACY_TRAINING_TOTAL_COST)).toBe(true);
+    expect(modelCompute(s).div(initialCompute).toNumber()).toBeCloseTo(2.9, 10);
+  });
 });
 
 describe("engine: orders", () => {
@@ -84,21 +130,105 @@ describe("engine: orders", () => {
     expect(beforeMoney).toBe(0);
   });
 
-  it("limits active orders to 4", () => {
+  it("starts the first unlocked order with four independent slots", () => {
     const s = makeState();
     acquireFirstModel(s);
     const now = 1_700_000_000_000;
     for (let i = 0; i < 4; i++) expect(acceptOrder(s, "o1", now).ok).toBe(true);
+    expect(s.activeOrders.map((order) => order.slotIndex)).toEqual([0, 1, 2, 3]);
     expect(acceptOrder(s, "o1", now).ok).toBe(false);
+  });
+
+  it("migrates legacy capacities and enforces four slots per order", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    s.money = 10_000;
+    s.unlockedOrderIds = ["o1", "o2"];
+    s.orderSlotCapacity = { o1: 1, o2: 1 };
+    const now = 1_700_000_000_000;
+    for (let index = 0; index < 4; index += 1) {
+      expect(acceptOrder(s, "o1", now).ok).toBe(true);
+      expect(acceptOrder(s, "o2", now).ok).toBe(true);
+    }
+    expect(s.activeOrders).toHaveLength(8);
+    expect(acceptOrder(s, "o1", now)).toMatchObject({ ok: false, error: "order_slots_full" });
+    expect(acceptOrder(s, "o2", now)).toMatchObject({ ok: false, error: "order_slots_full" });
+  });
+
+  it("advances four fixed lanes at 100%, 50%, 25%, and 12.5%", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    const now = 1_700_000_000_000;
+    for (let index = 0; index < 4; index += 1) {
+      expect(acceptOrder(s, "o1", now).ok).toBe(true);
+    }
+    const before = s.activeOrders.map((order) => order.remainingSec);
+    const speed = modelCompute(s).mul(effectiveServerPower(s)).toNumber();
+    tick(s, now + 1_000, 1);
+    expect(s.activeOrders.map((order) => order.remainingSec)).toEqual(
+      before.map((remaining, index) => expect.closeTo(
+        remaining - speed * orderSlotSpeedMultiplier(index),
+        8,
+      )),
+    );
+    expect(ORDER_QUEUE_EFFECTIVE_PARALLELISM).toBe(1.875);
+  });
+
+  it("keeps later lanes at fixed speeds after the front lane completes", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    const now = 1_700_000_000_000;
+    for (let index = 0; index < 4; index += 1) {
+      expect(acceptOrder(s, "o1", now).ok).toBe(true);
+    }
+    const speed = modelCompute(s).mul(effectiveServerPower(s)).toNumber();
+    s.activeOrders[0].remainingSec = speed;
+    for (let index = 1; index < 4; index += 1) s.activeOrders[index].remainingSec = speed * 100;
+
+    const result = tick(s, now + 2_000, 2);
+
+    expect(result.completedOrderIds).toEqual(["o1"]);
+    expect(s.activeOrders).toHaveLength(3);
+    expect(s.activeOrders.map((order) => order.slotIndex)).toEqual([1, 2, 3]);
+    expect(s.activeOrders[0].remainingSec).toBeCloseTo(speed * 99, 8);
+    expect(s.activeOrders[1].remainingSec).toBeCloseTo(speed * 99.5, 8);
+    expect(s.activeOrders[2].remainingSec).toBeCloseTo(speed * 99.75, 8);
+  });
+
+  it("refills an automated completion in the same lane without moving the others", () => {
+    const s = makeState();
+    acquireFirstModel(s);
+    s.serverCount = 1;
+    s.serverPower = 1.5;
+    const now = 1_700_000_000_000;
+    for (let index = 0; index < 4; index += 1) {
+      expect(acceptOrder(s, "o1", now).ok).toBe(true);
+    }
+    s.automation = true;
+    const speed = modelCompute(s).mul(effectiveServerPower(s)).toNumber();
+    s.activeOrders[0].remainingSec = speed;
+    for (let index = 1; index < 4; index += 1) s.activeOrders[index].remainingSec = speed * 100;
+
+    const result = tick(s, now + 2_000, 2);
+
+    expect(result.completedOrderIds).toEqual(["o1"]);
+    expect(s.activeOrders).toHaveLength(4);
+    expect(s.activeOrders.map((order) => order.slotIndex)).toEqual([0, 1, 2, 3]);
+    expect(s.activeOrders[0].remainingSec).toBeCloseTo(ORDERS[0].durationSec - speed, 8);
+    expect(s.activeOrders[1].remainingSec).toBeCloseTo(speed * 99, 8);
+    expect(s.activeOrders[2].remainingSec).toBeCloseTo(speed * 99.5, 8);
+    expect(s.activeOrders[3].remainingSec).toBeCloseTo(speed * 99.75, 8);
   });
 });
 
 describe("engine: automation", () => {
-  it("unlocks after 6 orders", () => {
+  it("unlocks after the first owned server", () => {
     const s = makeState();
     s.completedOrders = 5;
     expect(automationUnlocked(s)).toBe(false);
     s.completedOrders = 6;
+    expect(automationUnlocked(s)).toBe(false);
+    s.serverCount = 1;
     expect(automationUnlocked(s)).toBe(true);
   });
 
@@ -106,6 +236,8 @@ describe("engine: automation", () => {
     const s = makeState();
     expect(enableAutomation(s).ok).toBe(false);
     s.completedOrders = 6;
+    expect(enableAutomation(s).ok).toBe(false);
+    s.serverCount = 1;
     expect(enableAutomation(s).ok).toBe(true);
     expect(enableAutomation(s).ok).toBe(true); // 幂等
   });
@@ -148,17 +280,14 @@ describe("engine: servers", () => {
     s.lifetimeIncome = 24000;
     expect(buyServer(s).ok).toBe(true);
     expect(s.serverCount).toBe(1);
-    // 第二、三台成本递增；第 4 台起进入规模化扩张（成本回落起点），4→8 台成本单调递增；
+    // 候选 E：第 2→8 台价格全程严格递增，禁止第 4 台价格倒挂造成秒穿；
     // power 全程严格递增；serverPower 加法累积（每台 power 相加）
-    const c3 = SERVERS.find((sv) => sv.index === 3)!;
-    const c4 = SERVERS.find((sv) => sv.index === 4)!;
-    expect(c4.cost).toBeLessThan(c3.cost); // 集群后规模化经济
     let prevCost = 0;
     let prevPower = 0;
     for (let i = 2; i <= 8; i++) {
       s.money = 1e12;
       const def = SERVERS.find((sv) => sv.index === i)!;
-      if (i >= 5) expect(def.cost).toBeGreaterThan(prevCost);
+      if (i >= 3) expect(def.cost).toBeGreaterThan(prevCost);
       expect(def.power).toBeGreaterThan(prevPower);
       prevCost = def.cost;
       prevPower = def.power;

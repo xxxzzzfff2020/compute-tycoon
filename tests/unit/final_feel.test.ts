@@ -14,6 +14,9 @@ import { createAppShell } from "../../src/ui/render";
 import { buildViewModel } from "../../src/economy/viewmodel";
 import { buildReviewSave } from "../../src/review/checkpoints";
 import { buildEndgameReviewSave } from "../../src/review/endgame-checkpoints";
+import { freshSaveData } from "../../src/save/storage";
+import { MemorySaveStorage } from "../../src/save/storage";
+import { SaveRepository } from "../../src/save/repository";
 
 const NOW = 1_800_000_000_000;
 let dom: JSDOM | null = null;
@@ -99,6 +102,16 @@ describe("Level A feel selectors", () => {
     const fresh = buildFeelViewModel(buildReviewSave("new_game", NOW));
     expect(fresh.computeTier).toBe("idle");
     expect(fresh.affordableActions[0]?.id).toBe("acquire_model");
+    expect(fresh.affordableActions.some((action) => action.id === "enable_rental")).toBe(false);
+
+    const preServer = freshSaveData(NOW);
+    preServer.modelProgress = { modelId: "codex", level: 1, trainingCount: 0 };
+    preServer.ownedModelIds = ["codex"];
+    preServer.money = 1_000;
+    preServer.workshop.level = 2;
+    preServer.workshop.lifetimeRevenue = 1_000;
+    const preServerFeel = buildFeelViewModel(preServer);
+    expect(preServerFeel.affordableActions.some((action) => action.id === "enable_rental")).toBe(false);
 
     const lunar = buildFeelViewModel(buildEndgameReviewSave("endgame_stage4_mid", NOW));
     expect(lunar.computeTier).toBe("lunar");
@@ -125,7 +138,12 @@ describe("Level A feel selectors", () => {
       elapsedSec: 7200,
       rawElapsedSec: 7200,
       capSec: 21600,
+      eligibleSec: 7200,
+      adUnlocksUsed: 0,
+      adUnlocksMax: 6,
+      moneyPerSec: "138888888.89",
       money: "1000000000000",
+      paidSec: 0,
       claimed: false,
       researchProgress: 15,
       projectProgressDelta: 0,
@@ -137,6 +155,21 @@ describe("Level A feel selectors", () => {
     expect(preview!.computeLabel).toMatch(/^保持 /);
     expect(preview!.affordableAfterCount).toBeGreaterThan(0);
     expect(state.money).toBe(moneyBefore);
+  });
+
+  it("keeps an all-infrastructure-max Stage 3 save renderable across save and reload", () => {
+    const state = buildReviewSave("stage3_entry", NOW);
+    state.stage3.infrastructure = { power: 10, computeCards: 10, optical: 10, storage: 10 };
+    const storage = new MemorySaveStorage();
+    storage.save(state);
+    const repository = new SaveRepository({ storage, nowMs: () => NOW + 1 });
+    const loaded = repository.load();
+
+    expect(loaded.kind).toBe("loaded");
+    expect(() => buildViewModel(loaded.data)).not.toThrow();
+    const feelVm = buildFeelViewModel(loaded.data);
+    expect(feelVm.bottleneck).toBeNull();
+    expect(feelVm.affordableActions.some((action) => action.id.startsWith("upgrade_infra:"))).toBe(false);
   });
 });
 
@@ -240,6 +273,55 @@ describe("Level A stable presentation controller", () => {
     controller.destroy();
   });
 
+  it("keeps all four investment cells mounted when actions appear or disappear", () => {
+    const root = setupDom();
+    const money = document.createElement("div");
+    root.appendChild(money);
+    const controller = createFinalFeelController(root, money);
+    root.appendChild(controller.element);
+    const action = { id: "buy_server", label: "购买服务器", anchorAction: "buy_server", priority: 90 };
+
+    controller.patch(feel());
+    const summary = controller.element.querySelector<HTMLElement>(".investment-summary")!;
+    const hud = controller.element.querySelector<HTMLElement>(".feel-hud-feedback")!;
+    const slotsBefore = [...controller.element.querySelectorAll<HTMLButtonElement>(".investment-action")];
+    expect(summary.hidden).toBe(false);
+    expect(slotsBefore).toHaveLength(4);
+    expect(slotsBefore.every((slot) => slot.disabled)).toBe(true);
+    expect(hud.contains(controller.element.querySelector(".growth-feedback"))).toBe(true);
+    const growthReview = controller.element.querySelector<HTMLElement>(".growth-review-card")!;
+    expect(hud.contains(growthReview)).toBe(false);
+    expect(controller.element.contains(growthReview)).toBe(true);
+    expect(growthReview.nextElementSibling).toBe(summary);
+
+    controller.patch(feel({ affordableActions: [action] }));
+    const slotsAfter = [...controller.element.querySelectorAll<HTMLButtonElement>(".investment-action")];
+    expect(summary.hidden).toBe(false);
+    expect(slotsAfter).toEqual(slotsBefore);
+    expect(slotsAfter[0].disabled).toBe(false);
+    expect(slotsAfter.slice(1).every((slot) => slot.disabled)).toBe(true);
+    controller.destroy();
+  });
+
+  it("executes a located action only when the host explicitly injects the command callback", () => {
+    const root = setupDom();
+    const money = document.createElement("div");
+    const target = document.createElement("button");
+    target.dataset.action = "buy_server";
+    root.append(money, target);
+    const execute = vi.fn();
+    const controller = createFinalFeelController(root, money, { executeAction: execute });
+    root.appendChild(controller.element);
+    const action = { id: "buy_server", label: "购买服务器", anchorAction: "buy_server", priority: 90 };
+
+    controller.patch(feel({ affordableActions: [action] }));
+    (controller.element.querySelector("button[data-feel-anchor]") as HTMLButtonElement).click();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith("buy_server");
+    controller.destroy();
+  });
+
   it("pauses all visual feedback while hidden and resumes without replay", () => {
     const root = setupDom();
     const money = document.createElement("div");
@@ -273,22 +355,31 @@ describe("Level A stable presentation controller", () => {
     expect(css).toContain("animation-play-state: paused");
     expect(css).toContain(".final-feel-panel [hidden]");
     expect(css).toContain("display: none !important");
+    expect(css).toContain(".investment-action-placeholder");
+    expect(css).toContain("visibility: hidden");
+    expect(css).toContain(".feel-hud-feedback");
+    expect(css).not.toContain("data-action-count=");
     expect(css).not.toMatch(/\.gif|<canvas|<video/i);
   });
 
-  it("reorders Stage2 automation to model, server, aggregated orders", () => {
+  it("groups Stage2 automation sections into business sub-tabs", () => {
     const container = setupDom();
     const shell = createAppShell(container);
     shell.render(buildViewModel(buildReviewSave("server3_blueprint", NOW)));
-    const page = document.querySelector(".app-page-business")!;
     const model = document.getElementById("section-model")!;
     const server = document.getElementById("section-server")!;
     const orders = document.getElementById("section-orders")!;
-    const nodes = [...page.children];
-    expect(nodes.indexOf(model)).toBeLessThan(nodes.indexOf(server));
-    expect(nodes.indexOf(server)).toBeLessThan(nodes.indexOf(orders));
+    // 模型独立为模型子 Tab；订单保留在订单子 Tab，服务器在机房组。
+    expect(model.parentElement?.dataset.tab).toBe("models");
+    expect(orders.parentElement?.dataset.tab).toBe("operations");
+    expect(server.parentElement?.dataset.tab).toBe("facility");
     expect(server.querySelector(".section-title")?.textContent).toContain("②");
     expect(orders.querySelector(".section-title")?.textContent).toContain("③");
+    const operations = document.querySelector<HTMLButtonElement>("[data-action='business_tab:operations']")!;
+    expect(operations.classList.contains("active")).toBe(true);
+    expect(operations.getAttribute("aria-pressed")).toBe("true");
+    expect(operations.getAttribute("aria-current")).toBe("page");
+    expect(operations.getAttribute("aria-controls")).toBe("business-panel-operations");
     shell.destroy();
   });
 });

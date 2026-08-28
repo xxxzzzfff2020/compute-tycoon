@@ -12,7 +12,7 @@ import {
 } from "../../src/review/checkpoints";
 import { SaveRepository } from "../../src/save/repository";
 import { LocalStorageSaveStorage, MemorySaveStorage, freshSaveData } from "../../src/save/storage";
-import { SAVE_NAMESPACE } from "../../src/save/types";
+import { SAVE_NAMESPACE, SAVE_SCHEMA_VERSION } from "../../src/save/types";
 import { validateSave } from "../../src/save/validate";
 import {
   REVIEW_EXPERIENCE_SPEEDS,
@@ -66,7 +66,7 @@ describe("founder review build contract", () => {
       const save = build(checkpoint.id);
       const result = validateSave(save);
       expect(result.ok, checkpoint.id).toBe(true);
-      if (result.ok) expect(result.data.schemaVersion).toBe(6);
+      if (result.ok) expect(result.data.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     }
   });
 

@@ -5,7 +5,7 @@
 // - 生命周期监听只注册一次并随 shell.destroy 清理。
 import { OffsetClock } from "../core/time";
 import { buildDevSave, DEV_SAVE_NAMESPACE, devStateId } from "./devverify";
-import { ENDGAME_SAVE_NAMESPACE, newSaveId } from "../save/types";
+import { ENDGAME_SAVE_NAMESPACE, MAX_SUPPORTED_SCHEMA_VERSION, SAVE_NAMESPACE, newSaveId } from "../save/types";
 import { ensureEndgameSingularity } from "../economy/singularity";
 import { createGrowthFeedback } from "../economy/feel";
 import { getLocale, initLocale, localeFromCommand, setLocale, t } from "../i18n";
@@ -13,19 +13,13 @@ import { GameSession } from "./session";
 import { freshSaveData, LocalStorageSaveStorage } from "../save/storage";
 import { SaveRepository } from "../save/repository";
 import { createAppShell, type AppShell, type CommandHandler } from "../ui/render";
-import {
-  TapRewardedAdController,
-} from "../platform/taptap-ads";
-import type { RewardedAdOfferState } from "../save/types";
-import { TapCloudSaveController } from "../platform/taptap-cloud-save";
-import { TapLeaderboardController } from "../platform/taptap-leaderboards";
-import { GameAudio } from "../audio/game-audio";
+import { feedbackKindForCommand, GameAudio } from "../audio/game-audio";
+import { foregroundGameSeconds, uiRenderDue } from "./frame-clock";
 import {
   PLATFORM_FEATURE_REASONS,
-  PLATFORM_FEATURES,
-  PLATFORM_REVIEW_CLOUD_SLOT_NAME,
   PLATFORM_REVIEW_MODE,
   PLATFORM_REVIEW_SAVE_NAMESPACE,
+  isUnavailablePlatformCommand,
 } from "../platform/features";
 import {
   shouldMigrateExistingReviewSave,
@@ -41,12 +35,15 @@ let activeShell: AppShell | null = null;
 let boundContainer: HTMLElement | null = null;
 let onVisibility: (() => void) | null = null;
 let onBeforeUnload: (() => void) | null = null;
-let activeRewardedAdController: TapRewardedAdController | null = null;
-let removeRewardedAdSubscription: (() => void) | null = null;
 let activeAudio: GameAudio | null = null;
-let activeCloudSaveController: TapCloudSaveController | null = null;
-let removeCloudSaveSubscription: (() => void) | null = null;
 const PLATFORM_REVIEW_SPEEDS = new Set([1, 2, 4, 8, 16, 32, 64, 128, 256]);
+/**
+ * 负责人自然体验候选：从根地址进入正式自然流程；调试倍率只从菜单命令进入。
+ * 该构建仍可使用平台Review隔离槽，但拒绝所有URL快捷入口，避免把检查点带给玩家。
+ */
+const OWNER_NATURAL_REVIEW_MODE = import.meta.env.VITE_OWNER_NATURAL_REVIEW === "1";
+/** 正式交付包：在编译期关闭验收档、终局快捷入口与体验倍率。 */
+const RELEASE_PACKAGE_MODE = import.meta.env.VITE_RELEASE_PACKAGE === "1";
 
 /** 供测试/审计使用：当前活动 rAF 句柄（null 表示无活动循环） */
 export function activeLoopCount(): number {
@@ -78,29 +75,33 @@ export function boot(): void {
     teardown();
   }
 
-  const storage = new LocalStorageSaveStorage(
-    PLATFORM_REVIEW_MODE ? PLATFORM_REVIEW_SAVE_NAMESPACE : undefined,
-  );
   const clock = new OffsetClock();
+  initLocale();
   const reviewOverride: ReviewRuntimeOverride | null =
-    window.__CT_REVIEW_RUNTIME_OVERRIDE__?.kind === "founder-review-v2"
+    !RELEASE_PACKAGE_MODE && window.__CT_REVIEW_RUNTIME_OVERRIDE__?.kind === "founder-review-v2"
       ? window.__CT_REVIEW_RUNTIME_OVERRIDE__
       : null;
   // 开发加速只允许与合法隔离验收档同时启用，避免查询参数污染正式存档。
   const devParams = new URLSearchParams(window.location.search);
   // 隔离验收模式：独立存档命名空间，不影响正式档
-  const verifyStateId = reviewOverride ? null : devStateId();
+  const verifyStateId = RELEASE_PACKAGE_MODE || reviewOverride || OWNER_NATURAL_REVIEW_MODE ? null : devStateId();
   const devEnabled = verifyStateId !== null;
   // CARD-01 隔离终局入口：?endgame=1 使用独立实验命名空间，不影响正式档与 Review v2。
-  const endgameEnabled = reviewOverride == null && !devEnabled && devParams.get("endgame") === "1";
+  const endgameEnabled = !RELEASE_PACKAGE_MODE && !OWNER_NATURAL_REVIEW_MODE
+    && reviewOverride == null && !devEnabled && devParams.get("endgame") === "1";
+  const formalPlatformMode = reviewOverride == null && !devEnabled && !endgameEnabled;
   const requestedPlatformSpeed = Number(devParams.get("speed") ?? "1");
   let runtimeSpeed = reviewOverride
     ? reviewOverride.speed
     : devEnabled
       ? Math.max(1, Number(devParams.get("speed") ?? "1") || 1)
-      : PLATFORM_REVIEW_MODE && PLATFORM_REVIEW_SPEEDS.has(requestedPlatformSpeed)
+      : !OWNER_NATURAL_REVIEW_MODE && PLATFORM_REVIEW_MODE && PLATFORM_REVIEW_SPEEDS.has(requestedPlatformSpeed)
         ? requestedPlatformSpeed
         : 1;
+  // 单机正式档只按设备本地命名空间读取，绝不探测账号或云端身份。
+  const storage = new LocalStorageSaveStorage(
+    PLATFORM_REVIEW_MODE ? PLATFORM_REVIEW_SAVE_NAMESPACE : SAVE_NAMESPACE,
+  );
   const effectiveStorage = reviewOverride
     ? new LocalStorageSaveStorage(reviewOverride.namespace)
     : verifyStateId
@@ -166,7 +167,7 @@ export function boot(): void {
       const fresh = freshSaveData(now);
       ensureEndgameSingularity(fresh);
       effectiveStorage.save(fresh);
-    } else if (existing.singularity == null) {
+    } else if (existing.singularity == null && !(existing.schemaVersion > MAX_SUPPORTED_SCHEMA_VERSION)) {
       // 旧正式档：向前兼容迁移，不丢数据。
       if (ensureEndgameSingularity(existing)) {
         effectiveStorage.save(existing);
@@ -174,44 +175,20 @@ export function boot(): void {
     }
   }
   const repository = new SaveRepository({ storage: effectiveStorage, nowMs: () => clock.now() });
-  initLocale();
+  // 清理旧占位节点；单机启动不等待平台回调或联网请求。
+  container.replaceChildren();
   const shell = createAppShell(container);
   const audio = new GameAudio();
   audio.install();
+  shell.setInteractionFeedbackHandler((kind) => audio.playFeedback(kind));
   activeAudio = audio;
-  const formalPlatformMode = reviewOverride == null && !devEnabled && !endgameEnabled;
-  const cloudSave = formalPlatformMode && PLATFORM_FEATURES.cloudSave
-    ? new TapCloudSaveController({
-        slotName: PLATFORM_REVIEW_MODE ? PLATFORM_REVIEW_CLOUD_SLOT_NAME : undefined,
-      })
-    : null;
-  const leaderboards = formalPlatformMode && PLATFORM_FEATURES.leaderboard ? new TapLeaderboardController() : null;
-  activeCloudSaveController = cloudSave;
-  const leaderboardStatus = leaderboards?.supported()
-    ? "platform.connected"
-    : PLATFORM_FEATURES.leaderboard
-      ? "platform.notConnected"
-      : PLATFORM_FEATURE_REASONS.leaderboard;
   shell.setPlatformStatus({
-    cloud: cloudSave?.getSnapshot().message ?? PLATFORM_FEATURE_REASONS.cloudSave,
-    leaderboard: leaderboardStatus,
-    platformReview: PLATFORM_REVIEW_MODE,
+    cloud: PLATFORM_FEATURE_REASONS.cloudSave,
+    leaderboard: PLATFORM_FEATURE_REASONS.leaderboard,
+    platformReview: !RELEASE_PACKAGE_MODE && PLATFORM_REVIEW_MODE,
     runtimeSpeed,
   });
-  if (cloudSave) {
-    removeCloudSaveSubscription = cloudSave.subscribe((snapshot) => {
-      shell.setPlatformStatus({
-        cloud: snapshot.lastSuccessAtMs > 0
-          ? `${snapshot.message} · platform.lastSuccess ${new Date(snapshot.lastSuccessAtMs).toLocaleString(getLocale())}`
-          : snapshot.message,
-        leaderboard: leaderboardStatus,
-        platformReview: PLATFORM_REVIEW_MODE,
-        runtimeSpeed,
-      });
-    });
-  }
-  let session: GameSession;
-  session = new GameSession({
+  const session = new GameSession({
     repository,
     clock,
     onOrderCompleted: () => {
@@ -219,42 +196,11 @@ export function boot(): void {
       shell.resetMetrics();
       shell.incrementOrderCompletion(m.orderCompletionCount + 1);
     },
-    onSave: (result) => {
-      if (!result.ok || !session) return;
-      cloudSave?.scheduleUpload(() => session.exportJson());
-      if (leaderboards?.supported()) void leaderboards.submitEligible(session.getState());
-    },
   });
 
-  const rewardedAd = formalPlatformMode && PLATFORM_FEATURES.rewardedAds
-    ? new TapRewardedAdController()
-    : null;
-  const playRewardedOffer = (offer: RewardedAdOfferState | null | undefined): void => {
-    if (!offer || !rewardedAd) return;
-    const isOffline = offer.kind === "offline_capacity";
-    const started = rewardedAd.show((completed) => {
-      if (!completed) {
-        session.cancelPendingSponsorAd(offer.eventId);
-        shell.showToast(t("toast.adIncomplete"));
-        return;
-      }
-      const granted = session.grantRewardedAd(offer.eventId);
-      shell.showToast(granted.ok
-        ? (isOffline ? t("toast.offlineCapacityBoost") : t("toast.incomeBoost"))
-        : t("toast.rewardUnavailable"));
-    });
-    if (!started) {
-      session.cancelPendingSponsorAd(offer.eventId);
-      shell.showToast(t("toast.adNotReady"));
-    }
-  };
-  if (rewardedAd) {
-    activeRewardedAdController = rewardedAd;
-    removeRewardedAdSubscription = rewardedAd.subscribe(() => undefined);
-    rewardedAd.init();
-  }
-
   const executeCommand: CommandHandler = (command, payload) => {
+    // UI 禁用之外再拒绝旧命令，防止残留入口或脚本触发任何平台副作用。
+    if (isUnavailablePlatformCommand(command)) return { ok: false, error: "platform_disabled" };
     if (command.startsWith("set_locale:")) {
       const locale = localeFromCommand(command);
       if (!locale) return { ok: false, error: "invalid_locale" };
@@ -264,13 +210,26 @@ export function boot(): void {
       window.location.reload();
       return { ok: true };
     }
+    // 正式包在编译期移除整条调速命令分支；验收包保持原有菜单调速能力。
+    if (!RELEASE_PACKAGE_MODE && command === "set_debug_speed") {
+      const speed = Number((payload as { speed?: number } | undefined)?.speed);
+      if (!formalPlatformMode || !PLATFORM_REVIEW_MODE || !PLATFORM_REVIEW_SPEEDS.has(speed)) {
+        return { ok: false, error: "debug_speed_forbidden" };
+      }
+      runtimeSpeed = speed;
+      return { ok: true };
+    }
     switch (command) {
       case "acquire_model":
         return session.acquireModel();
       case "train_model":
         return session.trainModel();
-      case "research_model":
-        return session.researchModel();
+      case "upgrade_recommended_blueprint":
+        return session.upgradeRecommendedBlueprint(
+          ((payload as { quantity?: number | "max" } | undefined)?.quantity ?? 1),
+        );
+      case "reset_talents":
+        return session.resetTalents();
       case "enable_automation":
         return session.enableAutomation();
       case "complete_stage2_settlement":
@@ -319,77 +278,6 @@ export function boot(): void {
         return session.claimOffline();
       case "claim_free_income_sponsor":
         return session.claimFreeIncomeSponsor();
-      case "resume_sponsor_ad": {
-        const offer = session.pendingRewardedAdOffer();
-        if (!offer) return { ok: false, error: "ad_offer_missing" };
-        if (!rewardedAd || rewardedAd.getSnapshot().state !== "ready") {
-          shell.showToast(rewardedAd ? t("toast.adLoading") : t("toast.adTapTapOnly"));
-          return { ok: false, error: "ad_not_ready" };
-        }
-        queueMicrotask(() => playRewardedOffer(offer));
-        return { ok: true };
-      }
-      case "cancel_pending_sponsor_ad": {
-        const offer = session.pendingRewardedAdOffer();
-        return offer ? session.cancelPendingSponsorAd(offer.eventId) : { ok: false, error: "ad_offer_missing" };
-      }
-      case "cloud_upload": {
-        if (!cloudSave?.supported()) {
-          shell.showToast(t("toast.cloudUnsupported"));
-          return { ok: false, error: "cloud_unsupported" };
-        }
-        void cloudSave.upload(session.exportJson(), true).then((result) => {
-          if (result.ok) {
-            shell.showToast(t("toast.cloudBackupDone"));
-            return;
-          }
-          if (result.conflict) {
-            shell.confirmDialog({
-              title: t("cloud.conflictTitle"),
-              body: `${t(result.error ?? "cloud.conflictBody")}\n\n${t("cloud.conflictAdvice")}`,
-              confirmText: t("cloud.confirmOverride"),
-              onConfirm: () => {
-                void cloudSave.upload(session.exportJson(), true, true).then((forced) => {
-                  shell.showToast(forced.ok ? t("toast.cloudOverridden") : t(forced.error ?? "toast.cloudOverrideFailed"));
-                });
-              },
-            });
-            return;
-          }
-          shell.showToast(t(result.error ?? "toast.cloudBackupFailed"));
-        });
-        return { ok: true };
-      }
-      case "cloud_restore": {
-        if (!cloudSave?.supported()) {
-          shell.showToast(t("toast.cloudUnsupported"));
-          return { ok: false, error: "cloud_unsupported" };
-        }
-        shell.confirmDialog({
-          title: t("cloud.restoreTitle"),
-          body: t("cloud.restoreBody"),
-          confirmText: t("cloud.restoreConfirm"),
-          onConfirm: () => {
-            void cloudSave.download().then((downloaded) => {
-              if (!downloaded.ok || !downloaded.saveJson) {
-                shell.showToast(t(downloaded.error ?? "toast.cloudRestoreFailed"));
-                return;
-              }
-              const imported = session.importJson(downloaded.saveJson);
-              shell.showToast(imported.ok ? t("toast.cloudRestored") : t("toast.cloudRestoreInvalid"));
-            });
-          },
-        });
-        return { ok: true };
-      }
-      case "set_debug_speed": {
-        const speed = Number((payload as { speed?: number } | undefined)?.speed);
-        if (!formalPlatformMode || !PLATFORM_REVIEW_MODE || !PLATFORM_REVIEW_SPEEDS.has(speed)) {
-          return { ok: false, error: "debug_speed_forbidden" };
-        }
-        runtimeSpeed = speed;
-        return { ok: true };
-      }
       case "save":
         return session.save("manual");
       case "export_json": {
@@ -408,18 +296,26 @@ export function boot(): void {
         if (!res.ok) shell.showToast(t(res.error ?? "toast.importFailed"));
         return res;
       }
-      case "reset":
-        {
-          const result = session.reset();
-          if (result.ok) shell.showToast(t("toast.resetDone"));
-          return result;
-        }
+      case "reset": {
+        const result = session.reset();
+        if (result.ok) shell.showToast(t("toast.resetDone"));
+        return result;
+      }
       default:
         if (command.startsWith("accept_order:")) {
           return session.acceptOrder(command.slice("accept_order:".length));
         }
+        if (command.startsWith("unlock_order:")) {
+          return session.unlockOrder(command.slice("unlock_order:".length));
+        }
+        if (command.startsWith("expand_order_slot:")) {
+          return session.expandOrderSlot(command.slice("expand_order_slot:".length));
+        }
         if (command.startsWith("claim_order:")) {
           return session.claimOrder(Number(command.slice("claim_order:".length)));
+        }
+        if (command.startsWith("claim_order_queue:")) {
+          return session.claimOrderQueue(command.slice("claim_order_queue:".length));
         }
         if (command.startsWith("upgrade_infra:")) {
           return session.upgradeInfra(command.slice("upgrade_infra:".length));
@@ -439,72 +335,85 @@ export function boot(): void {
         if (command.startsWith("choose_blueprint:")) {
           return session.chooseBlueprint(command.slice("choose_blueprint:".length));
         }
-        if (command.startsWith("prepare_sponsor_ad:")) {
-          if (!rewardedAd || rewardedAd.getSnapshot().state !== "ready") {
-            shell.showToast(rewardedAd ? t("toast.adLoading") : t("toast.adTapTapOnly"));
-            return { ok: false, error: "ad_not_ready" };
-          }
-          const kind = command.slice("prepare_sponsor_ad:".length);
-          if (kind !== "offline_capacity" && kind !== "income_boost") return { ok: false, error: "invalid_sponsor_kind" };
-          return session.prepareSponsorAd(kind);
+        if (command.startsWith("upgrade_blueprint:")) {
+          const [, modelId, rawQuantity = "1"] = command.split(":");
+          const quantity = rawQuantity === "max" ? "max" : Math.max(1, Number(rawQuantity) || 1);
+          return session.upgradeBlueprint(modelId, quantity);
         }
-        if (command.startsWith("open_leaderboard:")) {
-          const kind = command.slice("open_leaderboard:".length);
-          if (kind !== "fastest" && kind !== "wealth") return { ok: false, error: "invalid_leaderboard" };
-          if (!leaderboards?.supported()) {
-            shell.showToast(t("toast.leaderboardTapTapOnly"));
-            return { ok: false, error: "leaderboard_unsupported" };
-          }
-          void leaderboards.submitEligible(session.getState()).finally(() => {
-            void leaderboards.open(kind).then((result) => {
-              if (!result.ok) shell.showToast(t(result.error ?? "leaderboard.err.openFailed"));
-            });
-          });
-          return { ok: true };
+        if (command.startsWith("expand_server_scale:")) {
+          const [, serverId, rawQuantity = "1"] = command.split(":");
+          const quantity = rawQuantity === "max" ? "max" : Math.max(1, Number(rawQuantity) || 1);
+          return session.expandServerScale(serverId, quantity);
+        }
+        if (command.startsWith("allocate_talent:")) {
+          return session.allocateTalent(command.slice("allocate_talent:".length) as import("../save/types").TalentNodeId);
+        }
+        if (command.startsWith("claim_achievement:")) {
+          const result = session.claimAchievement(command.slice("claim_achievement:".length));
+          if (result.ok) shell.showToast(t("toast.talentPointClaimed"));
+          return result;
         }
         return { ok: false, error: "unknown_command" };
     }
   };
+  let lastUiRenderAtMs = Number.NEGATIVE_INFINITY;
+  // 只用于方案 E 本地验收面板：累计前台实际推进的游戏时间，不进存档。
+  let debugElapsedGameSec = 0;
+  const render = (nowMs = performance.now(), force = false) => {
+    if (!force && !uiRenderDue(lastUiRenderAtMs, nowMs)) return;
+    lastUiRenderAtMs = nowMs;
+    const vm = session.viewModel();
+    audio.setPhase(vm.stage, vm.iterationCount);
+    shell.render(vm);
+    shell.setDebugRuntime(vm, debugElapsedGameSec, runtimeSpeed);
+  };
+
   const commandHandler: CommandHandler = (command, payload) => {
     const beforeFeel = session.viewModel().feel;
     const result = executeCommand(command, payload);
     if (result.ok) {
       const feedback = createGrowthFeedback(command, beforeFeel, session.viewModel().feel);
       if (feedback) shell.showGrowthFeedback(feedback);
-      audio.playCue(command);
+      const interactionFeedback = feedbackKindForCommand(command);
+      if (interactionFeedback) audio.playFeedback(interactionFeedback);
+      render(performance.now(), true);
     }
-    if (result.rewardedAdOffer) queueMicrotask(() => playRewardedOffer(result.rewardedAdOffer));
     return result;
   };
   shell.setCommandHandler(commandHandler);
 
-  const render = () => {
-    const vm = session.viewModel();
-    audio.setPhase(vm.stage, vm.iterationCount);
-    shell.render(vm);
-  };
-  render();
+  render(performance.now(), true);
   shell.setVisualPaused(document.visibilityState === "hidden");
 
   // 帧循环：保存句柄，重复启动时先取消旧的
   let last = performance.now();
+  const resetFrameClock = () => {
+    last = performance.now();
+  };
   const loop = (now: number) => {
     if (activeRaf !== null) cancelAnimationFrame(activeRaf);
-    const dt = (now - last) / 1000;
+    const paused = document.visibilityState === "hidden";
+    const elapsedGameSec = foregroundGameSeconds(last, now, runtimeSpeed, paused);
     last = now;
-    advanceSessionTime(session, dt * runtimeSpeed);
-    render();
+    if (elapsedGameSec > 0) {
+      advanceSessionTime(session, elapsedGameSec);
+      debugElapsedGameSec += elapsedGameSec;
+      render(now);
+    }
     activeRaf = requestAnimationFrame(loop);
   };
   activeRaf = requestAnimationFrame(loop);
 
   // 生命周期：隐藏时保存（防重入，只绑定一次）
   onVisibility = () => {
+    // 浏览器/容器恢复时从当前时刻重新计帧，禁止把后台或广告驻留时间塞进首帧。
+    resetFrameClock();
     if (document.visibilityState === "hidden") {
       shell.setVisualPaused(true);
       session.save("visibility_hidden");
     } else {
       shell.setVisualPaused(false);
+      render(performance.now(), true);
     }
   };
   document.addEventListener("visibilitychange", onVisibility);
@@ -553,27 +462,11 @@ export function teardown(): void {
     activeShell.destroy();
     activeShell = null;
   }
-  if (removeRewardedAdSubscription) {
-    removeRewardedAdSubscription();
-    removeRewardedAdSubscription = null;
-  }
-  if (activeRewardedAdController) {
-    activeRewardedAdController.destroy();
-    activeRewardedAdController = null;
-  }
-  if (activeCloudSaveController) {
-    activeCloudSaveController.destroy();
-    activeCloudSaveController = null;
-  }
-  if (removeCloudSaveSubscription) {
-    removeCloudSaveSubscription();
-    removeCloudSaveSubscription = null;
-  }
   if (activeAudio) {
     activeAudio.destroy();
     activeAudio = null;
   }
-  delete window.__CT_REVIEW_RUNTIME_PROBE__;
+  if (!RELEASE_PACKAGE_MODE) delete window.__CT_REVIEW_RUNTIME_PROBE__;
   bootedContainer = null;
   boundContainer = null;
 }

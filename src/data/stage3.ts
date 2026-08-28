@@ -15,11 +15,14 @@ export interface InfrastructureDef {
 }
 
 export const INFRASTRUCTURES: InfrastructureDef[] = [
-  { id: "power", name: "infra.power.name", icon: "⚡", baseCost: 2_500_000, costGrowth: 1.9, keyLevels: [3, 6, 8], desc: "infra.power.desc" },
-  { id: "computeCards", name: "infra.computeCards.name", icon: "🖥️", baseCost: 3_200_000, costGrowth: 1.8, keyLevels: [3, 5, 7], desc: "infra.computeCards.desc" },
-  { id: "optical", name: "infra.optical.name", icon: "🔆", baseCost: 2_000_000, costGrowth: 1.9, keyLevels: [3, 5, 7], desc: "infra.optical.desc" },
-  { id: "storage", name: "infra.storage.name", icon: "💾", baseCost: 1_800_000, costGrowth: 2.0, keyLevels: [3, 5, 7], desc: "infra.storage.desc" },
+  { id: "power", name: "infra.power.name", icon: "⚡", baseCost: 10_000_000, costGrowth: 1.9, keyLevels: [3, 6, 8], desc: "infra.power.desc" },
+  { id: "computeCards", name: "infra.computeCards.name", icon: "🖥️", baseCost: 12_800_000, costGrowth: 1.8, keyLevels: [3, 5, 7], desc: "infra.computeCards.desc" },
+  { id: "optical", name: "infra.optical.name", icon: "🔆", baseCost: 8_000_000, costGrowth: 1.9, keyLevels: [3, 5, 7], desc: "infra.optical.desc" },
+  { id: "storage", name: "infra.storage.name", icon: "💾", baseCost: 7_200_000, costGrowth: 2.0, keyLevels: [3, 5, 7], desc: "infra.storage.desc" },
 ];
+
+/** R2/R3重建基建时抵消永久收入倍率的单价倍率。 */
+export const INFRASTRUCTURE_ROUND_COST_MULTIPLIERS = [1, 20, 20] as const;
 
 export function infraById(id: string): InfrastructureDef {
   const def = INFRASTRUCTURES.find((d) => d.id === id);
@@ -107,6 +110,8 @@ export interface FlagshipProjectDef {
   requiresStorage: number;
   /** 完成所需进度（进度由总算力驱动） */
   progressRequired: number;
+  /** R1/R2/R3启动建设资金；只保留单一现金门，不叠加累计收入门。 */
+  constructionCosts: readonly [number, number, number];
   /** 完成奖励 */
   reward: {
     money: number;
@@ -129,7 +134,8 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresRooms: 1,
     requiresCompute: 500,
     requiresStorage: 0,
-    progressRequired: 500,
+    progressRequired: 3000,
+    constructionCosts: [15_000_000_000, 77_760_000_000, 92_400_000_000],
     reward: { money: 3_000_000, researchProgress: 25, unlocksRoom: null, computeCardBoost: 1 },
     desc: "flagship.1.desc",
   },
@@ -141,7 +147,8 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresCompute: 5_000,
     requiresOptical: 3,
     requiresStorage: 2,
-    progressRequired: 4000,
+    progressRequired: 30000,
+    constructionCosts: [180_000_000_000, 210_600_000_000, 369_600_000_000],
     reward: { money: 10_000_000, researchProgress: 30, unlocksRoom: 3, rateBonus: 0.15 },
     desc: "flagship.2.desc",
   },
@@ -153,7 +160,8 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresCompute: 20_000,
     requiresOptical: 4,
     requiresStorage: 8,
-    progressRequired: 15000,
+    progressRequired: 60000,
+    constructionCosts: [2_500_000_000_000, 2_430_000_000_000, 3_696_000_000_000],
     reward: { money: 30_000_000, researchProgress: 40, unlocksRoom: 0 },
     desc: "flagship.3.desc",
   },
@@ -164,7 +172,7 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
  * - R1 解锁点：现有旗舰 project_3 完成后追加“区域算力协作网”（方案 C）。
  * - R2：全球算力骨干环（核心 1 已领后解锁；进度 cap 14/秒）。
  * - R3：行星算力统一场（核心 2 已领后解锁；进度 cap 18/秒）。
- * 数值校准来自 CARD-00 模拟（required 27000/45000/43000）。
+ * 数值校准来自当前有界经济验收（required 27000/51500/53500）。
  */
 export const ERA_PROJECTS: FlagshipProjectDef[] = [
   {
@@ -174,7 +182,8 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
-    progressRequired: 27000,
+    progressRequired: 25200,
+    constructionCosts: [6_000_000_000_000, 6_000_000_000_000, 6_000_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
     desc: "flagship.r1.desc",
   },
@@ -185,7 +194,8 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
-    progressRequired: 45000,
+    progressRequired: 25200,
+    constructionCosts: [3_726_000_000_000, 3_726_000_000_000, 3_726_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
     desc: "flagship.r2.desc",
   },
@@ -196,7 +206,8 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     requiresRooms: 3,
     requiresCompute: 0,
     requiresStorage: 0,
-    progressRequired: 43000,
+    progressRequired: 32400,
+    constructionCosts: [5_376_000_000_000, 5_376_000_000_000, 5_376_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
     desc: "flagship.r3.desc",
   },
@@ -243,7 +254,7 @@ export interface TechArchiveDef {
 
 export const TECH_ARCHIVES: TechArchiveDef[] = [
   { id: "tech_gpu_array", name: "tech.gpuArray.name", desc: "tech.gpuArray.desc", unlock: { infra: "computeCards", level: 5 }, passive: { compute: 0.05 } },
-  { id: "tech_power_modular", name: "tech.powerModular.name", desc: "tech.liquidCooling.desc", unlock: { infra: "power", level: 4 }, passive: { income: 0.04 } },
+  { id: "tech_power_modular", name: "tech.powerModular.name", desc: "tech.powerModular.desc", unlock: { infra: "power", level: 4 }, passive: { income: 0.04 } },
   { id: "tech_liquid_cooling", name: "tech.liquidCooling.name", desc: "tech.liquidCooling.desc", unlock: { infra: "power", level: 6 }, passive: { compute: 0.04 } },
   { id: "tech_optical_bus", name: "tech.opticalBus.name", desc: "tech.opticalBus.desc", unlock: { infra: "optical", level: 3 }, passive: { throughput: 0.06 } },
   { id: "tech_distributed_storage", name: "tech.distributedStorage.name", desc: "tech.distributedStorage.desc", unlock: { infra: "storage", level: 3 }, passive: null },

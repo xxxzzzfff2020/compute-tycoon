@@ -1,7 +1,7 @@
 // CARD-06：集中复验关键契约（不变量、exactly-once、回拨、永续边界）单元测试。
 import { describe, expect, it } from "vitest";
 import { freshSaveData } from "../../src/save/storage";
-import { settleOfflineReward, claimOfflineReward, hasPendingOfflineReward } from "../../src/save/offline";
+import { settleOfflineReward, claimOfflineReward, hasPendingOfflineReward, offlineRemainingSec } from "../../src/save/offline";
 import { incomePerSecond } from "../../src/economy/engine";
 import { claimCore, canEndgameIterate, canClaimCore } from "../../src/economy/singularity";
 import { claimFlagshipReward } from "../../src/economy/stage3";
@@ -54,8 +54,9 @@ describe("CARD-06 central re-verification", () => {
       if (claimOfflineReward(st, EPOCH + i * 1000, { incomePerSecond }).claimed) claimed += 1;
     }
     expect(claimed).toBe(1);
-    expect(hasPendingOfflineReward(st)).toBe(false);
-    // 回拨：不产生负时长/重复区间
+    // 部分领取：报价常驻但剩余为 0；回拨不产生负时长/重复区间
+    expect(hasPendingOfflineReward(st)).toBe(true);
+    expect(offlineRemainingSec(st.pendingOfflineReward!)).toBe(0);
     expect(settleOfflineReward(st, EPOCH - 60_000, { incomePerSecond })).toBeNull();
     expect(st.money).toBeGreaterThanOrEqual(q1!.money.toNumber());
   });

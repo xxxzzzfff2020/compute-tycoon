@@ -1,4 +1,5 @@
-// 存储接口：与游戏状态解耦。首版实现 localStorage，Codex 后续可替换为云备份。
+// 单机存储接口：与游戏状态解耦，仅使用本地存储与手工备份。
+import { ORDER_QUEUE_CAP } from "../data/content";
 import {
   SAVE_NAMESPACE,
   SAVE_SCHEMA_VERSION,
@@ -101,9 +102,33 @@ export function freshSaveData(nowMs: number): SaveData {
     automation: false,
     completedOrders: 0,
     activeOrders: [],
+    unlockedOrderIds: ["o1"],
+    orderSlotCapacity: { o1: ORDER_QUEUE_CAP },
     rentalCompute: { active: false, units: 0, unitCostPerSec: 0 },
     serverCount: 0,
     serverPower: 1,
+    growth: {
+      blueprintBaseLevels: {},
+      legacyModelId: null,
+      serverUnits: {},
+      serverBaseUnits: {},
+      talent: {
+        highestWorkshopLevel: 1,
+        claimedWorkshopLevels: [],
+        claimedCoreIds: [],
+        claimedAchievementIds: [],
+        achievementRecords: {},
+        pointsEarned: 0,
+        allocations: {
+          blueprint_power: 0,
+          blueprint_efficiency: 0,
+          blueprint_milestone: 0,
+          scale_power: 0,
+          scale_efficiency: 0,
+          scale_milestone: 0,
+        },
+      },
+    },
     computeCenterLevel: 0,
     technologyIterationCount: 0,
     permanentMultiplier: 1,
@@ -119,6 +144,7 @@ export function freshSaveData(nowMs: number): SaveData {
       lifetimeRevenue: 0,
       firstServerAwarded: false,
     },
+    company: { totalExperience: 0 },
     modelResearch: { progress: 0, stage2Draws: 0 },
     stage2: { settlementShown: false, completedAtMs: 0, stageIncome: 0 },
     stage3: {
@@ -148,6 +174,12 @@ export function freshSaveData(nowMs: number): SaveData {
         incomeBoostUntilMs: 0,
         lastObservedNowMs: nowMs,
       },
+    },
+    chronicle: {
+      maxObservedDeviceAtMs: nowMs,
+      clockAdjustmentCount: 0,
+      lastClockAdjustmentAtMs: 0,
+      milestones: {},
     },
     settings: { soundEnabled: true, notificationsEnabled: true },
     createdAtMs: nowMs,

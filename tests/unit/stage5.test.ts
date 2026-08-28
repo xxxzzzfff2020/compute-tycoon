@@ -20,6 +20,7 @@ import {
   manualResetAvailable,
   STAGE5_NODES,
   STAGE5_ERA_NAME,
+  STAGE5_FINAL_PROJECT,
   STAGE5_FINAL_PROJECT_ID,
 } from "../../src/economy/stage5";
 import { tick } from "../../src/economy/engine";
@@ -68,6 +69,12 @@ function stage5ReadyState(): SaveData {
     flagship: { activeId: null, progress: 0, startedAtMs: 0, completedIds: ["project_1", "project_2", "project_3"], pendingReward: null },
   };
   return s;
+}
+
+function prepareDysonConstruction(s: SaveData): void {
+  s.money = STAGE5_NODES.slice(1).reduce((sum, node) => sum + node.cost, 0)
+    + STAGE5_FINAL_PROJECT.constructionCost;
+  for (const node of STAGE5_NODES.slice(1)) expect(buyNode(s, node.id).ok).toBe(true);
 }
 
 describe("stage5: entry & exactly-once", () => {
@@ -141,6 +148,7 @@ describe("stage5: dyson sphere & story complete", () => {
   it("dyson completion unlocks perpetual exactly-once", () => {
     const s = stage5ReadyState();
     startStage5(s, now());
+    prepareDysonConstruction(s);
     expect(canStartFinalProject(s)).toBe(true);
     expect(startFinalProject(s).ok).toBe(true);
     for (let i = 0; i < 500000; i++) {
@@ -170,6 +178,7 @@ describe("stage5: dyson sphere & story complete", () => {
   it("perpetual blocks iteration but keeps manual reset", () => {
     const s = stage5ReadyState();
     startStage5(s, now());
+    prepareDysonConstruction(s);
     startFinalProject(s);
     for (let i = 0; i < 500000; i++) {
       if (advanceFinalProject(s, 100).completed) break;
@@ -186,13 +195,13 @@ describe("stage5: dyson sphere & story complete", () => {
 });
 
 describe("stage5: offline cap & exactly-once", () => {
-  it("stage5 offline base cap is 6h with 75% efficiency", async () => {
+  it("stage5 retains the original free 2h cap with 75% efficiency", async () => {
     const { OFFLINE_STAGE5_CAP_SECONDS, OFFLINE_STAGE5_EFFICIENCY, offlineCapSeconds, offlineEfficiency } = await import("../../src/save/offline");
     const s = stage5ReadyState();
     startStage5(s, now());
     expect(offlineCapSeconds(s)).toBe(OFFLINE_STAGE5_CAP_SECONDS);
     expect(offlineEfficiency(s)).toBe(OFFLINE_STAGE5_EFFICIENCY);
-    expect(OFFLINE_STAGE5_CAP_SECONDS).toBe(6 * 60 * 60);
+    expect(OFFLINE_STAGE5_CAP_SECONDS).toBe(2 * 60 * 60);
   });
 
   it("settle produces one quote; claim once; no duplicate", async () => {
@@ -203,7 +212,7 @@ describe("stage5: offline cap & exactly-once", () => {
     s.lastTickAtMs = now() - 10 * 60 * 60 * 1000;
     const q1 = settleOfflineReward(s, now(), { incomePerSecond });
     expect(q1).not.toBeNull();
-    expect(q1!.elapsedSec).toBe(6 * 60 * 60);
+    expect(q1!.elapsedSec).toBe(2 * 60 * 60);
     expect(hasPendingOfflineReward(s)).toBe(true);
     expect(settleOfflineReward(s, now(), { incomePerSecond })).toBeNull();
     const c1 = claimOfflineReward(s, now(), { incomePerSecond });

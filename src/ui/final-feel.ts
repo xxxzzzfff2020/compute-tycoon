@@ -22,6 +22,13 @@ export interface FinalFeelController {
   destroy(): void;
 }
 
+export interface FinalFeelOptions {
+  /** Optional host hook to reveal a hidden sub-tab before scrolling. */
+  beforeNavigate?: (action: string) => void;
+  /** Optional host hook: the standalone controller remains navigation-only by default. */
+  executeAction?: (action: string) => void;
+}
+
 const PARTICLE_COUNT = 10;
 const ACTION_SLOT_COUNT = 4;
 
@@ -44,7 +51,11 @@ function exactActionTarget(root: HTMLElement, action: string): HTMLElement | nul
   return null;
 }
 
-export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLElement): FinalFeelController {
+export function createFinalFeelController(
+  root: HTMLElement,
+  moneyElement: HTMLElement,
+  options: FinalFeelOptions = {},
+): FinalFeelController {
   const element = node("section", "final-feel-panel");
   element.setAttribute("aria-label", t("feel.aria.running"));
   element.dataset.tier = "idle";
@@ -104,9 +115,11 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   const actionSlots = node("div", "investment-summary-actions");
   const actionButtons: HTMLButtonElement[] = [];
   for (let index = 0; index < ACTION_SLOT_COUNT; index += 1) {
-    const button = node("button", "investment-action") as HTMLButtonElement;
+    const button = node("button", "investment-action investment-action-placeholder") as HTMLButtonElement;
     button.type = "button";
-    button.hidden = true;
+    button.disabled = true;
+    button.tabIndex = -1;
+    button.setAttribute("aria-hidden", "true");
     button.setAttribute("aria-label", t("feel.actions.locate"));
     actionSlots.appendChild(button);
     actionButtons.push(button);
@@ -121,7 +134,12 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   const growthReviewSummary = node("div", "growth-review-summary");
   growthReview.append(growthReviewKicker, growthReviewRoute, growthReviewMetrics, growthReviewSummary);
 
-  element.append(engine, feedback, actionSummary, growthReview);
+  // 只有短时反馈属于 HUD；阶段回顾进入正常文档流，避免遮挡页头和经营内容。
+  const hudFeedback = node("div", "feel-hud-feedback");
+  hudFeedback.setAttribute("aria-live", "polite");
+  hudFeedback.append(feedback);
+
+  element.append(engine, growthReview, actionSummary, hudFeedback);
 
   let initialized = false;
   let previousActionIds = new Set<string>();
@@ -151,6 +169,9 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   }
 
   function patchActions(actions: FeelActionVM[]): void {
+    // 固定保留四个行动位；余额变化只切换内容，不能改变顶部列表高度。
+    actionSummary.hidden = false;
+    actionSummary.dataset.actionCount = String(actions.length);
     setText(actionTitle, t("feel.actions.available", { count: actions.length }));
     const recommended = actions[0];
     setText(
@@ -163,13 +184,20 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
     for (let index = 0; index < actionButtons.length; index += 1) {
       const button = actionButtons[index];
       const action = actions[index];
-      button.hidden = action == null;
       if (!action) {
+        button.disabled = true;
+        button.tabIndex = -1;
+        button.classList.add("investment-action-placeholder");
+        button.setAttribute("aria-hidden", "true");
         button.removeAttribute("data-feel-anchor");
         button.removeAttribute("data-feel-action-id");
         button.textContent = "";
         continue;
       }
+      button.disabled = false;
+      button.tabIndex = 0;
+      button.classList.remove("investment-action-placeholder");
+      button.removeAttribute("aria-hidden");
       button.dataset.feelAnchor = action.anchorAction;
       button.dataset.feelActionId = action.id;
       button.textContent = index === 0 ? `${t("feel.actions.goTo")} · ${action.label}` : action.label;
@@ -192,6 +220,10 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
   }
 
   function patch(feel: FeelViewModel): void {
+    // 新档还没有任何算力时，不用一整块“0 算力 / 等待业务”占据首屏。
+    // 获得首个模型或出现成长回顾后再渐进展开运行态反馈。
+    const showRunningLayer = feel.computeTier !== "idle" || feel.activity01 > 0 || feel.growthReview.visible;
+    element.hidden = !showRunningLayer;
     element.dataset.tier = feel.computeTier;
     element.dataset.running = String(!paused && feel.activity01 > 0);
     element.style.setProperty("--feel-activity", feel.activity01.toFixed(3));
@@ -268,14 +300,18 @@ export function createFinalFeelController(root: HTMLElement, moneyElement: HTMLE
     event.stopPropagation();
     const action = button.dataset.feelAnchor;
     if (!action) return;
+    options.beforeNavigate?.(action);
     const destination = exactActionTarget(root, action);
     if (!destination) return;
+    const destinationButton = destination.closest<HTMLButtonElement>("button");
+    if (destinationButton?.disabled || destination.classList.contains("disabled") || destination.getAttribute("aria-disabled") === "true") return;
     metrics.navigationCount += 1;
     destination.scrollIntoView?.({ behavior: "smooth", block: "center" });
     destination.focus?.({ preventScroll: true });
     destination.classList.remove("feel-target-focus");
     window.setTimeout(() => destination.classList.add("feel-target-focus"), 0);
     window.setTimeout(() => destination.classList.remove("feel-target-focus"), 900);
+    options.executeAction?.(action);
   };
   actionSummary.addEventListener("click", onActionClick);
 

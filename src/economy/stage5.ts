@@ -23,9 +23,9 @@ export const STAGE5_NODES: ReadonlyArray<{
   incomeMult: number;
 }> = [
   { id: "solar_array", name: "stage5.node.solarArray.name", icon: "☀️", cost: 0, incomeMult: 1 },
-  { id: "stellar_node", name: "stage5.node.stellarNode.name", icon: "⭐", cost: 7.2e11, incomeMult: 1.8 },
-  { id: "dyson_cloud", name: "stage5.node.dysonCloud.name", icon: "🌫️", cost: 7.2e12, incomeMult: 3 },
-  { id: "stellar_model", name: "stage5.node.stellarModel.name", icon: "🌠", cost: 7.2e13, incomeMult: 5 },
+  { id: "stellar_node", name: "stage5.node.stellarNode.name", icon: "⭐", cost: 1.862e13, incomeMult: 1.8 },
+  { id: "dyson_cloud", name: "stage5.node.dysonCloud.name", icon: "🌫️", cost: 2.352e14, incomeMult: 3 },
+  { id: "stellar_model", name: "stage5.node.stellarModel.name", icon: "🌠", cost: 1.176e15, incomeMult: 5 },
 ];
 
 /** 宇宙模型包装：仅展示名称/图标（不增加独立抽取、配置或复杂槽位）。 */
@@ -136,13 +136,14 @@ export function stage5IncomePerSecond(state: SaveData, nowMs = Date.now()): Deci
 }
 
 // ---------- 戴森算力球 ----------
-/** 唯一最终巨构：戴森算力球（最终RC：约8小时在线等效，cap=30/秒）。 */
+/** 唯一最终巨构：价格承担等待，进度条只保留约4小时施工反馈。 */
 export const STAGE5_FINAL_PROJECT = {
   id: STAGE5_FINAL_PROJECT_ID,
   name: "stage5.dysonSphere",
   icon: "🔮",
   desc: "stage5.dysonSphereDesc",
-  progressRequired: 864000,
+  constructionCost: 3.136e15,
+  progressRequired: 432000,
   progressCapPerSec: 30,
 };
 
@@ -161,6 +162,8 @@ export function buildLegendaryArchive(state: SaveData, completedAtMs: number): L
 export function canStartFinalProject(state: SaveData): boolean {
   if (!stage5Entered(state)) return false;
   const s5 = state.singularity!.stage5!;
+  if (!STAGE5_NODES.every((node) => s5.nodes.includes(node.id))) return false;
+  if (new Decimal(state.money).lt(STAGE5_FINAL_PROJECT.constructionCost)) return false;
   if (s5.completedProjectIds.includes(STAGE5_FINAL_PROJECT_ID)) return false;
   if (s5.activeProjectId != null) return false;
   return s5.pendingRewardProjectId == null;
@@ -168,6 +171,7 @@ export function canStartFinalProject(state: SaveData): boolean {
 
 export function startFinalProject(state: SaveData): { ok: boolean; error?: string } {
   if (!canStartFinalProject(state)) return { ok: false, error: "not_ready" };
+  state.money = toStoredBig(new Decimal(state.money).minus(STAGE5_FINAL_PROJECT.constructionCost));
   state.singularity!.stage5 = {
     ...state.singularity!.stage5!,
     activeProjectId: STAGE5_FINAL_PROJECT_ID,

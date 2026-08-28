@@ -2,6 +2,7 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { JSDOM } from "jsdom";
 import { performance as nodePerformance } from "node:perf_hooks";
+import { readFileSync } from "node:fs";
 import { GameSession } from "../../src/app/session";
 import { FakeClock } from "./helpers";
 import { MemorySaveStorage } from "../../src/save/storage";
@@ -9,6 +10,7 @@ import { SaveRepository } from "../../src/save/repository";
 import { createAppShell, type AppShell } from "../../src/ui/render";
 import { buildViewModel } from "../../src/economy/viewmodel";
 import { freshSaveData } from "../../src/save/storage";
+import { buildEndgameReviewSave } from "../../src/review/endgame-checkpoints";
 import {
   getLocale,
   initLocale,
@@ -46,6 +48,8 @@ function shellFor(container: HTMLElement, session: GameSession): AppShell {
     if (cmd === "acquire_model") return session.acquireModel();
     if (cmd.startsWith("accept_order:")) return session.acceptOrder(cmd.slice("accept_order:".length));
     if (cmd.startsWith("claim_order:")) return session.claimOrder(Number(cmd.slice("claim_order:".length)));
+    if (cmd.startsWith("claim_order_queue:")) return session.claimOrderQueue(cmd.slice("claim_order_queue:".length));
+    if (cmd.startsWith("claim_order_queue:")) return session.claimOrderQueue(cmd.slice("claim_order_queue:".length));
     if (cmd === "claim_offline") return session.claimOffline();
     return { ok: false, error: "unknown" };
   });
@@ -82,6 +86,35 @@ describe("i18n dictionaries", () => {
     expect(text).not.toMatch(/(^|\s)(prestige|archive|toast|feel|story|hall|cloud|menu)\.[a-z]/);
     shell.destroy();
   });
+
+  it("uses current Training, Blueprint, ad, and platform terminology", () => {
+    const zhText = Object.values(zhCN).join("\n");
+    const enText = Object.values(enUS).join("\n");
+
+    expect(zhText).not.toMatch(/模型研修|模型与研发|蓝图研发|免费充能|等待充能|继续充能|真容器|等待平台验证|已收入荣誉馆|Lv\.2680|Lv\.5000/);
+    expect(enText).not.toMatch(/Hall of Honor|Blueprint research|waiting to charge|Resume charging|real container|awaits platform verification|Model Mastery|Lv\.2680|Lv\.5000/);
+    expect(zhCN["section.stage3Model"]).toBe("① 模型训练");
+    expect(enUS["section.stage3Model"]).toBe("① Model Training");
+    expect(zhCN["stage3.blueprintChoice3"]).toContain("自动解锁");
+    expect(enUS["stage3.blueprintChoice3"]).toContain("Automatically unlock");
+    expect(zhCN["stage3.infrastructureCurrentBottleneck"]).toBe("当前收入瓶颈");
+    expect(enUS["stage3.infrastructureCurrentBottleneck"]).toBe("Current Income Bottleneck");
+    expect(zhCN["stage3.infrastructurePressure"]).toBe("瓶颈压力 {percent}%");
+    expect(enUS["stage3.infrastructurePressure"]).toBe("Bottleneck pressure {percent}%");
+    expect(zhCN["stage3.infrastructureStorageEffect"]).toContain("工程资金奖励");
+    expect(enUS["stage3.infrastructureStorageEffect"]).toContain("project fund rewards");
+  });
+
+  it("localizes the single-player menu and disabled advertising", () => {
+    const source = readFileSync(new URL("../../src/app/main.ts", import.meta.url), "utf8");
+    expect(source).not.toContain("bootstrapPlatformAccount");
+    expect(source).toContain("initLocale();");
+    setLocale("en-US");
+    expect(t("standalone.status")).toContain("Single-player");
+    expect(t("standalone.adsButton")).toBe("Ads disabled");
+    expect(t("archive.tab.chronicle")).toBe("Chronicle");
+    expect(t("page.honor")).toBe("Honors");
+  });
 });
 
 describe("en-US rendering", () => {
@@ -98,7 +131,7 @@ describe("en-US rendering", () => {
     shell.render(buildViewModel(session.getState()));
     const text = container.textContent ?? "";
     expect(text).toContain("Startup Era · AI Studio");
-    expect(text).toContain("Model Blueprint");
+    expect(text).toContain("Blueprint Upgrades");
     expect(text).toContain("Acquire First Model");
     // 不应出现中文文案（带圈数字序号 ①②③④ 是跨语言装饰，允许）
     // 语言切换按钮以母语显示名称（简体中文/English）是刻意行为，其余不应出现中文
@@ -112,6 +145,31 @@ describe("en-US rendering", () => {
     expect(formatNumber(1234567)).toBe("1,234,567");
     expect(formatPercent(0.5)).toBe("50%");
     expect(t("app.currentMoney", { money: formatNumber(1234567) })).toBe("Funds 1,234,567");
+  });
+
+  it("translates Stage 4 and Stage 5 nodes, projects, and reward copy", () => {
+    setupDom("en-US");
+    initLocale();
+    const container = document.getElementById("app")!;
+    const shell = createAppShell(container);
+
+    const stage4Vm = buildViewModel(buildEndgameReviewSave("endgame_stage4_mid", 1_800_000_000_000));
+    shell.render(stage4Vm);
+    expect(container.textContent).toContain("LEO Compute Node");
+    expect(container.textContent).toContain("Earth-Moon Unified Compute Network");
+    expect(stage4Vm.stage4.finalProject.rewardText).toBe(
+      "Claim manually after completion: Earth-Moon story completion milestone",
+    );
+
+    const stage5Vm = buildViewModel(buildEndgameReviewSave("endgame_stage5_dyson_almost", 1_800_000_000_000));
+    shell.render(stage5Vm);
+    expect(container.textContent).toContain("Solar Collection Array");
+    expect(container.textContent).toContain("Dyson Compute Sphere");
+    expect(stage5Vm.stage5.finalProject.rewardText).toBe(
+      "Claim manually after completion: Galactic finale celebration · keep observing perpetual growth",
+    );
+    expect(container.textContent).not.toMatch(/stage[45]\.[a-z]/);
+    shell.destroy();
   });
 });
 
@@ -195,7 +253,7 @@ describe("fallback behavior", () => {
   it("never renders the literal key for known keys", () => {
     setupDom("zh-CN");
     expect(t("menu.title")).toBe("游戏菜单");
-    expect(t("model.notAcquired")).toBe("未获取模型 Lv.1");
+    expect(t("model.notAcquired")).toBe("未获取模型");
     expect(t("order.ready")).toBe("可领取");
     setLocale("en-US");
     expect(t("menu.title")).toBe("Game Menu");

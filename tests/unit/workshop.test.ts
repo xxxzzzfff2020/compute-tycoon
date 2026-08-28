@@ -28,8 +28,7 @@ describe("workshop: order grants", () => {
       clock.advance(1000);
       session.update(1);
     }
-    expect(session.getState().activeOrders[0].status).toBe(1);
-    session.claimOrder(0);
+    expect(session.getState().activeOrders).toHaveLength(0);
     // 资金增加（净收入）
     expect(session.getState().money).toBeGreaterThan(0);
     // 经验增加（按订单毛收入折算）

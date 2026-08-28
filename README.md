@@ -2,11 +2,13 @@
 
 > An open-source incremental AI infrastructure tycoon game — and a reproducible case study of AI-agent-driven game development with human product governance.
 
-**Compute Tycoon** is a fully playable H5 incremental/idle tycoon game about building a personal AI studio into a planetary-scale compute empire. It is also a reference implementation: the entire pipeline — product contract, agent roles, code, automated tests, economic simulation, device QA, ads/cloud adapters, release process — is open, documented, and reproducible from a clean clone.
+**Compute Tycoon** is a fully playable H5 incremental/idle tycoon game about building a personal AI studio into a galaxy-spanning compute empire. This GitHub edition uses the August 28, 2026 formal H5 release as its gameplay baseline, adapted for pure single-player: no account/UID lookup, cloud saves, online leaderboards, or advertising SDK. Development history and human product-governance documents remain available as a case study.
 
-**Play it live:** https://xxxzzzfff2020.github.io/compute-tycoon/
+**Play the single-player edition:** [Compute Tycoon](https://xxxzzzfff2020.github.io/compute-tycoon/)
 
-**Official site:** https://xxxzzzfff2020.github.io/compute-tycoon/official-site/
+**Official site:** [算力大亨官网](https://xxxzzzfff2020.github.io/compute-tycoon/official-site/)
+
+**单机版说明：**保留最新正式 H5 版的玩法、界面和素材。移除名人堂排名；广告按钮保留为禁用状态，不会播放或发奖。进度只保存在当前浏览器，可从菜单手动导出/导入。清理浏览器数据或更换设备前请备份。参见 [本次发布说明](docs/release/STANDALONE_H5_20260828.md)。
 
 ---
 
@@ -17,7 +19,7 @@ You start with one AI studio, research models, and accept compute orders. Grow f
 `AI Studio → Model R&D → Orders → First Server → Server Cluster → Compute Center → Technology Iterations → Off-world Compute Plan → Earth-Moon Compute Network → Dyson Compute Sphere`
 
 - **Locales:** zh-CN (default) and en-US, switchable in-game, preference stored outside the save schema
-- **Offline progression:** exactly-once offline receipts, stage-based offline caps
+- **Offline progression:** exactly-once offline receipts; the original free 2-hour allowance, without ad extensions
 - **Save safety:** schema-versioned localStorage saves, export/import, exactly-once claims
 - **No framework lock-in:** TypeScript + Vite + Vitest + decimal.js, DOM-first rendering
 
@@ -27,10 +29,10 @@ You start with one AI studio, research models, and accept compute orders. Grow f
 - Manual order flow → automation unlock → high-throughput server clusters
 - 8 servers → Stage 2 settlement → Compute Center (power / compute cards / optical / storage)
 - 3 machine rooms + 3 flagship projects, era/tech archives, blueprint milestones
-- Technology iterations (×1.5 / ×2.0 / ×2.0 permanent multipliers)
+- Three technology iterations with permanent progress and Singularity Core rewards
 - Singularity Cores (3), Off-world Compute Plan reveal, Stage 4 lunar network, Stage 5 Dyson sphere
-- Honor Hall / Archive: models, blueprints, tech, eras, cores, growth history, leaderboards
-- Platform adapters for rewarded ads, cloud save, leaderboards — runtime-injected, safe fallbacks
+- Local Honors / Archive: models, blueprints, tech, eras, cores, achievements, personal chronicle
+- Disabled ad entries with no rewards or free replacement; no platform SDK is loaded or probed
 - Fully documented i18n layer (`src/i18n/`), 760+ keys per locale
 
 ## Tech Stack
@@ -43,7 +45,7 @@ You start with one AI studio, research models, and accept compute orders. Grow f
 | Numbers | decimal.js |
 | Icons | lucide |
 | State/Save | localStorage, versioned schema + validation |
-| Platform | TapTap adapters via runtime `tap` object (ads / cloud save / leaderboards) |
+| Platform | Browser-local storage, optional local vibration; no account or remote gameplay services |
 
 ## Quick Start
 
@@ -51,13 +53,14 @@ You start with one AI studio, research models, and accept compute orders. Grow f
 npm install
 npm run dev          # local dev server
 npm test             # unit tests (Vitest)
-npm run e2e          # browser E2E (full loop: new save → iteration)
+npm run e2e          # command-flow E2E: first iteration and three cores → Dyson endgame
 npm run typecheck    # TypeScript check
 npm run build        # production build → dist/
+npm run build:release # equivalent formal build → dist-release/
 npm run simulate     # economy simulation (8 strategies × 1000 runs)
 ```
 
-Requires Node.js 20+ and npm. No platform accounts are needed to build or run the core game; TapTap features are optional at runtime.
+Use the Node.js 20 runtime configured in CI (latest 20.x) or a supported newer Node.js runtime, and npm. No platform account is needed. The default build starts at natural 1× speed and ignores review/checkpoint URL shortcuts. Build verification rejects platform SDK entrypoints and preserves the official-site artifact.
 
 ## Architecture
 
@@ -68,11 +71,11 @@ Requires Node.js 20+ and npm. No platform accounts are needed to build or run th
 - `src/save/` — storage, schema validation, migration, repository
 - `src/ui/` — DOM renderer (no Canvas main UI), final-feel layer
 - `src/i18n/` — locale dictionaries and runtime (zh-CN / en-US)
-- `src/platform/` — TapTap adapters (ads, cloud save, leaderboards)
+- `src/platform/` — disabled platform-feature boundary and local browser haptics
 - `src/audio/` — BGM controller
 - `src/review/` — isolated founder-concentrated review runtime (separate build)
 - `scripts/` — simulations, browser verification, release tooling
-- `tests/` — unit + E2E suites (383 unit tests at the RC baseline)
+- `tests/` — unit + E2E suites, including single-player and legacy-save regressions
 
 ## AI Development Workflow
 
@@ -90,8 +93,8 @@ This project is a **case study in AI-agent-driven game development**. The workfl
 
 ## Testing
 
-- **Unit (383 tests):** economy rules, save/migration, offline exactly-once, stage 3–5, platform adapters, i18n acceptance
-- **E2E:** full game loop from new save through first technology iteration (jsdom/Puppeteer)
+- **Unit:** economy rules, save/migration, offline exactly-once, stage 3–5, disabled ads/remote services, i18n acceptance
+- **E2E:** first technology iteration and three-core-to-Dyson command gates; long-duration resources are accelerated in test fixtures
 - **Economic simulation:** `npm run simulate` — 8 strategies × 1000 runs, budget/balance checks
 - **Review checkpoints:** isolated state-machine checkpoints for human experience reviews
 - **Evidence-driven QA:** browser matrices, runtime soaks, save/load round-trips — see `docs/reports/`
@@ -111,7 +114,7 @@ This project is a **case study in AI-agent-driven game development**. The workfl
 - `docs/SAVE_CONTRACT.md` — save / offline / idempotency contract
 - `docs/ai-development/` — the AI-agent development case study
 - `docs/oss/` — open-source scope, security audit, license audit, release plan
-- `docs/platform/` — platform capability audit
+- `docs/platform/` — historical platform capability audit (not active in this single-player edition)
 - `docs/release/` — release notes and checklists
 
 ## Contributing
@@ -131,6 +134,6 @@ Code: [MIT](LICENSE). Media assets in `public/assets/` and `public/official-site
 - [ ] Japanese / Korean / Traditional Chinese locales
 - [ ] Community-contributed content hooks
 - [ ] Webhook-driven issue/PR triage automation
-- [ ] Release automation via GitHub Actions
+- [x] GitHub Pages deployment via GitHub Actions
 
 *Roadmap reflects current intent; items are not commitments.*

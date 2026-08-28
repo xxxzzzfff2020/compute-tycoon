@@ -5,6 +5,7 @@ import { acquireFirstModel } from "../../src/economy/engine";
 import { ensureEndgameSingularity } from "../../src/economy/singularity";
 import { SaveRepository } from "../../src/save/repository";
 import { freshSaveData, MemorySaveStorage } from "../../src/save/storage";
+import { AUTOMATION_TOTAL_ORDER_CAP, ORDERS, ORDER_QUEUE_CAP } from "../../src/data/content";
 import { FakeClock, makeSession } from "./helpers";
 
 describe("release stability gates", () => {
@@ -22,7 +23,10 @@ describe("release stability gates", () => {
     expect(new Decimal(state.money).isFinite()).toBe(true);
     expect(new Decimal(state.money).gte(0)).toBe(true);
     expect(state.revision).toBeGreaterThanOrEqual(100);
-    expect(state.activeOrders.length).toBeLessThanOrEqual(4);
+    expect(state.activeOrders.length).toBeLessThanOrEqual(AUTOMATION_TOTAL_ORDER_CAP);
+    for (const order of ORDERS) {
+      expect(state.activeOrders.filter((active) => active.orderId === order.id).length).toBeLessThanOrEqual(ORDER_QUEUE_CAP);
+    }
   });
 
   it("survives 100 consecutive save/load cycles with the same identity and progression", () => {
