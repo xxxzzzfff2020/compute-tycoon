@@ -15,10 +15,10 @@ export interface InfrastructureDef {
 }
 
 export const INFRASTRUCTURES: InfrastructureDef[] = [
-  { id: "power", name: "infra.power.name", icon: "⚡", baseCost: 10_000_000, costGrowth: 1.9, keyLevels: [3, 6, 8], desc: "infra.power.desc" },
-  { id: "computeCards", name: "infra.computeCards.name", icon: "🖥️", baseCost: 12_800_000, costGrowth: 1.8, keyLevels: [3, 5, 7], desc: "infra.computeCards.desc" },
-  { id: "optical", name: "infra.optical.name", icon: "🔆", baseCost: 8_000_000, costGrowth: 1.9, keyLevels: [3, 5, 7], desc: "infra.optical.desc" },
-  { id: "storage", name: "infra.storage.name", icon: "💾", baseCost: 7_200_000, costGrowth: 2.0, keyLevels: [3, 5, 7], desc: "infra.storage.desc" },
+  { id: "power", name: "infra.power.name", icon: "⚡", baseCost: 10_000_000, costGrowth: 1.9, keyLevels: [3, 4, 6, 8, 10], desc: "infra.power.desc" },
+  { id: "computeCards", name: "infra.computeCards.name", icon: "🖥️", baseCost: 12_800_000, costGrowth: 1.8, keyLevels: [3, 5, 7, 10], desc: "infra.computeCards.desc" },
+  { id: "optical", name: "infra.optical.name", icon: "🔆", baseCost: 8_000_000, costGrowth: 1.9, keyLevels: [2, 3, 5, 8, 10], desc: "infra.optical.desc" },
+  { id: "storage", name: "infra.storage.name", icon: "💾", baseCost: 7_200_000, costGrowth: 2.0, keyLevels: [2, 3, 5, 8, 10], desc: "infra.storage.desc" },
 ];
 
 /** R2/R3重建基建时抵消永久收入倍率的单价倍率。 */
@@ -106,8 +106,10 @@ export interface FlagshipProjectDef {
   requiresCompute: number;
   /** 解锁所需光模块等级（工程 2 门槛） */
   requiresOptical?: number;
-  /** 计算存储奖励加成时的最低存储等级。 */
+  /** 工程启动所需存储等级。 */
   requiresStorage: number;
+  /** 计算存储奖励加成时的基准等级；与启动门槛分离，避免门槛调整污染奖励。 */
+  storageRewardBaseline?: number;
   /** 完成所需进度（进度由总算力驱动） */
   progressRequired: number;
   /** R1/R2/R3启动建设资金；只保留单一现金门，不叠加累计收入门。 */
@@ -134,6 +136,7 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresRooms: 1,
     requiresCompute: 500,
     requiresStorage: 0,
+    storageRewardBaseline: 0,
     progressRequired: 3000,
     constructionCosts: [15_000_000_000, 77_760_000_000, 92_400_000_000],
     reward: { money: 3_000_000, researchProgress: 25, unlocksRoom: null, computeCardBoost: 1 },
@@ -147,6 +150,7 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     requiresCompute: 5_000,
     requiresOptical: 3,
     requiresStorage: 2,
+    storageRewardBaseline: 2,
     progressRequired: 30000,
     constructionCosts: [180_000_000_000, 210_600_000_000, 369_600_000_000],
     reward: { money: 10_000_000, researchProgress: 30, unlocksRoom: 3, rateBonus: 0.15 },
@@ -158,8 +162,9 @@ export const FLAGSHIP_PROJECTS: FlagshipProjectDef[] = [
     icon: "🛰️",
     requiresRooms: 3,
     requiresCompute: 20_000,
-    requiresOptical: 4,
+    requiresOptical: 8,
     requiresStorage: 8,
+    storageRewardBaseline: 8,
     progressRequired: 60000,
     constructionCosts: [2_500_000_000_000, 2_430_000_000_000, 3_696_000_000_000],
     reward: { money: 30_000_000, researchProgress: 40, unlocksRoom: 0 },
@@ -181,7 +186,9 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     icon: "🛰️",
     requiresRooms: 3,
     requiresCompute: 0,
-    requiresStorage: 0,
+    requiresOptical: 10,
+    requiresStorage: 10,
+    storageRewardBaseline: 10,
     progressRequired: 25200,
     constructionCosts: [6_000_000_000_000, 6_000_000_000_000, 6_000_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
@@ -193,7 +200,9 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     icon: "🌍",
     requiresRooms: 3,
     requiresCompute: 0,
-    requiresStorage: 0,
+    requiresOptical: 10,
+    requiresStorage: 10,
+    storageRewardBaseline: 10,
     progressRequired: 25200,
     constructionCosts: [3_726_000_000_000, 3_726_000_000_000, 3_726_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },
@@ -205,7 +214,9 @@ export const ERA_PROJECTS: FlagshipProjectDef[] = [
     icon: "🌌",
     requiresRooms: 3,
     requiresCompute: 0,
-    requiresStorage: 0,
+    requiresOptical: 10,
+    requiresStorage: 10,
+    storageRewardBaseline: 10,
     progressRequired: 32400,
     constructionCosts: [5_376_000_000_000, 5_376_000_000_000, 5_376_000_000_000],
     reward: { money: 0, researchProgress: 0, unlocksRoom: null },

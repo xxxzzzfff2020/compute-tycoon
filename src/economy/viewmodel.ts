@@ -322,6 +322,8 @@ export interface OfflineVM {
   hasPending: boolean;
   /** 剩余未领取资金（已解锁但未入账部分）。 */
   money: string;
+  /** 本回执已经实际入账的资金；由快照费率 × 已领取秒数推导，不新增存档字段。 */
+  creditedMoney: string;
   /** 已领取入账时长。 */
   paidLabel: string;
   /** 剩余可领时长（0 表示已领完）。 */
@@ -1084,6 +1086,7 @@ export function buildViewModel(state: SaveData): ViewModel {
     : {
         hasPending: false,
         money: "",
+        creditedMoney: "",
         paidLabel: "",
         remainingLabel: "",
         allSettled: false,
@@ -1116,10 +1119,12 @@ export function buildViewModel(state: SaveData): ViewModel {
         ? new Decimal(reward.money).div(reward.elapsedSec)
         : new Decimal(0);
     const remainingMoney = formatMoney(rate.mul(remainingSec));
+    const creditedMoney = paidSec > 0 ? formatMoney(rate.mul(paidSec)) : "";
     const maxAds = Math.max(0, reward.adUnlocksMax ?? OFFLINE_AD_SLICE_LIMIT);
     return {
       hasPending: true,
       money: remainingMoney,
+      creditedMoney,
       paidLabel: formatTime(paidSec),
       remainingLabel: formatTime(remainingSec),
       allSettled,
@@ -1151,6 +1156,12 @@ export function buildViewModel(state: SaveData): ViewModel {
   const eff = effectiveEfficiency(state);
   const compute3 = stage3TotalCompute(state);
   const roomsOwned = roomCount(state);
+  const activeFlagshipSpeed = flagshipProgressPerSec(state);
+  const flagshipEtaLabel = (progressRequired: number, active: boolean): string => {
+    if (!active || activeFlagshipSpeed.lte(0)) return "";
+    const remainingProgress = Math.max(0, progressRequired - (state.stage3?.flagship?.progress ?? 0));
+    return formatTime(new Decimal(remainingProgress).div(activeFlagshipSpeed).ceil().toNumber());
+  };
   const previewProjectId = state.stage3?.flagship?.pendingReward?.projectId
     ?? state.stage3?.flagship?.activeId
     ?? FLAGSHIP_PROJECTS.find((project) => !(state.stage3?.flagship?.completedIds ?? []).includes(project.id))?.id
@@ -1256,6 +1267,7 @@ export function buildViewModel(state: SaveData): ViewModel {
       activeName: active ? p.name : null,
       progress: active ? (state.stage3?.flagship?.progress ?? 0) : 0,
       progressLabel: active ? `${Math.min(100, Math.floor(((state.stage3?.flagship?.progress ?? 0) / p.progressRequired) * 100))}%` : "",
+      etaLabel: flagshipEtaLabel(p.progressRequired, active),
       progressRequired: p.progressRequired,
       totalCompute: formatDisplayedCompute(compute3),
       pendingRewardId: pendingForThisProject ? p.id : null,
@@ -1277,6 +1289,8 @@ export function buildViewModel(state: SaveData): ViewModel {
       const requirements = [
         `${t("stage3.reqRooms")} ${roomsOwned}/3`,
         `${t("stage3.reqPrereq")}「${t("flagship.3.name")}」${(state.stage3?.flagship?.completedIds ?? []).includes("project_3") ? t("common.done") : t("stage3.notDone")}`,
+        `${t("stage3.reqOptical")} Lv.${infraLevel(state, "optical")}/Lv.${eraDef.requiresOptical ?? 0}`,
+        `${t("stage3.reqStorage")} Lv.${infraLevel(state, "storage")}/Lv.${eraDef.requiresStorage}`,
         `${t("stage3.constructionCost")} ${formatMoney(projectConstructionCost(state, eraDef.id) ?? 0)}`,
       ];
       if (previousCore) requirements.push(`${t("stage3.reqCore")} ${claimedCoreIds.has(previousCore) ? t("stage3.obtained") : t("stage3.notObtained")}`);
@@ -1291,6 +1305,7 @@ export function buildViewModel(state: SaveData): ViewModel {
         activeName: active ? eraDef.name : null,
         progress: active ? (state.stage3?.flagship?.progress ?? 0) : 0,
         progressLabel: active ? `${Math.min(100, Math.floor(((state.stage3?.flagship?.progress ?? 0) / eraDef.progressRequired) * 100))}%` : "",
+        etaLabel: flagshipEtaLabel(eraDef.progressRequired, active),
         progressRequired: eraDef.progressRequired,
         totalCompute: formatDisplayedCompute(compute3),
         pendingRewardId: pendingForThisProject ? eraDef.id : null,
@@ -1683,6 +1698,7 @@ export interface FlagshipVM {
   activeName: string | null;
   progress: number;
   progressLabel: string;
+  etaLabel: string;
   progressRequired: number;
   totalCompute: string;
   pendingRewardId: string | null;

@@ -73,6 +73,7 @@ import type { SaveRepository } from "../save/repository";
 import {
   claimOfflineReward,
   hasPendingOfflineReward,
+  offlineRewardSettled,
   settleOfflineReward,
   type OfflineQuote,
 } from "../save/offline";
@@ -255,10 +256,14 @@ export class GameSession {
     }
   }
 
-  /** 离线结算（启动时）：生成待领取报价，不自动入账 */
-  private settleOfflineAtBoot(): void {
-    const now = this.clock.now();
-    const hadPending = hasPendingOfflineReward(this.state);
+  /**
+   * 离线结算唯一入口：启动与同一 WebView 的后台恢复共用。
+   * 生成待领取报价但不自动入账；返回是否产生了玩家可见的资金/工程/研发变化。
+   */
+  private settleOfflineAt(now: number): { visibleChanged: boolean; anchorChanged: boolean } {
+    const anchorBefore = this.state.lastTickAtMs;
+    const existing = this.state.pendingOfflineReward;
+    const hadUnsettledReceipt = existing != null && !offlineRewardSettled(existing);
     const quote = settleOfflineReward(this.state, now, {
       incomePerSecond: (s) => incomePerSecond(s),
     }, (s, q) => {
@@ -268,8 +273,9 @@ export class GameSession {
     });
     // 无资金报价时（income=0）：仍按同一有效时长推进研发/工程（不产生回执）。
     let sideEffectChanged = false;
-    const freeElapsedSec = !hadPending && now > this.state.lastTickAtMs
-      ? Math.min((now - this.state.lastTickAtMs) / 1000, 2 * 60 * 60)
+    // 必须使用结算前锚点：settleOfflineReward 即使没有报价也会把锚点推进到 now。
+    const freeElapsedSec = !hadUnsettledReceipt && anchorBefore > 0 && now > anchorBefore
+      ? Math.min((now - anchorBefore) / 1000, 2 * 60 * 60)
       : 0;
     if (!quote && freeElapsedSec >= 5) {
       sideEffectChanged = this.applyOfflineSideEffects(this.state, null, freeElapsedSec);
@@ -277,9 +283,41 @@ export class GameSession {
     if (quote) {
       this.log.push(`离线收益 ${quote.elapsedSec}秒 ¥${quote.money.toFixed(0)} 待领取`);
     }
-    if (quote || sideEffectChanged) {
+    return {
+      visibleChanged: quote != null || sideEffectChanged,
+      anchorChanged: this.state.lastTickAtMs !== anchorBefore,
+    };
+  }
+
+  /** 离线结算（启动时）：生成待领取报价，不自动入账。 */
+  private settleOfflineAtBoot(): void {
+    const result = this.settleOfflineAt(this.clock.now());
+    if (result.visibleChanged || result.anchorChanged) {
       this.save("offline_settle");
     }
+  }
+
+  /**
+   * 真正从后台返回时结算一次隐藏区间；单机版不装配广告或平台生命周期。
+   * 保存失败则回滚内存态，让同一区间能在后续保存/重启时安全重试。
+   */
+  resumeFromBackground(): { ok: boolean; settled: boolean; error?: string } {
+    if (this.pendingReset) return { ok: false, settled: false, error: "reset_in_progress" };
+    const before = structuredClone(this.state);
+    const now = this.clock.now();
+    const result = this.settleOfflineAt(now);
+    this.lastTickMs = now;
+    this.elapsedSinceSave = 0;
+    if (!result.visibleChanged && !result.anchorChanged) {
+      return { ok: true, settled: false };
+    }
+    const saved = this.save("visibility_resume");
+    if (!saved.ok) {
+      this.state = before;
+      return { ok: false, settled: false, error: saved.error };
+    }
+    if (result.visibleChanged) this.emitChanged();
+    return { ok: true, settled: result.visibleChanged };
   }
 
   /** 应用离线侧效（研发/工程推进，仅一次）并填充回执；返回是否有任何状态变化。 */

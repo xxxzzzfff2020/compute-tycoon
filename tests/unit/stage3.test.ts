@@ -55,6 +55,7 @@ import {
 import { iterationResearchBonus } from "../../src/economy/stage3";
 import { ORDERS } from "../../src/data/content";
 import { COMMISSION_BONUS_DURATION_SEC } from "../../src/data/stage3";
+import { buildViewModel } from "../../src/economy/viewmodel";
 import type { SaveData } from "../../src/save/types";
 
 function makeState(): SaveData {
@@ -154,10 +155,10 @@ describe("stage3: infrastructure & bottleneck", () => {
   it("derives monotonic readiness from real Stage 3 requirements", () => {
     const s = stage3State();
     const expected = {
-      power: { next: 3, final: 6 },
-      computeCards: { next: 3, final: 7 },
-      optical: { next: 2, final: 5 },
-      storage: { next: 2, final: 8 },
+      power: { next: 3, final: 10 },
+      computeCards: { next: 3, final: 10 },
+      optical: { next: 2, final: 10 },
+      storage: { next: 2, final: 10 },
     } as const;
     for (const id of ["power", "computeCards", "optical", "storage"] as const) {
       const status = infrastructureReadiness(s, id);
@@ -253,6 +254,30 @@ describe("stage3: machine rooms", () => {
 });
 
 describe("stage3: flagship projects", () => {
+  it("requires optical and storage Lv8 before project_3 can start", () => {
+    const s = stage3State();
+    s.money = 1e30;
+    s.serverPower = 1_000_000_000;
+    s.stage3 = {
+      ...s.stage3,
+      machineRooms: [
+        { index: 1, id: "room_1", name: "r1", commissionedAtMs: 1 },
+        { index: 2, id: "room_2", name: "r2", commissionedAtMs: 1 },
+        { index: 3, id: "room_3", name: "r3", commissionedAtMs: 1 },
+      ],
+      infrastructure: { power: 10, computeCards: 10, optical: 8, storage: 7 },
+      flagship: {
+        activeId: null, progress: 0, startedAtMs: 0,
+        completedIds: ["project_1", "project_2"], pendingReward: null,
+      },
+    };
+    expect(canStartFlagship(s, "project_3")).toBe(false);
+    s.stage3.infrastructure.storage = 8;
+    expect(canStartFlagship(s, "project_3")).toBe(true);
+    s.stage3.infrastructure.optical = 7;
+    expect(canStartFlagship(s, "project_3")).toBe(false);
+  });
+
   it("flagship_project_single_active", () => {
     const s = stage3State();
     s.serverPower = 20_000_000; // 确保满足工程 2 的算力门槛
@@ -283,6 +308,42 @@ describe("stage3: flagship projects", () => {
     const before = s.stage3?.flagship?.progress ?? 0;
     advanceFlagship(s, 60);
     expect((s.stage3?.flagship?.progress ?? 0)).toBeGreaterThan(before);
+  });
+
+  it("shows a live ETA derived from authoritative project progress speed", () => {
+    const s = stage3State();
+    s.stage3 = {
+      ...s.stage3,
+      flagship: {
+        activeId: "project_1", progress: 0, startedAtMs: 1,
+        completedIds: [], pendingReward: null,
+      },
+    };
+    const first = buildViewModel(s).stage3.flagship.find((project) => project.id === "project_1");
+    expect(first?.etaLabel).not.toBe("");
+    expect(buildViewModel(s).stage3.flagship.find((project) => project.id === "project_2")?.etaLabel).toBe("");
+
+    advanceFlagship(s, 60);
+    const second = buildViewModel(s).stage3.flagship.find((project) => project.id === "project_1");
+    expect(second?.progress).toBeGreaterThan(first?.progress ?? 0);
+    expect(second?.etaLabel).not.toBe(first?.etaLabel);
+  });
+
+  it("keeps an already-active legacy project progressing below the new unlock gate", () => {
+    const s = stage3State();
+    s.stage3 = {
+      ...s.stage3,
+      infrastructure: { power: 8, computeCards: 7, optical: 4, storage: 3 },
+      projectProgress: 120,
+      flagship: {
+        activeId: "project_3", progress: 120, startedAtMs: 1,
+        completedIds: ["project_1", "project_2"], pendingReward: null,
+      },
+    };
+    advanceFlagship(s, 60);
+    expect(s.stage3.flagship?.activeId).toBe("project_3");
+    expect(s.stage3.flagship?.progress).toBeGreaterThan(120);
+    expect(s.stage3.flagship?.completedIds).toEqual(["project_1", "project_2"]);
   });
 
   it("flagship_reward_requires_manual_claim", () => {

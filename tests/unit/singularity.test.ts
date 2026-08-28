@@ -89,6 +89,7 @@ function endgameState(): SaveData {
       { index: 2, id: "room_2", name: "r2", commissionedAtMs: now() },
       { index: 3, id: "room_3", name: "r3", commissionedAtMs: now() },
     ],
+    infrastructure: { power: 10, computeCards: 10, optical: 10, storage: 10 },
     flagship: {
       activeId: null,
       progress: 0,
@@ -268,6 +269,17 @@ describe("singularity: schema & isolation", () => {
 });
 
 describe("singularity: core state machine", () => {
+  it("requires both optical and storage Lv10 before an era project can start", () => {
+    const s = endgameState();
+    s.stage3.infrastructure.optical = 9;
+    expect(canStartFlagship(s, "project_r1")).toBe(false);
+    s.stage3.infrastructure.optical = 10;
+    s.stage3.infrastructure.storage = 9;
+    expect(canStartFlagship(s, "project_r1")).toBe(false);
+    s.stage3.infrastructure.storage = 10;
+    expect(canStartFlagship(s, "project_r1")).toBe(true);
+  });
+
   it("R1 core requires era project completion and manual claim", () => {
     const s = endgameState();
     expect(canClaimCore(s)).toBe(false);
@@ -339,6 +351,7 @@ describe("singularity: core state machine", () => {
         { index: 2, id: "room_2", name: "r2", commissionedAtMs: now() },
         { index: 3, id: "room_3", name: "r3", commissionedAtMs: now() },
       ],
+      infrastructure: { power: 10, computeCards: 10, optical: 10, storage: 10 },
       flagship: {
         activeId: null,
         progress: 0,
@@ -362,6 +375,7 @@ describe("singularity: core state machine", () => {
         { index: 2, id: "room_2", name: "r2", commissionedAtMs: now() },
         { index: 3, id: "room_3", name: "r3", commissionedAtMs: now() },
       ],
+      infrastructure: { power: 10, computeCards: 10, optical: 10, storage: 10 },
       flagship: {
         activeId: null,
         progress: 0,

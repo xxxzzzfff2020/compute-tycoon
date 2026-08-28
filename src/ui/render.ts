@@ -2121,6 +2121,7 @@ function patchModel(vm: ViewModel): void {
       vm.offline.canWatchOfflineAd,
       vm.offline.canClaim,
       vm.offline.money,
+      vm.offline.creditedMoney,
       vm.offline.rawElapsedLabel,
       vm.offline.eligibleLabel,
       vm.offline.adUnlocksUsed,
@@ -2162,6 +2163,9 @@ function patchModel(vm: ViewModel): void {
         lines.push(t("offline.allClaimed"));
       } else {
         lines.push(t("offline.money", { value: vm.offline.money }));
+      }
+      if (vm.offline.creditedMoney) {
+        lines.push(t("offline.moneyCredited", { value: vm.offline.creditedMoney }));
       }
       const feelPreview = vm.feel.offlinePreview;
       if (feelPreview) {
@@ -2870,7 +2874,13 @@ function patchModel(vm: ViewModel): void {
       // P1：机房保留各自的主题图标；投产状态由卡片状态表达，
       // 不再让三座已投产机房退回为相同的通用勾选图标。
       card.appendChild(createGameObjectHeader(contentGameIcon(`room_${r.index}`, "server"), tr(r.name), {
-        subtitle: r.commissioned ? tr(r.scaleName) : r.index === 1 ? t("stage3.commissionRoom", { name: tr(r.name) }) : requirementText,
+        subtitle: r.index === 1 && r.commissioned
+          ? t("room.1.autoDesc")
+          : r.commissioned
+            ? tr(r.scaleName)
+            : r.index === 1
+              ? t("stage3.commissionRoom", { name: tr(r.name) })
+              : requirementText,
         badge: r.commissioned ? t("stage4.deployed") : `0${r.index}`,
       }));
       if (r.commissioned) {
@@ -2903,6 +2913,11 @@ function patchModel(vm: ViewModel): void {
         badge: active.progressLabel,
       });
       flagshipActiveEl.appendChild(activeHeader);
+      flagshipActiveEl.appendChild(el(
+        "div",
+        "flagship-eta",
+        t("stage3.estimatedRemaining", { value: active.etaLabel }),
+      ));
       const progress = activeHeader.querySelector<HTMLElement>(".flagship-active-progress");
       if (progress) syncProgress(progress, Number.parseFloat(active.progressLabel));
     } else {
@@ -2975,6 +2990,8 @@ function patchModel(vm: ViewModel): void {
         setText(prog as HTMLElement, `${t("stage3.progressLabel")}${t("common.colon")}${active.progressLabel} · ${t("stage3.contributeCompute")}${t("common.colon")}${active.totalCompute}`);
         syncProgress(prog as HTMLElement, Number.parseFloat(active.progressLabel));
       }
+      const eta = flagshipActiveEl.querySelector(".flagship-eta");
+      if (eta) setText(eta as HTMLElement, t("stage3.estimatedRemaining", { value: active.etaLabel }));
     } else if (!st.flagship.some((f) => f.pendingRewardId)) {
       flagshipActiveEl.style.display = "none";
     }

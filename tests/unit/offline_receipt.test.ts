@@ -1,5 +1,5 @@
 // CARD-04：离线时长、上限与回归回执（隔离终局命名空间；保持 exactly-once）。
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import Decimal from "decimal.js";
 import { freshSaveData } from "../../src/save/storage";
 import { normalizeSave } from "../../src/save/validate";
@@ -15,6 +15,7 @@ import {
   unlockOfflineRewardSlice,
 } from "../../src/save/offline";
 import { incomePerSecond } from "../../src/economy/engine";
+import * as engine from "../../src/economy/engine";
 import { startStage5, stage5Entered, startFinalProject, advanceFinalProject, STAGE5_FINAL_PROJECT, STAGE5_NODES } from "../../src/economy/stage5";
 import { startSpacePlan, startFinalProject as startS4Final, stage4Entered } from "../../src/economy/stage4";
 import { makeSession } from "./helpers";
@@ -240,6 +241,60 @@ describe("CARD-04: receipt drives same-cap side effects", () => {
     expect(hasPendingFinalRewardLike(state)).toBe(false);
     // 不自动领取/解锁永续
     expect(state.singularity?.perpetual).toBeNull();
+  });
+
+  it("same-session background resume advances an active project exactly once", () => {
+    const s = stage5State();
+    startFinalProject(s);
+    s.lastTickAtMs = now();
+    const { session, clock } = makeSession({ initial: { ...s } as Partial<SaveData> });
+    const before = session.getState().singularity?.stage5?.projectProgress ?? 0;
+
+    session.save("visibility_hidden");
+    clock.advance(10 * 60 * 1000);
+    expect(session.resumeFromBackground()).toEqual({ ok: true, settled: true });
+    const after = session.getState().singularity?.stage5?.projectProgress ?? 0;
+    expect(after).toBeGreaterThan(before);
+    expect(session.getState().pendingOfflineReward?.projectName).toBe("stage5.dysonSphere");
+    expect(session.getState().pendingOfflineReward?.projectProgressDelta).toBe(after - before);
+
+    expect(session.resumeFromBackground()).toEqual({ ok: true, settled: false });
+    expect(session.getState().singularity?.stage5?.projectProgress).toBe(after);
+  });
+
+  it.each([false, true])("zero-income resume advances projects once within the free cap (settled receipt: %s)", (keepSettledReceipt) => {
+    const s = stage5State();
+    expect(startFinalProject(s).ok).toBe(true);
+    if (keepSettledReceipt) {
+      s.pendingOfflineReward = {
+        startedAtMs: now() - 600_000, endedAtMs: now(),
+        elapsedSec: 600, rawElapsedSec: 600, eligibleSec: 600, capSec: OFFLINE_FREE_SECONDS,
+        adUnlocksUsed: 0, adUnlocksMax: 0,
+        moneyPerSec: 1, money: 600, paidSec: 600, claimed: true,
+        researchProgress: 0, projectProgressDelta: 0, projectName: null,
+      };
+    }
+    const zeroIncome = vi.spyOn(engine, "incomePerSecond").mockReturnValue(new Decimal(0));
+    try {
+      const { session, clock } = makeSession({ initial: s });
+      expect(session.save("visibility_hidden").ok).toBe(true);
+      const before = structuredClone(session.getState());
+      const expected = structuredClone(before);
+      advanceFinalProject(expected, OFFLINE_FREE_SECONDS);
+      clock.advance(3 * 60 * 60 * 1000);
+
+      expect(session.resumeFromBackground()).toEqual({ ok: true, settled: true });
+      const after = session.getState();
+      expect(after.singularity?.stage5?.projectProgress).toBeGreaterThan(before.singularity?.stage5?.projectProgress ?? 0);
+      expect(after.singularity?.stage5?.projectProgress).toBe(expected.singularity?.stage5?.projectProgress);
+      expect(after.pendingOfflineReward).toEqual(before.pendingOfflineReward);
+      expect(after.money).toBe(before.money);
+      expect(after.lastTickAtMs).toBe(clock.now());
+      expect(session.resumeFromBackground()).toEqual({ ok: true, settled: false });
+      expect(session.getState().singularity?.stage5?.projectProgress).toBe(after.singularity?.stage5?.projectProgress);
+    } finally {
+      zeroIncome.mockRestore();
+    }
   });
 });
 

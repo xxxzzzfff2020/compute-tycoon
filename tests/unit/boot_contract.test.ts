@@ -4,7 +4,9 @@ import { JSDOM } from "jsdom";
 import { performance as nodePerformance } from "node:perf_hooks";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SAVE_NAMESPACE, MAX_SUPPORTED_SCHEMA_VERSION } from "../../src/save/types";
+import { SAVE_NAMESPACE, MAX_SUPPORTED_SCHEMA_VERSION, type SaveData } from "../../src/save/types";
+import { freshSaveData } from "../../src/save/storage";
+import { GameSession } from "../../src/app/session";
 
 let teardownRef: (() => void) | null = null;
 
@@ -89,6 +91,51 @@ describe("boot runtime contract", () => {
     expect(dom.window.localStorage.getItem(SAVE_NAMESPACE)).toBe(future);
     teardown();
     expect(dom.window.localStorage.getItem(SAVE_NAMESPACE)).toBe(future);
+  });
+
+  it("只结算真实隐藏区间，重复 visible 和销毁后的事件不重复结算", async () => {
+    const dom = setupDom();
+    let now = 1_700_000_000_000;
+    let visibility: DocumentVisibilityState = "visible";
+    vi.spyOn(Date, "now").mockImplementation(() => now);
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibility });
+    // jsdom 不提供真实音频；本例只验证存档生命周期。
+    dom.window.localStorage.setItem("compute_tycoon_h5_audio_v1", JSON.stringify({ bgmEnabled: false }));
+    const base = freshSaveData(now);
+    base.modelProgress = { modelId: "codex", level: 3, trainingCount: 2 };
+    base.ownedModelIds = ["codex"];
+    base.serverCount = 1;
+    base.serverPower = 1.5;
+    dom.window.localStorage.setItem(SAVE_NAMESPACE, JSON.stringify(base));
+    const resume = vi.spyOn(GameSession.prototype, "resumeFromBackground");
+    const { boot, teardown } = await import("../../src/app/main");
+    teardownRef = teardown;
+    boot();
+
+    visibility = "hidden";
+    document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    now += 600_000;
+    visibility = "visible";
+    document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    const raw = dom.window.localStorage.getItem(SAVE_NAMESPACE)!;
+    const saved = JSON.parse(raw) as SaveData;
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(saved.pendingOfflineReward?.rawElapsedSec).toBe(600);
+    expect(saved.pendingOfflineReward?.paidSec).toBe(0);
+    expect(saved.money).toBe(base.money);
+
+    now += 60_000;
+    document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(dom.window.localStorage.getItem(SAVE_NAMESPACE)).toBe(raw);
+    teardown();
+    visibility = "hidden";
+    document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    now += 600_000;
+    visibility = "visible";
+    document.dispatchEvent(new dom.window.Event("visibilitychange"));
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(dom.window.localStorage.getItem(SAVE_NAMESPACE)).toBe(raw);
   });
 
   it("正式 shell 启动时会替换账号预检 modal，不会与经营 UI 共存", async () => {

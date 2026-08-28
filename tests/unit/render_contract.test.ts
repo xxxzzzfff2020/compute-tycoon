@@ -1260,6 +1260,10 @@ describe("stage3 render contract", () => {
     };
     session.save("project_start");
     shell.render(buildViewModel(session.getState()));
+    const activeCard = document.querySelector<HTMLElement>(".flagship-active");
+    const etaNode = activeCard?.querySelector<HTMLElement>(".flagship-eta") ?? null;
+    expect(etaNode?.textContent).toContain("预计剩余");
+    expect(activeCard?.children.item(1)).toBe(etaNode);
     const nodesStart = totalNodes();
     const fullBefore = shell.getMetrics().fullRenderCount;
     // 工程推进 60 秒（tick 驱动），高频渲染模拟 rAF
@@ -1274,6 +1278,8 @@ describe("stage3 render contract", () => {
     expect(shell.getElement()).toBe(rootNode);
     expect(totalNodes()).toBeLessThanOrEqual(nodesStart + 10);
     expect(count(".flagship-active")).toBe(1);
+    expect(document.querySelector(".flagship-eta")).toBe(etaNode);
+    expect(etaNode?.textContent).toContain("预计剩余");
     expect(count(".infra-grid")).toBe(1);
     expect(count(".room-list")).toBe(1);
   });
@@ -1941,8 +1947,30 @@ describe("CARD-04 offline return receipt", () => {
     const afterClaim = document.querySelector(".offline-card");
     expect(afterClaim).not.toBeNull();
     expect(afterClaim!.textContent ?? "").toContain("已领取 2小时");
+    expect(afterClaim!.textContent ?? "").toContain("本次已入账");
     expect(afterClaim!.textContent ?? "").not.toContain("观看广告");
     expect(afterClaim!.querySelector("[data-action^='prepare_sponsor_ad:']")).toBeNull();
+  });
+
+  it("renders the offline project name and delta without leaking template placeholders", () => {
+    setupDom();
+    const container = document.getElementById("app")!;
+    const { session } = makeHarness();
+    const state = session.getState();
+    state.pendingOfflineReward = {
+      startedAtMs: 1, endedAtMs: 601_000,
+      elapsedSec: 600, rawElapsedSec: 600, capSec: 2 * 60 * 60, eligibleSec: 600,
+      adUnlocksUsed: 0, adUnlocksMax: 0,
+      moneyPerSec: 1, money: 600, paidSec: 0, claimed: false,
+      researchProgress: 0, projectProgressDelta: 120, projectName: "flagship.r1.name",
+    };
+    const shell = shellFor(container, session);
+    shell.render(buildViewModel(state));
+    const text = document.querySelector(".offline-card")?.textContent ?? "";
+    expect(text).toContain("区域算力协作网 推进 +120");
+    expect(text).not.toContain("{value}");
+    expect(text).not.toContain("{name}");
+    expect(text).not.toContain("{delta}");
   });
 });
 

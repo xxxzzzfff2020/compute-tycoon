@@ -387,6 +387,7 @@ export function boot(): void {
 
   // 帧循环：保存句柄，重复启动时先取消旧的
   let last = performance.now();
+  let hiddenIntervalPending = document.visibilityState === "hidden";
   const resetFrameClock = () => {
     last = performance.now();
   };
@@ -404,14 +405,18 @@ export function boot(): void {
   };
   activeRaf = requestAnimationFrame(loop);
 
-  // 生命周期：隐藏时保存（防重入，只绑定一次）
+  // 生命周期：真实后台区间回到前台时结算一次，重复 visible 不重放。
   onVisibility = () => {
-    // 浏览器/容器恢复时从当前时刻重新计帧，禁止把后台或广告驻留时间塞进首帧。
+    // 从当前时刻重新计帧，后台时间仅走离线结算，不补进在线首帧。
     resetFrameClock();
     if (document.visibilityState === "hidden") {
       shell.setVisualPaused(true);
+      hiddenIntervalPending = true;
       session.save("visibility_hidden");
     } else {
+      const completedInterval = hiddenIntervalPending;
+      hiddenIntervalPending = false;
+      if (completedInterval) session.resumeFromBackground();
       shell.setVisualPaused(false);
       render(performance.now(), true);
     }

@@ -2,13 +2,13 @@
 
 > An open-source incremental AI infrastructure tycoon game — and a reproducible case study of AI-agent-driven game development with human product governance.
 
-**Compute Tycoon** is a fully playable H5 incremental/idle tycoon game about building a personal AI studio into a galaxy-spanning compute empire. This GitHub edition uses the August 28, 2026 formal H5 release as its gameplay baseline, adapted for pure single-player: no account/UID lookup, cloud saves, online leaderboards, or advertising SDK. Development history and human product-governance documents remain available as a case study.
+**Compute Tycoon** is a fully playable H5 incremental/idle tycoon game about building a personal AI studio into a galaxy-spanning compute empire. This GitHub edition uses the August 29, 2026 formal H5 release as its gameplay baseline, adapted for pure single-player: no account/UID lookup, cloud saves, online leaderboards, or advertising SDK. Development history and human product-governance documents remain available as a case study.
 
 **Play the single-player edition:** [Compute Tycoon](https://xxxzzzfff2020.github.io/compute-tycoon/)
 
 **Official site:** [算力大亨官网](https://xxxzzzfff2020.github.io/compute-tycoon/official-site/)
 
-**单机版说明：**保留最新正式 H5 版的玩法、界面和素材。移除名人堂排名；广告按钮保留为禁用状态，不会播放或发奖。进度只保存在当前浏览器，可从菜单手动导出/导入。清理浏览器数据或更换设备前请备份。参见 [本次发布说明](docs/release/STANDALONE_H5_20260828.md)。
+**单机版说明：**保留最新正式 H5 版的玩法、界面和素材。移除名人堂排名；广告按钮保留为禁用状态，不会播放或发奖。进度只保存在当前浏览器，可从菜单手动导出/导入。清理浏览器数据或更换设备前请备份。参见 [本次发布说明](docs/release/STANDALONE_H5_20260829.md)。
 
 ---
 
@@ -19,7 +19,7 @@ You start with one AI studio, research models, and accept compute orders. Grow f
 `AI Studio → Model R&D → Orders → First Server → Server Cluster → Compute Center → Technology Iterations → Off-world Compute Plan → Earth-Moon Compute Network → Dyson Compute Sphere`
 
 - **Locales:** zh-CN (default) and en-US, switchable in-game, preference stored outside the save schema
-- **Offline progression:** exactly-once offline receipts; the original free 2-hour allowance, without ad extensions
+- **Offline progression:** exactly-once receipts on launch and return from background; the original free 2-hour allowance, without ad extensions
 - **Save safety:** schema-versioned localStorage saves, export/import, exactly-once claims
 - **No framework lock-in:** TypeScript + Vite + Vitest + decimal.js, DOM-first rendering
 

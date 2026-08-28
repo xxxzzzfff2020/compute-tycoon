@@ -1209,6 +1209,13 @@ body {
 .flagship-active-name { color: #f2f5ff; font-size: 14px; font-weight: 900; }
 .flagship-reward,
 .flagship-active-progress { color: #b6c4dc; font-size: 12px; line-height: 1.5; }
+.flagship-eta {
+  margin-top: 6px;
+  color: #90a4c2;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
+}
 .flagship-completed { color: #69e2bc; font-size: 12px; font-weight: 800; }
 .flagship-locked { color: #7d8ca9; font-size: 11px; }
 .flagship-reward-ready { color: #ffe093; font-size: 13px; font-weight: 900; }

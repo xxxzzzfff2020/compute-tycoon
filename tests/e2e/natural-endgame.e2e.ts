@@ -37,7 +37,7 @@ function seedStage3Round(session: GameSession, completedIds: string[]): void {
     ...state.stage3,
     entered: true,
     enteredAtMs: state.updatedAtMs,
-    infrastructure: { power: 9, computeCards: 9, optical: 8, storage: 8 },
+    infrastructure: { power: 10, computeCards: 10, optical: 10, storage: 10 },
     machineRooms: [
       { index: 1, id: "room_1", name: "room.1", commissionedAtMs: state.updatedAtMs },
       { index: 2, id: "room_2", name: "room.2", commissionedAtMs: state.updatedAtMs },

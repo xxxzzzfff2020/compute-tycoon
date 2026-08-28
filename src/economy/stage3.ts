@@ -280,7 +280,7 @@ export function infrastructureReadiness(
   state: SaveData,
   id: Stage3InfrastructureId,
 ): InfrastructureReadiness {
-  const requirements = new Set<number>();
+  const requirements = new Set<number>(infraById(id).keyLevels);
   for (const room of MACHINE_ROOMS) {
     const level = room.requires[id];
     if (level > 0) requirements.add(level);
@@ -292,12 +292,12 @@ export function infrastructureReadiness(
     }
   }
   if (id === "optical") {
-    for (const project of FLAGSHIP_PROJECTS) {
+    for (const project of [...FLAGSHIP_PROJECTS, ...ERA_PROJECTS]) {
       if ((project.requiresOptical ?? 0) > 0) requirements.add(project.requiresOptical!);
     }
   }
   if (id === "storage") {
-    for (const project of FLAGSHIP_PROJECTS) {
+    for (const project of [...FLAGSHIP_PROJECTS, ...ERA_PROJECTS]) {
       if (project.requiresStorage > 0) requirements.add(project.requiresStorage);
     }
   }
@@ -536,6 +536,7 @@ export function flagshipUnlocked(state: SaveData, def: FlagshipProjectDef): bool
   const compute = stage3TotalCompute(state);
   if (compute.lt(def.requiresCompute)) return false;
   if (def.requiresOptical && infraLevel(state, "optical") < def.requiresOptical) return false;
+  if (def.requiresStorage && infraLevel(state, "storage") < def.requiresStorage) return false;
   return true;
 }
 
@@ -549,6 +550,8 @@ export function eraProjectUnlocked(state: SaveData, projectId: string): boolean 
   if (state.stage3?.flagship?.activeId) return false;
   if (state.stage3?.flagship?.pendingReward) return false;
   if ((state.stage3?.flagship?.completedIds ?? []).includes(projectId)) return false;
+  if ((def.requiresOptical ?? 0) > infraLevel(state, "optical")) return false;
+  if (def.requiresStorage > infraLevel(state, "storage")) return false;
   if (projectId === "project_r1") {
     // 方案 C：旗舰 project_3 完成后追加。
     return roomCount(state) >= 3 && (state.stage3?.flagship?.completedIds ?? []).includes("project_3");
@@ -607,7 +610,8 @@ export function flagshipProgressPerSec(state: SaveData): Decimal {
   if (eraDef && endgameMode(state)) {
     const compute = stage3TotalCompute(state);
     const cap = eraDef.id === "project_r3" ? 18 : 14;
-    return Decimal.min(compute.mul(0.001), new Decimal(cap));
+    const opticalSpeed = new Decimal(1).plus(infraLevel(state, "optical") * 0.04);
+    return Decimal.min(compute.mul(opticalSpeed).mul(0.001), new Decimal(cap));
   }
   const def = FLAGSHIP_PROJECTS.find((p) => p.id === activeId);
   if (!def) return new Decimal(0);
@@ -631,7 +635,8 @@ export function flagshipRewardMultiplier(state: SaveData, projectId: string): De
   }
   const def = FLAGSHIP_PROJECTS.find((project) => project.id === projectId);
   if (!def) return new Decimal(1);
-  const bonusLevels = Math.max(0, infraLevel(state, "storage") - def.requiresStorage);
+  const rewardBaseline = def.storageRewardBaseline ?? def.requiresStorage;
+  const bonusLevels = Math.max(0, infraLevel(state, "storage") - rewardBaseline);
   const bonus = Math.min(FLAGSHIP_STORAGE_REWARD_CAP, bonusLevels * FLAGSHIP_STORAGE_REWARD_PER_LEVEL);
   return new Decimal(1).plus(bonus);
 }
