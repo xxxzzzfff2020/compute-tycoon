@@ -36,7 +36,7 @@ jobs:
           test -f dist/official-site/styles.css
           test -f dist/official-site/site.js
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
